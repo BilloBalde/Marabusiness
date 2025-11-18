@@ -1,0 +1,12 @@
+*.sqlite*
+/vendor
+/node_modules
+/public/storage
+.env
+.env.backup
+/storage/*.key
+/public/hot
+/public/build
+/.idea
+/.vscode
+

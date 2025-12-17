@@ -11,7 +11,7 @@ use Livewire\Attributes\Title;
 use Spatie\Permission\Models\Role;
 use Livewire\Component;
 
-#[Title('Register Page - ECPG SA')]
+#[Title('Register Page - MARA BUSINESS')]
 class RegisterPage extends Component
 {
     public $name = '';

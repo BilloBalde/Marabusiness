@@ -6,25 +6,24 @@ use App\Models\Order;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-#[Title('Order Detail - EGPG SA')]
+#[Title('Order Detail - MARA BUSINESS')]
 class OrderDetailPage extends Component
 {
     public $order;
-    public $order_id;
 
     public function mount($order_id)
     {
-        $this->order = Order::where('id', $order_id)->firstOrFail();
+        $this->order = Order::with(['address', 'items.product', 'vendor.currency'])
+            ->findOrFail($order_id);
     }
 
     public function render()
     {
-        $address = $this->order->address;
-        $order_items = $this->order->items;
+        //dd($this->order);
         return view('livewire.order-detail-page', [
             'order' => $this->order,
-            'address' => $address,
-            'order_items' => $order_items,
+            'address' => $this->order->address ?? 'no address',
+            'order_items' => $this->order->items,
         ]);
     }
 }

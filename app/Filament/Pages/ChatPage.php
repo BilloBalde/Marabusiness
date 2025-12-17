@@ -16,6 +16,21 @@ class ChatPage extends Page
     public $customers;
     public $searchTerm = '';
 
+    public function getHeading(): string
+    {
+        return __('filament.nav.chat');
+    }
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('filament.groups.extras');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament.nav.chat');
+    }
+
     protected $listeners = ['customerSelected'];
 
     public function customerSelected($id)
@@ -83,15 +98,5 @@ class ChatPage extends Page
                 ->where('name', 'like', '%' . $this->searchTerm . '%')
                 ->get();
         }
-    }
-
-    public static function getNavigationLabel(): string
-    {
-        return 'Chat';
-    }
-
-    public static function getNavigationGroup(): ?string
-    {
-        return 'EXTRA';
     }
 }

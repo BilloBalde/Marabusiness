@@ -1,5 +1,5 @@
 <section class="px-6 py-20 mx-auto text-center max-w-7xl">
-    <h2 class="mb-12 text-4xl font-bold">Shop by Brand</h2>
+    <h2 class="mb-12 text-4xl font-bold">{{ __('ui.popular_brands.title') }}</h2>
     <div class="justify-center max-w-6xl px-4 py-4 mx-auto lg:py-0">
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-6 md:grid-cols-2">
             @foreach ($brands as $brand)

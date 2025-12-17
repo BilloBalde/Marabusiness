@@ -14,7 +14,6 @@ use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Models\Role;
 
 class UserResource extends Resource
@@ -25,20 +24,40 @@ class UserResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    public static function getNavigationLabel(): string
+    {
+        return __('filament.nav.users');
+    }
+
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
-        /** @var \App\Models\User| \Spatie\Permission\Traits\HasRoles $user */
-        if (!Filament::auth()->user()->hasRole('admin')) {
+        
+        // Get the authenticated user using Filament's auth
+        $authUser = Filament::auth()->user();
+        
+        if (!$authUser->hasRole('admin')) {
             // Get user IDs who have the admin role
             $adminRole = Role::where('name', 'admin')->first();
-
+            
             if ($adminRole) {
                 $adminUserIds = $adminRole->users()->pluck('id')->toArray();
                 $query->whereNotIn('id', $adminUserIds);
             }
+            
+            // If user is manager, only show vendors and customers
+            if ($authUser->hasRole('manager')) {
+                $vendorRole = Role::where('name', 'vendor')->first();
+                $customerRole = Role::where('name', 'customer')->first();
+                
+                $vendorUserIds = $vendorRole ? $vendorRole->users()->pluck('id')->toArray() : [];
+                $customerUserIds = $customerRole ? $customerRole->users()->pluck('id')->toArray() : [];
+                
+                $allowedUserIds = array_merge($vendorUserIds, $customerUserIds);
+                $query->whereIn('id', $allowedUserIds);
+            }
         }
-
+        
         return $query;
     }
 
@@ -65,33 +84,30 @@ class UserResource extends Resource
                     ->label('Password')
                     ->password()
                     ->dehydrated(fn($state) => filled($state))
-                    ->required(),
-                Select::make('roles')
-                    ->label('Roles')
-                    ->multiple()
-                    ->preload()
-                    ->relationship('roles', 'name')
+                    ->required(fn(string $context): bool => $context === 'create'),
+                
+                Select::make('role')
+                    ->label('Role')
                     ->options(function () {
                         $query = Role::query();
-
-                        // Hide the "admin" role unless the logged-in user is an admin
-                        /** @var \App\Models\User|\Spatie\Permission\Traits\HasRoles $user */
-                        if (!Auth::user()->hasRole('admin')) {
-                            $query->where('name', '!=', 'admin');
+                        
+                        // Get the authenticated user using Filament's auth
+                        $authUser = Filament::auth()->user();
+                        
+                        if ($authUser->hasRole('admin')) {
+                            // Admin can see all roles
+                            return $query->pluck('name', 'name');
+                        } elseif ($authUser->hasRole('manager')) {
+                            // Manager can only assign vendor and customer roles
+                            return $query->whereIn('name', ['vendor', 'customer'])->pluck('name', 'name');
+                        } else {
+                            // For other roles, hide admin
+                            return $query->where('name', '!=', 'admin')->pluck('name', 'name');
                         }
-
-                        return $query->pluck('name', 'id');
                     })
-                    ->searchable(),
-                /* Select::make('role')
-                    ->label('Role')
-                    ->options(Role::query()
-                    ->when(auth()->user()?->hasRole('admin') === false, fn ($q) => $q->where('name', '!=', 'admin'))
-                    ->pluck('name', 'name'))
                     ->default(fn (?User $record) => $record?->roles()->pluck('name')->first())
-                    ->dehydrated(false) // prevents trying to save it to users table
                     ->required()
-                    ->searchable(), // helpful for debug/testing */
+                    ->searchable(),
             ]);
     }
 
@@ -117,8 +133,18 @@ class UserResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->hidden(fn(User $record): bool => 
+                        // Hide edit action for admin users if current user is not admin
+                        !Filament::auth()->user()->hasRole('admin') && 
+                        $record->hasRole('admin')
+                    ),
+                Tables\Actions\DeleteAction::make()
+                    ->hidden(fn(User $record): bool => 
+                        // Hide delete action for admin users if current user is not admin
+                        !Filament::auth()->user()->hasRole('admin') && 
+                        $record->hasRole('admin')
+                    ),
                 Tables\Actions\ViewAction::make(),
             ])
             ->bulkActions([

@@ -31,6 +31,16 @@ class BrandResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-computer-desktop';
 
+    public static function getNavigationGroup(): ?string
+    {
+        return __('filament.groups.catalog');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament.nav.brands');
+    }
+
     protected static ?string $recordTitleAttribute = 'name';
     public static function form(Form $form): Form
     {

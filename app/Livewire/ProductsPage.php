@@ -5,81 +5,149 @@ namespace App\Livewire;
 use App\Helpers\CartManagement;
 use App\Livewire\Partials\Navbar;
 use App\Models\Product;
+use App\Models\VendorProduct;
+use App\Models\Category;
+use App\Models\Brand;
+use App\Models\Currency;
+use Livewire\Component;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
-use Livewire\Component;
+use Livewire\Attributes\On;
 use Livewire\WithPagination;
-use Jantinnerezo\LivewireAlert\Facades\LivewireAlert;
+use Livewire\Attributes\Layout;
 
+#[Layout('components.layouts.app')]
 class ProductsPage extends Component
 {
     use WithPagination;
-    #[Title('Products Page - ECPG SA')]
-    #[Url]
-    public $selectedCategories = [];
 
-    #[Url]
-    public $selectedBrands = [];
+    #[Title('Products - MARA BUSINESS')]
 
-    #[Url]
-    public $featured;
+    #[Url] public $selectedCategories = [];
+    #[Url] public $selectedBrands = [];
+    #[Url] public $featured = false;
+    #[Url] public $on_sale = false;
+    #[Url] public $price_range = 0;
+    #[Url] public $sort = 'latest';
+    #[Url] public $search;
 
-    #[Url]
-    public $on_sale;
+    public $currencyCode;   // selected currency (from session)
+    public $currencyRate = 1;
 
-    #[Url]
-    public $price_range = 0;
-
-    #[Url]
-    public $sort = 'latest';
-
-    // Method for adding the product in the cart
-
-    public function addToCart($product_id)
+    public function mount()
     {
-        $total_count = CartManagement::addItemToCart($product_id);
+        // load selected currency
+        $this->currencyCode = session('currency_code', 'USD');
 
-        $this->dispatch('update-cart-count', total_count: $total_count)->to(Navbar::class);
-
-        LivewireAlert::title('Produit Ajouté')
-            ->text('Le produit a été ajouté à votre panier')
-            ->success()
-            ->show();
-
+        // load rate
+        $this->currencyRate = Currency::where('code', $this->currencyCode)
+            ->value('rate_to_usd') ?? 1;
     }
+
+    /**
+     * React when navbar changes currency
+     */
+    #[On('currency-changed')]
+    public function updateCurrency(string $code)
+    {
+        $this->currencyCode = $code;
+        session(['currency_code' => $code]);
+
+        $this->currencyRate = Currency::where('code', $code)->value('rate_to_usd') ?? 1;
+
+        $this->resetPage();
+    }
+
+    public function updating($field)
+    {
+        $this->resetPage();
+    }
+
+    public function addToCart($vendor_product_id)
+    {
+        // Add item to cart with empty variations (since it's from homepage)
+        $total_count = \App\Helpers\CartManagement::addItemToCart(
+            vendor_product_id: $vendor_product_id,
+            quantity: 1,
+            selectedVariations: [],
+            custom_note: ''
+        );
+
+        $this->dispatch('cart-updated', total_count: $total_count)->to(Navbar::class);
+        $this->dispatch('cart-added');
+    }
+
+    /**
+     * Convert vendor price → USD → selected currency
+     */
+    private function convertPrice($price, $vendorRate)
+    {
+        if (!$price || $price <= 0) return 0;
+
+        $usd = $price * ($vendorRate ?: 1);
+        return $usd * $this->currencyRate;
+    }
+
     public function render()
     {
-        $productQuery = Product::query()
-            ->where('is_active', 1)
-            ->with(['category', 'brand'])
-            ->orderBy('created_at', 'desc');
+        // 🔥🔥 THE REAL SOURCE OF TRUTH
+        $query = VendorProduct::with(['product', 'vendor.currency'])
+            ->whereHas('product', fn($q) => $q->where('is_active', 1));
 
+        /** SEARCH */
+        if ($this->search) {
+            $query->whereHas('product', fn($p) =>
+                $p->where('name', 'LIKE', '%' . $this->search . '%')
+            );
+        }
+
+        /** CATEGORY */
         if (!empty($this->selectedCategories)) {
-            $productQuery->whereIn('category_id', $this->selectedCategories);
+            $query->whereHas('product', fn($p) =>
+                $p->whereIn('category_id', $this->selectedCategories)
+            );
         }
+
+        /** BRAND */
         if (!empty($this->selectedBrands)) {
-            $productQuery->whereIn('brand_id', $this->selectedBrands);
+            $query->whereHas('product', fn($p) =>
+                $p->whereIn('brand_id', $this->selectedBrands)
+            );
         }
+
+        /** FEATURED */
         if ($this->featured) {
-            $productQuery->where('is_featured', 1);
+            $query->whereHas('product', fn($p) =>
+                $p->where('is_featured', 1)
+            );
         }
+
+        /** ON SALE */
         if ($this->on_sale) {
-            $productQuery->where('on_sale', 1);
+            $query->whereNotNull('sale_price');
         }
-        if ($this->price_range) {
-            $productQuery->whereBetween('price', [0, $this->price_range]);
+
+        /** PRICE FILTER */
+        if ($this->price_range > 0) {
+            $query->where('price', '<=', $this->price_range);
         }
-        if ($this->sort == 'latest') {
-            $productQuery->latest();
+
+        /** SORT */
+        if ($this->sort === 'price') {
+            $query->orderBy('price', 'ASC');
+        } else {
+            $query->latest();
         }
-        if ($this->sort == 'price') {
-            $productQuery->orderBy('price', 'desc');
-        }
-        return view('livewire.products-page',[
-            'products' => $productQuery->paginate(9),
-            'categories' => \App\Models\Category::where('is_active', 1)->get(),
-            'brands' => \App\Models\Brand::where('is_active', 1)->get(),
+
+        $vendorProducts = $query->paginate(12);
+        //dd($vendorProducts);
+
+        return view('livewire.products-page', [
+            'vendorProducts' => $vendorProducts,
+            'categories'     => Category::where('is_active', 1)->get(),
+            'brands'         => Brand::where('is_active', 1)->get(),
             'price_range' => $this->price_range,
+            'currencyCode'   => $this->currencyCode,
         ]);
     }
 }

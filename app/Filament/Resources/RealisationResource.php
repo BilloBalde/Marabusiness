@@ -20,6 +20,16 @@ class RealisationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office';
 
+    public static function getNavigationGroup(): ?string
+    {
+        return __('filament.groups.civil_eng');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament.nav.realisations');
+    }
+
     public static function form(Form $form): Form
     {
         return $form

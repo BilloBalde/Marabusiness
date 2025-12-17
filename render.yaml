@@ -1,0 +1,25 @@
+# render.yaml
+services:
+  - type: web
+    name: marabusiness
+    env: php
+    region: oregon  # or virginia, ohio, frankfurt, singapore
+    buildCommand: |
+      composer install --no-dev --optimize-autoloader
+      php artisan optimize
+      chmod -R 755 storage bootstrap/cache
+      # Create SQLite database if not exists
+      touch storage/database.sqlite
+    startCommand: php artisan serve --host=0.0.0.0 --port=8000
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_URL
+        sync: false
+      - key: DB_CONNECTION
+        value: sqlite
+      - key: DB_DATABASE
+        value: /opt/render/project/src/storage/database.sqlite
+    autoDeploy: true

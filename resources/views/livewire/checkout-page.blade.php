@@ -1,260 +1,476 @@
-<div class="w-full max-w-[85rem] py-10 px-4 sm:px-6 lg:px-8 mx-auto">
-	<h1 class="mb-4 text-2xl font-bold text-gray-800 dark:text-black">
-		Checkout
-	</h1>
-	<form wire:submit.prevent='placeOrder'>
-        <div class="grid grid-cols-12 gap-4">
-		<div class="col-span-12 md:col-span-12 lg:col-span-8">
-			<!-- Card -->
-			<div class="p-4 bg-white shadow rounded-xl sm:p-7 dark:bg-slate-900">
-				<!-- Shipping Address -->
-				<div class="mb-6">
-					<h2 class="mb-2 text-xl font-bold text-gray-700 underline dark:text-white">
-						Shipping Address
-					</h2>
-					<div class="grid grid-cols-2 gap-4">
-						<div>
-							<label class="block mb-1 text-gray-700 dark:text-white" for="first_name">
-								First Name
-							</label>
-							<input class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-none @error('first_name') border-red-500 @enderror" wire:model='first_name' id="first_name" type="text">
-							</input>
-                            @error('first_name')
-                                <div class="text-sm text-red-500">{{ $message }}</div>
-                            @enderror
-						</div>
-						<div>
-							<label class="block mb-1 text-gray-700 dark:text-white" for="last_name">
-								Last Name
-							</label>
-							<input class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-none @error('last_name') border-red-500 @enderror" wire:model='last_name' id="last_name" type="text">
-							</input>
-                            @error('last_name')
-                                <div class="text-sm text-red-500">{{ $message }}</div>
-                            @enderror
-						</div>
-					</div>
-					<div class="mt-4">
-						<label class="block mb-1 text-gray-700 dark:text-white" for="phone">
-							Phone
-						</label>
-						<input class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-none @error('phone') border-red-500 @enderror" wire:model='phone' id="phone" type="text">
-						</input>
-                        @error('phone')
-                                <div class="text-sm text-red-500">{{ $message }}</div>
-                            @enderror
-					</div>
-					<div class="mt-4">
-						<label class="block mb-1 text-gray-700 dark:text-white" for="address">
-							Address
-						</label>
-						<input class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-none @error('street_address') border-red-500 @enderror" wire:model='street_address' id="address" type="text">
-						</input>
-                        @error('street_address')
-                                <div class="text-sm text-red-500">{{ $message }}</div>
-                            @enderror
-					</div>
-					<div class="mt-4">
-						<label class="block mb-1 text-gray-700 dark:text-white" for="city">
-							City
-						</label>
-						<input class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-none @error('city') border-red-500 @enderror" wire:model='city' id="city" type="text">
-						</input>
-                        @error('city')
-                                <div class="text-sm text-red-500">{{ $message }}</div>
-                            @enderror
-					</div>
-					<div class="grid grid-cols-2 gap-4 mt-4">
-						<div>
-							<label class="block mb-1 text-gray-700 dark:text-white" for="state">
-								State
-							</label>
-							<input class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-none @error('state') border-red-500 @enderror" wire:model='state' id="state" type="text">
-							</input>
-                            @error('state')
-                                <div class="text-sm text-red-500">{{ $message }}</div>
-                            @enderror
-						</div>
-						<div>
-							<label class="block mb-1 text-gray-700 dark:text-white" for="zip">
-								ZIP Code
-							</label>
-							<input class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-none @error('zip_code') border-red-500 @enderror" wire:model='zip_code' id="zip" type="text">
-							</input>
-                            @error('zip_code')
-                                <div class="text-sm text-red-500">{{ $message }}</div>
-                            @enderror
-						</div>
-					</div>
-				</div>
-				<div class="mb-4 text-lg font-semibold text-gray-700 underline dark:text-white">
-					Select Payment Method
-				</div>
-				<ul class="grid w-full gap-6 md:grid-cols-3">
-					<li>
-						<input wire:change="$set('payment_method', 'cod')" name="payment_method" value="cod" class="hidden peer" id="hosting-small" type="radio"/>
-						<label class="inline-flex items-center justify-between w-full p-5 text-gray-500 bg-white border border-gray-200 rounded-lg cursor-pointer dark:hover:text-gray-300 dark:border-gray-700 dark:peer-checked:text-blue-500 peer-checked:border-blue-600 peer-checked:text-blue-600 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700" for="hosting-small">
-							<div class="block">
-								<div class="w-full text-lg font-semibold @error('payment_method') border-red-500 @enderror">
-									Cash on Delivery
-								</div>
-							</div>
-							<svg aria-hidden="true" class="w-5 h-5 ms-3 rtl:rotate-180" fill="none" viewbox="0 0 14 10" xmlns="http://www.w3.org/2000/svg">
-								<path d="M1 5h12m0 0L9 1m4 4L9 9" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-								</path>
-							</svg>
-						</label>
-					</li>
-					<li>
-						<input wire:change="$set('payment_method', 'stripe')" name="payment_method" value="stripe" class="hidden peer" id="hosting-middle" type="radio"/>
-						<label class="inline-flex items-center justify-between w-full p-5 text-gray-500 bg-white border border-gray-200 rounded-lg cursor-pointer dark:hover:text-gray-300 dark:border-gray-700 dark:peer-checked:text-blue-500 peer-checked:border-blue-600 peer-checked:text-blue-600 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700" for="hosting-middle">
-							<div class="block">
-								<div class="w-full text-lg font-semibold @error('payment_method') border-red-500 @enderror">
-									Stripe
-								</div>
-							</div>
-							<svg aria-hidden="true" class="w-5 h-5 ms-3 rtl:rotate-180" fill="none" viewbox="0 0 14 10" xmlns="http://www.w3.org/2000/svg">
-								<path d="M1 5h12m0 0L9 1m4 4L9 9" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-								</path>
-							</svg>
-						</label>
-					</li>
-					<li>
-						<input wire:change="$set('payment_method', 'om')" name="payment_method" value="om" class="hidden peer" id="hosting-big" type="radio"/>
-						<label class="inline-flex items-center justify-between w-full p-5 text-gray-500 bg-white border border-gray-200 rounded-lg cursor-pointer dark:hover:text-gray-300 dark:border-gray-700 dark:peer-checked:text-blue-500 peer-checked:border-blue-600 peer-checked:text-blue-600 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700" for="hosting-big">
-							<div class="block">
-								<div class="w-full text-lg font-semibold @error('payment_method') border-red-500 @enderror">
-									Orange Money
-								</div>
-							</div>
-							<svg aria-hidden="true" class="w-5 h-5 ms-3 rtl:rotate-180" fill="none" viewbox="0 0 14 10" xmlns="http://www.w3.org/2000/svg">
-								<path d="M1 5h12m0 0L9 1m4 4L9 9" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-								</path>
-							</svg>
-						</label>
-					</li>
-
-				</ul>
-                @error('payment_method')
-                    <div class="text-sm text-red-500">{{ $message }}</div>
-                @enderror
-                @if ($payment_method === 'om')
-                    <div class="mt-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                        <p class="font-semibold mb-2">
-                            Faites un dépôt sur ce numéro <strong>625170257</strong>,
-                            entrez le montant déposé et la capture d'écran dans les champs ci-dessous.
-                        </p>
-
-                        <div class="mt-4">
-                            <label class="block mb-1 text-gray-700 dark:text-white" for="amount">
-                                Montant Déposé (Orange Money)
-                            </label>
-                            <input type="number" id="amount" wire:model="amount"
-                                class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-none @error('amount') border-red-500 @enderror">
-                            @error('amount')
-                                <div class="text-sm text-red-500">{{ $message }}</div>
-                            @enderror
+<div class="bg-gray-50 min-h-screen py-6">
+    <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {{-- LEFT COLUMN — SHIPPING + PAYMENT FORM --}}
+        <div class="lg:col-span-8 space-y-6">
+            {{-- FLASH MESSAGES --}}
+            @if(session()->has('error'))
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                    {{ session('error') }}
+                </div>
+            @endif
+            
+            @if(session()->has('shipping-success'))
+                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
+                    {{ session('shipping-success') }}
+                </div>
+            @endif
+            
+            @if(session()->has('shipping-error'))
+                <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg">
+                    {{ session('shipping-error') }}
+                </div>
+            @endif
+            
+            {{-- SHIPPING ADDRESS FORM --}}
+            <div class="bg-white shadow-md rounded-xl p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Delivery Address</h2>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-gray-600">First Name *</label>
+                        <input wire:model.blur="first_name" type="text" 
+                               class="mt-1 w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
+                        @error('first_name')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+                    
+                    <div>
+                        <label class="text-gray-600">Last Name *</label>
+                        <input wire:model.blur="last_name" type="text" 
+                               class="mt-1 w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
+                        @error('last_name')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <label class="text-gray-600">Phone *</label>
+                    <input wire:model.blur="phone" type="tel" 
+                           class="mt-1 w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
+                    @error('phone')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                </div>
+                
+                <div class="mt-4">
+                    <label class="text-gray-600">Street Address *</label>
+                    <textarea wire:model.blur="street_address" rows="2" 
+                              class="mt-1 w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent"></textarea>
+                    @error('street_address')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                    <div class="md:col-span-2">
+                        <label class="text-gray-600">City *</label>
+                        <input wire:model.blur="city" type="text" 
+                               class="mt-1 w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
+                        @error('city')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+                    
+                    <div>
+                        <label class="text-gray-600">State *</label>
+                        <input wire:model.blur="state" type="text" 
+                               class="mt-1 w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
+                        @error('state')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+                    
+                    <div>
+                        <label class="text-gray-600">Zip Code *</label>
+                        <input wire:model.blur="zip_code" type="text" 
+                               class="mt-1 w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
+                        @error('zip_code')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <label class="text-gray-600">Country *</label>
+                    <select wire:model.blur="country" 
+                            class="mt-1 w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
+                        <option value="Guinea">Guinea</option>
+                        <option value="Senegal">Senegal</option>
+                        <option value="Ivory Coast">Ivory Coast</option>
+                        <option value="Mali">Mali</option>
+                        <option value="France">France</option>
+                        <option value="United States">United States</option>
+                        <option value="Canada">Canada</option>
+                        <option value="United Kingdom">United Kingdom</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    @error('country')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                </div>
+                
+                {{-- GEOLOCATION --}}
+                <div class="mt-6 border-t pt-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-700">Location (Optional)</h3>
+                            <p class="text-sm text-gray-500">For accurate shipping zone calculation</p>
                         </div>
-
-                        <div class="mt-4">
-                            <label class="block mb-1 text-gray-700 dark:text-white" for="image">
-                                Capture d'écran du paiement
-                            </label>
-                            <input type="file" id="image" wire:model="image"
-                                class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-none @error('image') border-red-500 @enderror">
-                            @error('image')
-                                <div class="text-sm text-red-500">{{ $message }}</div>
-                            @enderror
-
-                            <div wire:loading wire:target="image" class="text-sm text-gray-500 mt-1">
-                                Téléchargement...
-                            </div>
-                            @if ($image)
-                                <div class="mt-3">
-                                    <span class="block mb-1 text-gray-700 dark:text-white font-medium">Aperçu de l'image :</span>
-                                    <img src="{{ $image->temporaryUrl() }}" class="w-64 h-auto rounded border border-gray-300 dark:border-gray-600">
+                        <button type="button" wire:click="getLocation" 
+                                wire:loading.attr="disabled"
+                                class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition disabled:opacity-50">
+                            <span wire:loading.remove wire:target="getLocation">📍 Get My Location</span>
+                            <span wire:loading wire:target="getLocation">Getting location...</span>
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-gray-600">Latitude</label>
+                            <input wire:model.blur="latitude" type="number" step="0.000001" 
+                                   class="mt-1 w-full p-3 border rounded-lg" placeholder="e.g., 9.945587">
+                        </div>
+                        <div>
+                            <label class="text-gray-600">Longitude</label>
+                            <input wire:model.blur="longitude" type="number" step="0.000001" 
+                                   class="mt-1 w-full p-3 border rounded-lg" placeholder="e.g., -9.696677">
+                        </div>
+                    </div>
+                    
+                    @if($has_location)
+                        <p class="text-sm text-green-600 mt-2">
+                            ✅ Location detected. Shipping will be calculated accurately.
+                        </p>
+                    @endif
+                </div>
+                
+                {{-- CALCULATE SHIPPING BUTTON --}}
+                <div class="mt-6">
+                    <button type="button" wire:click="calculateShipping" 
+                            wire:loading.attr="disabled"
+                            wire:target="calculateShipping"
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition disabled:opacity-50">
+                        <span wire:loading.remove wire:target="calculateShipping">
+                            🚚 Calculate Shipping Costs
+                        </span>
+                        <span wire:loading wire:target="calculateShipping">
+                            🔄 Calculating shipping...
+                        </span>
+                    </button>
+                </div>
+            </div>
+            
+            {{-- SHIPPING OPTIONS --}}
+            @if($has_shipping_calculated && !empty($availableCarriers))
+                <div class="bg-white shadow-md rounded-xl p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Shipping Options</h2>
+                    
+                    <div class="space-y-3">
+                        @foreach($availableCarriers as $key => $carrier)
+                            <label class="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition
+                                      {{ $shipping_carrier === $key ? 'border-[#D4AF37] bg-yellow-50' : '' }}">
+                                <div class="flex items-center space-x-3">
+                                    <input type="radio" 
+                                           wire:model.live="shipping_carrier" 
+                                           value="{{ $key }}" 
+                                           class="text-[#D4AF37] focus:ring-[#D4AF37]">
+                                    
+                                    <div>
+                                        <span class="font-semibold">{{ $carrier['name'] }}</span>
+                                        <p class="text-sm text-gray-500">
+                                            @if(isset($carrier['vendors'][array_key_first($carrier['vendors'])]['delivery_days']))
+                                                📅 {{ $carrier['vendors'][array_key_first($carrier['vendors'])]['delivery_days'] }} days
+                                            @endif
+                                        </p>
+                                        
+                                        {{-- Show vendor zones --}}
+                                        @if(count($carrier['vendors']) > 0)
+                                            <div class="mt-1 flex flex-wrap gap-1">
+                                                @foreach($carrier['vendors'] as $vendorId => $vendorShipping)
+                                                    @if(isset($groups[$vendorId]))
+                                                        <span class="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
+                                                            {{ $groups[$vendorId]['vendor']->store_name }}: {{ $vendorShipping['zone'] ?? 'Standard' }}
+                                                        </span>
+                                                    @endif
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
-                            @endif
+                                
+                                <div class="text-right">
+                                    <span class="font-bold text-lg">
+                                        ${{ number_format($carrier['total_cost_usd'] ?? 0, 2) }}
+                                    </span>
+                                    <p class="text-sm text-gray-500">Shipping cost</p>
+                                </div>
+                            </label>
+                        @endforeach
+                    </div>
+                    
+                    @error('shipping_carrier')<p class="text-red-500 text-sm mt-2">{{ $message }}</p>@enderror
+                </div>
+            @endif
+            
+            {{-- PAYMENT METHODS --}}
+            <div class="bg-white shadow-md rounded-xl p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Payment Method *</h2>
+                
+                {{-- Show warning for multiple vendors --}}
+                @if($has_multiple_vendors)
+                    <div class="mb-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
+                        <div class="flex items-center">
+                            <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
+                            <p class="text-yellow-700">
+                                <strong>Multiple Vendors Detected:</strong> Only Cash on Delivery is available for orders with multiple vendors.
+                            </p>
                         </div>
                     </div>
                 @endif
-
-			</div>
-			<!-- End Card -->
-		</div>
-		<div class="col-span-12 md:col-span-12 lg:col-span-4">
-			<div class="p-4 bg-white shadow rounded-xl sm:p-7 dark:bg-slate-900">
-				<div class="mb-2 text-xl font-bold text-gray-700 underline dark:text-white">
-					COMMANDE SOMMAIRE
-				</div>
-				<div class="flex justify-between mb-2 font-bold text-gray-500">
-					<span>
-						Subtotal
-					</span>
-					<span>
-						{{ Number::currency($grand_total, 'CAD') }}
-					</span>
-				</div>
-				<div class="flex justify-between mb-2 font-bold text-gray-500">
-					<span>
-						Taxes
-					</span>
-					<span>
-						{{ Number::currency(0.00, 'CAD') }}
-					</span>
-				</div>
-				<div class="flex justify-between mb-2 font-bold text-gray-500">
-					<span>
-						Shipping Cost
-					</span>
-					<span>
-						{{ Number::currency(0.00, 'CAD') }}
-					</span>
-				</div>
-				<hr class="h-1 my-4 rounded bg-slate-100">
-				<div class="flex justify-between mb-2 font-bold text-gray-500">
-					<span>
-						Grand Total
-					</span>
-					<span>
-						{{ Number::currency($grand_total, 'CAD') }}
-					</span>
-				</div>
-				</hr>
-			</div>
-			<button type="submit" class="w-full p-3 mt-4 text-lg text-white bg-green-500 rounded-lg hover:bg-green-600">
-				<span wire:loading.remove>Placer la Commande</span>
-                <span wire:loading>Processing...</span>
-			</button>
-			<div class="p-4 mt-4 bg-white shadow rounded-xl sm:p-7 dark:bg-slate-900">
-				<div class="mb-2 text-xl font-bold text-gray-700 underline dark:text-white">
-					BASKET SUMMARY
-				</div>
-				<ul class="divide-y divide-gray-200 dark:divide-gray-700" role="list">
-					@foreach ($cart_items as $ci)
-                    <li class="py-3 sm:py-4" wire:key="{{ $ci['product_id'] }}">
-						<div class="flex items-center">
-							<div class="flex-shrink-0">
-								<img alt="Neil image" class="w-12 h-12 rounded-full" src="{{ url('uploads', $ci['image']) }}">
-								</img>
-							</div>
-							<div class="flex-1 min-w-0 ms-4">
-								<p class="text-sm font-medium text-gray-900 truncate dark:text-white">
-									{{ $ci['name'] }}
-								</p>
-								<p class="text-sm text-gray-500 truncate dark:text-gray-400">
-									Quantity: {{ $ci['quantity'] }}
-								</p>
-							</div>
-							<div class="inline-flex items-center text-base font-semibold text-gray-900 dark:text-white">
-								{{ Number::currency($ci['total_amount'], 'CAD') }}
-							</div>
-						</div>
-					</li>
-                    @endforeach
-				</ul>
-			</div>
-		</div>
-	</div>
-    </form>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <label class="cursor-pointer border rounded-xl p-4 text-center hover:bg-gray-50 transition
+                                {{ $payment_method === 'cod' ? 'border-[#D4AF37] bg-yellow-50' : '' }} {{ $has_multiple_vendors ? 'opacity-100' : '' }}">
+                        <input type="radio" wire:model.live="payment_method" value="cod" class="hidden" {{ $has_multiple_vendors ? 'checked disabled' : '' }}>
+                        <div class="font-semibold text-gray-700">💵 Cash on Delivery</div>
+                        <p class="text-sm text-gray-500 mt-1">Pay when you receive</p>
+                        @if($has_multiple_vendors)
+                            <p class="text-xs text-green-600 mt-1">✓ Required for multi-vendor orders</p>
+                        @endif
+                    </label>
+                    
+                    <label class="cursor-pointer border rounded-xl p-4 text-center hover:bg-gray-50 transition
+                                {{ $payment_method === 'stripe' ? 'border-[#D4AF37] bg-yellow-50' : '' }} {{ $has_multiple_vendors ? 'opacity-50 cursor-not-allowed bg-gray-100' : 'hover:bg-gray-50' }}">
+                        <input type="radio" wire:model.live="payment_method" value="stripe" class="hidden" {{ $has_multiple_vendors ? 'disabled' : '' }}>
+                        <div class="font-semibold text-gray-700">💳 Credit/Debit Card</div>
+                        <p class="text-sm text-gray-500 mt-1">Secure payment via Stripe</p>
+                        @if($has_multiple_vendors)
+                            <p class="text-xs text-red-500 mt-1">✗ Not available for multi-vendor</p>
+                        @endif
+                    </label>
+                    
+                    <label class="cursor-pointer border rounded-xl p-4 text-center hover:bg-gray-50 transition
+                                {{ $payment_method === 'om' ? 'border-[#D4AF37] bg-yellow-50' : '' }} {{ $has_multiple_vendors ? 'opacity-50 cursor-not-allowed bg-gray-100' : 'hover:bg-gray-50' }}">
+                        <input type="radio" wire:model.live="payment_method" value="om" class="hidden" {{ ($has_multiple_vendors || $selectedCurrency != 'GNF') ? 'disabled' : '' }}>
+                        <div class="font-semibold text-gray-700">📱 Orange Money</div>
+                        <p class="text-sm text-gray-500 mt-1">Mobile money payment</p>
+                        @if($has_multiple_vendors)
+                            <p class="text-xs text-red-500 mt-1">✗ Not available for multi-vendor</p>
+                        @endif
+                        @if($selectedCurrency != 'GNF')
+                            <p class="text-xs text-green-600 mt-1">✓ Required for GNF orders</p>
+                        @endif
+                    </label>
+                </div>
+                @error('payment_method')<p class="text-red-500 text-sm mt-2">{{ $message }}</p>@enderror
+                
+                {{-- ORANGE MONEY FIELDS --}}
+                @if ($payment_method === 'om')
+                    <div class="mt-6 p-4 bg-yellow-50 border border-yellow-300 rounded-xl">
+                        <p class="text-yellow-800 font-semibold mb-3">
+                            Send payment to <strong>625170257</strong> and upload screenshot
+                        </p>
+                         {{-- Show the exact amount to pay --}}
+                        @foreach($groups as $vendorId => $group)
+                            <div class="mb-3 p-3 bg-white rounded-lg border">
+                                <div class="text-center">
+                                    <p class="text-sm text-gray-500">Send exactly:</p>
+                                    <span class="font-bold text-2xl text-green-600">
+                                        {{ number_format($group['total'], 2) }} GNF
+                                    </span>
+                                    <p class="text-sm text-gray-500 mt-1">
+                                        (Entrer just le montant dans le champ mais la capture doit comporter les frais {{ number_format($group['total'] * 0.01, 2) }} GNF)
+                                    </p>
+                                </div>
+                            </div>
+                        @endforeach
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-gray-700">Amount Sent *</label>
+                                <input type="number" wire:model="amount" min="1" step="0.01"
+                                       class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37]">
+                                @error('amount')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                                {{-- Simple amount validation --}}
+                                @if($amount > 0 && !empty($groups))
+                                    @php
+                                        $vendorGroup = reset($groups); // Get first (and only) vendor
+                                        $exactAmount = $vendorGroup['total'];
+                                    @endphp
+                                    
+                                    @if(number_format($amount, 2) == number_format($exactAmount, 2))
+                                        <p class="text-green-600 text-sm mt-2">
+                                            ✅ Amount matches exactly!
+                                        </p>
+                                    @else
+                                        <p class="text-red-500 text-sm mt-2">
+                                            ❌ Amount must be exactly {{ number_format($exactAmount, 2) }} GNF
+                                        </p>
+                                    @endif
+                                @endif
+                            </div>
+                            
+                            <div>
+                                <label class="text-gray-700">Payment Screenshot *</label>
+                                <input type="file" wire:model="image" accept="image/*"
+                                       class="w-full mt-1 p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37]">
+                                @error('image')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                                
+                                <div wire:loading wire:target="image" class="text-gray-500 mt-1">
+                                    Uploading...
+                                </div>
+                            </div>
+                        </div>
+                        
+                        @if ($image)
+                            <div class="mt-3">
+                                <img src="{{ $image->temporaryUrl() }}" 
+                                     class="w-48 h-48 object-cover rounded-lg border">
+                            </div>
+                        @endif
+                    </div>
+                @endif
+            </div>
+            
+            {{-- PLACE ORDER BUTTON --}}
+            <button wire:click="placeOrder" 
+                    wire:loading.attr="disabled"
+                    wire:target="placeOrder"
+                    class="w-full bg-[#D4AF37] hover:bg-[#C9A227] text-white text-lg font-semibold p-4 rounded-xl shadow-md transition disabled:opacity-50">
+                <span wire:loading.remove wire:target="placeOrder">
+                    ✅ Place Order ({{ $selected_count }} items)
+                </span>
+                <span wire:loading wire:target="placeOrder">
+                    ⏳ Processing Order...
+                </span>
+            </button>
+        </div>
+        
+        {{-- RIGHT COLUMN — ORDER SUMMARY --}}
+        <div class="lg:col-span-4">
+            <div class="bg-white shadow-md rounded-xl p-6 sticky top-10">
+                <h2 class="text-xl font-bold text-gray-800 mb-3">
+                    Order Summary ({{ $selected_count }} items)
+                </h2>
+                
+                {{-- Display by vendor --}}
+                @foreach($groups as $vendorId => $group)
+                    <div class="mb-4 pb-4 border-b last:border-b-0">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-semibold text-gray-700">
+                                🏬 {{ $group['vendor']->store_name ?? 'Vendor' }}
+                            </h3>
+                            @if($group['zone'] !== 'Unknown')
+                                <span class="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                                    {{ $group['zone'] }}
+                                </span>
+                            @endif
+                        </div>
+                        
+                        {{-- Items list --}}
+                        <div class="space-y-2 max-h-60 overflow-y-auto pr-2">
+                            @foreach($group['items'] as $item)
+                                <div class="flex justify-between text-sm">
+                                    <div class="flex-1">
+                                        <p class="font-medium">{{ $item['product_name'] ?? 'Product' }}</p>
+                                        @if(!empty($item['selected_variations']) || !empty($item['variation_note']))
+                                            <div class="text-xs text-gray-500 mt-1">
+                                                @if(!empty($item['selected_variations']))
+                                                    @foreach($item['selected_variations'] as $key => $value)
+                                                        <span>{{ ucfirst($key) }}: {{ $value }}</span>
+                                                        @if(!$loop->last) • @endif
+                                                    @endforeach
+                                                @endif
+                                                @if(!empty($item['variation_note']))
+                                                    <div class="text-blue-600">📝 {{ $item['variation_note'] }}</div>
+                                                @endif
+                                            </div>
+                                        @endif
+                                        <p class="text-gray-500">× {{ $item['quantity'] }}</p>
+                                        
+                                        {{-- Weight/Volume info if available --}}
+                                        @if($group['weight'] > 0)
+                                            <p class="text-xs text-gray-400">
+                                                📦 {{ number_format($group['weight'], 2) }} kg
+                                                @if($group['cbm'] > 0)
+                                                     • {{ number_format($group['cbm'], 3) }} m³
+                                                @endif
+                                            </p>
+                                        @endif
+                                    </div>
+                                    <div class="text-right">
+                                        <p>{{ number_format($item['unit_amount'], 2) }} {{ $group['currency'] }}</p>
+                                        <p class="text-xs text-gray-500">
+                                            {{ number_format($item['total_amount'], 2) }} {{ $group['currency'] }}
+                                        </p>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        
+                        {{-- Vendor subtotal with shipping --}}
+                        <div class="mt-3 pt-3 border-t">
+                            <div class="flex justify-between text-sm">
+                                <span>Subtotal:</span>
+                                <span>{{ number_format($group['subtotal_usd'] / $group['rate_to_usd'] , 2) }} {{ $group['currency'] }}</span>
+                            </div>
+                            <div class="flex justify-between text-sm mt-1">
+                                <span>
+                                    Shipping:
+                                    <span class="text-xs text-gray-500">
+                                        ({{ $selectedCarrier['name'] ?? 'Standard' }})
+                                    </span>
+                                </span>
+                                <span>{{ number_format($group['shipping_usd'] / $group['rate_to_usd'], 2) }} {{ $group['currency'] }}</span>
+                            </div>
+                            <div class="flex justify-between font-semibold mt-2 text-[#D4AF37]">
+                                <span>Total {{ $group['currency'] }}:</span>
+                                <span>{{ number_format($group['total'], 2) }} {{ $group['currency'] }}</span>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+                
+                {{-- Grand Total --}}
+                <div class="mt-4 pt-4 border-t">
+                    <div class="flex justify-between text-sm mb-1">
+                        <span>Items Subtotal:</span>
+                        <span>${{ number_format($subtotal_usd, 2) }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span>Shipping:</span>
+                        <span>${{ number_format($total_shipping_usd, 2) }}</span>
+                    </div>
+                    
+                    @if($selectedCarrier && isset($selectedCarrier['delivery_days']))
+                        <div class="flex justify-between text-sm mb-1 text-green-600">
+                            <span>Estimated Delivery:</span>
+                            <span>{{ $selectedCarrier['delivery_days'] ?? 3-5 }} business days</span>
+                        </div>
+                    @endif
+                    
+                    <div class="flex justify-between font-bold text-lg text-gray-900 mt-2 pt-2 border-t">
+                        <span>Total USD:</span>
+                        <span>${{ number_format($grand_total_usd, 2) }}</span>
+                    </div>
+                    
+                    @if($has_shipping_calculated)
+                        <p class="text-xs text-green-600 mt-2">
+                            ✅ Shipping calculated based on weight and destination
+                        </p>
+                    @else
+                        <p class="text-xs text-yellow-600 mt-2">
+                            ⚠️ Enter address to calculate shipping
+                        </p>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+{{-- JavaScript for geolocation --}}
+<script>
+    document.addEventListener('livewire:initialized', () => {
+        Livewire.on('get-browser-location', () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        @this.set('latitude', position.coords.latitude.toFixed(6));
+                        @this.set('longitude', position.coords.longitude.toFixed(6));
+                    },
+                    (error) => {
+                        console.error('Geolocation error:', error);
+                        alert('Unable to get location. Please enter manually.');
+                    }
+                );
+            } else {
+                alert('Geolocation is not supported by your browser.');
+            }
+        });
+    });
+</script>

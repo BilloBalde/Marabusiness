@@ -2,20 +2,14 @@
 
 namespace App\Filament\Resources\OrderResource\RelationManagers;
 
-use Closure;
 use Filament\Forms;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
-use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\FileUpload;
+use Filament\Resources\RelationManagers\RelationManager;
 
 class PaiementsRelationManager extends RelationManager
 {
@@ -23,116 +17,82 @@ class PaiementsRelationManager extends RelationManager
 
     public function form(Form $form): Form
     {
-        return $form
-            ->schema([
-                TextInput::make('transaction_id')
-                    ->default(function () {
-                        return \App\Models\Order::generateTransactionNumber(); // call the method
-                    })
-                    ->disabled() // make it non-editable
-                    ->dehydrated() // ensure it's saved to the database
-                    ->required()
-                    ->maxLength(255),
+        return $form->schema([
+            Select::make('payment_method')
+                ->required()
+                ->options([
+                    'cash' => 'Cash',
+                    'stripe' => 'Stripe',
+                    'paypal' => 'PayPal',
+                    'cod' => 'Cash on Delivery',
+                    'om' => 'Orange Money',
+                ]),
 
-                TextInput::make('amount')->numeric()->required(),
-                Select::make('payment_method')
-                    ->options([
-                        'stripe' => 'Stripe',
-                        'paypal' => 'PayPal',
-                        'cod' => 'Cash on Delivery',
-                        'om' => 'Orange Money',
-                    ])
-                    ->required(),
-                Select::make('currency')
-                    ->options([
-                        'usd' => 'USD',
-                        'cad' => 'CAD',
-                        'gnf' => 'GNF',
-                    ])
-                    ->required(),
-                FileUpload::make('image')
-                    ->disk('public_uploads')
-                    ->directory('payments')
-                    ->label('Payment Screenshot')
-                    ->previewable(true),
-                Select::make('payment_status')
-                    ->options([
-                        'pending' => 'Pending',
-                        'partial' => 'Partial',
-                        'paid' => 'Paid',
-                    ])
-                    ->required(),
-            ]);
+            TextInput::make('amount')
+                ->numeric()
+                ->minValue(0.01)
+                ->required()
+                ->prefix(fn($livewire) => optional($livewire->ownerRecord->vendor->currency)->code ?? 'USD'),
+
+            FileUpload::make('image')
+                ->label('Receipt')
+                ->image()
+                ->directory('payments')
+                ->visibility('public')
+                ->nullable(),
+
+            Select::make('payment_status')
+                ->options([
+                    'pending' => 'Pending',
+                    'partial' => 'Partial',
+                    'paid' => 'Paid',
+                ])
+                ->required(),
+        ]);
     }
 
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('transaction_id')
             ->columns([
-                TextColumn::make('amount'),
-                TextColumn::make('currency'),
-                TextColumn::make('payment_method'),
-                TextColumn::make('payment_status'),
-                ImageColumn::make('image')
-                    ->label('Image')
-                    ->disk('public_uploads')
-                    ->circular(),
-                TextColumn::make('created_at')->dateTime()->sortable(),
+                Tables\Columns\TextColumn::make('transaction_id'),
+                Tables\Columns\TextColumn::make('payment_method'),
+                Tables\Columns\TextColumn::make('payment_status'),
+                Tables\Columns\TextColumn::make('amount'),
+                Tables\Columns\TextColumn::make('currency'),
+                Tables\Columns\TextColumn::make('created_at')->dateTime(),
             ])
-            ->defaultSort('created_at', 'desc')
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->after(function ($record) {
-                        $order = $record->order;
-                        $totalPaid = $order->paiements()->sum('amount');
-                        $remaining = max(0, $order->grand_total - $totalPaid);
-
-                        $order->update([
-                            'total_paid' => $totalPaid,
-                            'total_remaining' => $remaining,
-                        ]);
+                    ->after(function ($record, $livewire) {
+                        $this->updateOrderTotals($livewire->ownerRecord);
+                        $livewire->ownerRecord->refresh();   // 👈 VERY IMPORTANT
                     }),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->after(function ($record) {
-                        $order = $record->order;
-                        $totalPaid = $order->paiements()->sum('amount');
-                        $remaining = max(0, $order->grand_total - $totalPaid);
-
-                        $order->update([
-                            'total_paid' => $totalPaid,
-                            'total_remaining' => $remaining,
-                        ]);
+                    ->after(function ($record, $livewire) {
+                        $this->updateOrderTotals($livewire->ownerRecord);
+                        $livewire->ownerRecord->refresh();
                     }),
+
                 Tables\Actions\DeleteAction::make()
-                    ->after(function ($record) {
-                        $order = $record->order;
-                        $totalPaid = $order->paiements()->sum('amount');
-                        $remaining = max(0, $order->grand_total - $totalPaid);
-
-                        $order->update([
-                            'total_paid' => $totalPaid,
-                            'total_remaining' => $remaining,
-                        ]);
-                    }),
-            ])
-            ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make()
-                    ->after(function (Collection $records) {
-                        foreach ($records as $record) {
-                            $order = $record->order;
-                            $totalPaid = $order->paiements()->sum('amount');
-                            $remaining = max(0, $order->grand_total - $totalPaid);
-
-                            $order->update([
-                                'total_paid' => $totalPaid,
-                                'total_remaining' => $remaining,
-                            ]);
-                        }
+                    ->after(function ($record, $livewire) {
+                        $this->updateOrderTotals($livewire->ownerRecord);
+                        $livewire->ownerRecord->refresh();
                     }),
             ]);
     }
 
+    private function updateOrderTotals($order)
+    {
+        $totalPaid = $order->paiements()->sum('amount');
+        $remaining = max(0, $order->grand_total - $totalPaid);
+
+        $order->update([
+            'total_paid'      => $totalPaid,
+            'total_remaining' => $remaining,
+            'payment_status'  => $remaining <= 0 ? 'paid' : ($totalPaid > 0 ? 'partial' : 'unpaid'),
+        ]);
+    }
 }

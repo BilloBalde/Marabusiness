@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Category extends Model
 {
-    protected $fillable = ['name', 'image', 'slug', 'is_active'];
+    protected $fillable = ['name', 'image', 'slug', 'family', 'is_active'];
 
     public function products()
     {

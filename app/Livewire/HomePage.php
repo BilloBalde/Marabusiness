@@ -2,45 +2,256 @@
 
 namespace App\Livewire;
 
-use App\Models\Brand;
+use App\Models\Product;
+use App\Models\VendorProduct;
+use App\Models\Currency;
 use App\Models\Category;
-use Livewire\Attributes\Title;
+use App\Models\Vendor;
+use App\Models\Service;
 use Livewire\Component;
+use App\Livewire\Partials\Navbar;
+use Livewire\Attributes\Title;
+use Livewire\Attributes\On;
 
 class HomePage extends Component
 {
-    #[Title('Home Page - MMB FOGO')]
+    #[Title('Home Page - MARA BUSINESS')]
+
+    public $currencyCode;     // selected currency: USD / EUR / RMB / FG
+    public $currencyRate = 1; // selected currency → USD conversion rate
+    public $currencyChanged = false; // Flag to force re-render
+
+    public function mount()
+    {
+        // Load selected currency from session
+        $this->currencyCode = session('currency_code', 'USD');
+
+        // Load rate for selected currency
+        $this->currencyRate = Currency::where('code', $this->currencyCode)
+            ->value('rate_to_usd') ?? 1;
+            
+    }
+
+    /**
+     * When Navbar triggers a currency change event
+     */
+    #[On('currency-changed')]
+    public function updateCurrency(string $code)
+    {
+        \Log::info('HOMEPAGE: Currency change event received', [
+            'old_currency' => $this->currencyCode,
+            'new_currency' => $code,
+            'old_rate' => $this->currencyRate,
+        ]);
+        // Clear the old values
+        $this->reset(['currencyCode', 'currencyRate']);
+        
+        $this->currencyCode = $code;
+        session(['currency_code' => $code]);
+
+        // Refresh selected currency rate
+        $this->currencyRate = Currency::where('code', $code)
+            ->value('rate_to_usd') ?? 1;
+            
+        \Log::info('HOMEPAGE: Currency updated', [
+            'new_rate' => $this->currencyRate,
+        ]);
+
+        // Force Livewire to re-render the component
+        $this->currencyChanged = !$this->currencyChanged;
+        // Force a re-render
+        // This forces Livewire to see the component as "dirty" and re-render
+        $this->skipRender(); // Skip current render
+        $this->render(); // Force new render
+    }
+
+    /**
+     * Convert vendor PP prices:
+     * VENDOR_CURRENCY → USD → SELECTED_CURRENCY
+     */
+    private function convertPrice($price, $vendorRate)
+    {
+        if (!$price || $price <= 0) {
+            return 0;
+        }
+
+        // Convert vendor price → USD
+        $usd = $price * ($vendorRate ?: 1);
+
+        // Convert USD → selected currency
+        return $usd * $this->currencyRate;
+    }
+
+    /**
+     * Get vendor_product_id for a product and vendor
+     */
+    private function getVendorProductId($product_id, $vendor_id)
+    {
+        if (!$vendor_id) {
+            return null;
+        }
+        
+        $vp = VendorProduct::where('product_id', $product_id)
+            ->where('vendor_id', $vendor_id)
+            ->first();
+            
+        return $vp ? $vp->id : null;
+    }
+
+    /**
+     * Map products for homepage layout
+     */
+    private function mapProductForHomepage(Product $product)
+    {
+        // Check if product has vendors
+        if (!$product->vendors || $product->vendors->isEmpty()) {
+            return (object)[
+                'id' => $product->id,
+                'name' => $product->name,
+                'slug' => $product->slug,
+                'images' => $product->images ?? [],
+                'vendor_id' => null,
+                'vendor_product_id' => null,
+                'vendor_name' => null,
+                'stock' => 0,
+                'vendor_currency' => $this->currencyCode,
+                'display_price' => 0,
+                'original_price' => 0,
+                'sale_price' => null,
+                'sale_end' => null,
+                'discount' => null,
+                'has_vendor' => false, // Add flag to check if product has vendor
+            ];
+        }
+
+        // Remove duplicated vendors (variations)
+        $uniqueVendor = $product->vendors
+            ->groupBy('id')
+            ->map(fn($g) => $g->first())
+            ->sortBy(fn($v) => $v->pivot->price)
+            ->first();
+
+        if (!$uniqueVendor) {
+            return (object)[
+                'id' => $product->id,
+                'name' => $product->name,
+                'slug' => $product->slug,
+                'images' => $product->images ?? [],
+                'vendor_id' => null,
+                'vendor_product_id' => null,
+                'vendor_name' => null,
+                'stock' => 0,
+                'vendor_currency' => $this->currencyCode,
+                'display_price' => 0,
+                'original_price' => 0,
+                'sale_price' => null,
+                'sale_end' => null,
+                'discount' => null,
+                'has_vendor' => false,
+            ];
+        }
+
+        // Get vendor_product_id
+        $vendor_product_id = $this->getVendorProductId($product->id, $uniqueVendor->id);
+
+        // Vendor currency → USD rate
+        $vendorRate = $uniqueVendor->currency->rate_to_usd ?? 1;
+
+        // Convert prices
+        $base = $this->convertPrice($uniqueVendor->pivot->price, $vendorRate);
+
+        $sale = $uniqueVendor->pivot->sale_price
+            ? $this->convertPrice($uniqueVendor->pivot->sale_price, $vendorRate)
+            : null;
+        
+        $sale_end = $uniqueVendor->pivot->sale_end;
+
+        return (object)[
+            'id' => $product->id,
+            'name' => $product->name,
+            'slug' => $product->slug,
+            'images' => $product->images ?? [],
+            'vendor_id' => $uniqueVendor->id,
+            'vendor_product_id' => $vendor_product_id,
+            'vendor_name' => $uniqueVendor->store_name,
+            'vendor_slug' => $uniqueVendor->slug ?? null,
+            'stock' => $uniqueVendor->pivot->stock ?? 0,
+            'vendor_currency' => $this->currencyCode,
+            'display_price' => $sale ?? $base,
+            'original_price' => $base,
+            'sale_price' => $sale,
+            'sale_end' => $sale_end,
+            'discount' => $sale && $base > 0
+                ? round(100 - ($sale / $base * 100))
+                : null,
+            'has_vendor' => true, // Add flag to check if product has vendor
+        ];
+    }
+
+    /**
+     * Add to cart
+     */
+    public function addToCart($vendor_product_id)
+    {
+        if (!$vendor_product_id) {
+            $this->dispatch('show-toast', 
+                message: 'This product is not available for purchase.',
+                type: 'error'
+            );
+            return;
+        }
+        
+        // Add item to cart with empty variations (since it's from homepage)
+        $total_count = \App\Helpers\CartManagement::addItemToCart(
+            vendor_product_id: $vendor_product_id,
+            quantity: 1,
+            selectedVariations: [],
+            custom_note: ''
+        );
+
+        $this->dispatch('cart-updated', total_count: $total_count)->to(Navbar::class);
+        $this->dispatch('cart-added');
+    }
+
     public function render()
     {
-        $title = 'Acheter les télephones et accéssoires de meilleurs qualité chez ';
-        $description = 'Trouvez tout le nécessaire pour vos projets de construction en un seul endroit. Nous proposons une large gamme de matériaux de construction et d’équipements professionnels : ciment, sable, gravier, fer à béton, briques, peinture, outils électriques, équipements de protection, et bien plus encore. Que vous soyez un particulier ou un professionnel du bâtiment, nous avons les produits qu’il vous faut pour mener à bien vos travaux, de la fondation à la finition.';
-        // Get all active brands
-        $brands = Brand::where('is_active', 1)->get();
-        // describe all brand
-        $descriptionBrands = ' Découvrez nos marques partenaires, reconnues pour leur qualité et leur fiabilité. Que vous ayez besoin de matériaux de construction, d’outils ou d’équipements, nous avons tout ce qu’il vous faut pour réaliser vos projets en toute sérénité.';
-
-        // Get all active categories
-        $categories = Category::where('is_active', 1)->get();
-        // describe all categories
-        $descriptionCategories = 'Our Categories';
-        // Render the view with the data
-        // Add services section
-        $services = \App\Models\Service::all();
-        $featuredProducts = \App\Models\Product::where('is_featured', 1)
+        // Get featured products
+        $featuredProducts = Product::with(['vendors.currency'])
+            ->where('is_featured', 1)
             ->where('is_active', 1)
+            ->get()
+            ->map(fn($p) => $this->mapProductForHomepage($p))
+            ->filter(fn($p) => $p->has_vendor);
+
+        // Get sale products
+        $saleProducts = Product::with(['vendors.currency'])
+            ->where('on_sale', 1)
+            ->where('is_active', 1)
+            ->get()
+            ->map(fn($p) => $this->mapProductForHomepage($p))
+            ->filter(fn($p) => $p->has_vendor);
+
+        // Get categories with their first product (if any)
+        $categories = Category::with(['products' => function($query) {
+            $query->where('is_active', 1)
+                  ->orderBy('created_at', 'desc')
+                  ->limit(1);
+        }])->where('is_active', 1)->get();
+
+        // Get active vendors
+        $vendors = Vendor::where('is_active', 1)
             ->orderBy('created_at', 'desc')
-            ->take(10)
             ->get();
 
+        // Get services
+        $services = Service::all();
+
         return view('livewire.home-page', [
-            'brands' => $brands,
-            'title' => $title,
-            'description' => $description,
-            'descriptionBrands' => $descriptionBrands,
-            'descriptionCategories' => $descriptionCategories,
+            'featuredProducts' => $featuredProducts,
+            'saleProducts' => $saleProducts,
             'categories' => $categories,
+            'vendors' => $vendors,
             'services' => $services,
-            'featuredProducts' => $featuredProducts
         ]);
     }
 }

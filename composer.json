@@ -3,6 +3,8 @@
   "type": "project",
   "require": {
     "php": "^8.2",
+    "barryvdh/laravel-dompdf": "^3.1",
+    "doctrine/dbal": "^4.3",
     "filament/actions": "3.2.*",
     "filament/filament": "3.2.*",
     "filament/forms": "3.2.*",
@@ -13,9 +15,11 @@
     "filament/widgets": "3.2.*",
     "jantinnerezo/livewire-alert": "^4.0",
     "laravel/framework": "^11.0",
+    "laravel/socialite": "^5.23",
     "laravel/tinker": "^2.10",
     "livewire/livewire": "^3.5",
     "openspout/openspout": "^4.22",
+    "simplesoftwareio/simple-qrcode": "^4.2",
     "spatie/laravel-permission": "^6.18",
     "stripe/stripe-php": "^18.2"
   },
@@ -53,6 +57,17 @@
     "preferred-install": "dist",
     "sort-packages": true
   },
+  "extra": {
+    "laravel": {
+        "livewire": {
+            "discover": [
+                "app/Livewire",
+                "app/Livewire/Dashboard"
+            ]
+        }
+    }
+  },
+
   "minimum-stability": "stable",
   "prefer-stable": true
 }

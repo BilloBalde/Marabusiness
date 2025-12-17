@@ -11,11 +11,24 @@ use Livewire\Component;
 #[Title('Success Page - MARA BUSINESS')]
 class SuccessPage extends Component
 {
+    public $orders = [];
+
+    public function mount()
+    {
+        $userId = Auth::check() ? Auth::id() : User::first()->id;
+
+        // Retrieve ALL orders created IN THIS SESSION
+        $this->orders = Order::with(['address', 'items.product', 'vendor', 'latestShipment'])
+            ->where('user_id', $userId)
+            ->whereDate('created_at', now()->toDateString()) // ⬅ same day
+            ->latest()
+            ->get();
+    }
+
     public function render()
     {
-        $latest_order = Order::with('address')->where('user_id', Auth::check() ? Auth::user()->id : User::first()->id)->latest()->first();
         return view('livewire.success-page', [
-            'latest_order' => $latest_order
+            'orders' => $this->orders
         ]);
     }
 }

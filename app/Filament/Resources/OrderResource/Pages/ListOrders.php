@@ -11,6 +11,11 @@ class ListOrders extends ListRecords
 {
     protected static string $resource = OrderResource::class;
 
+    public function getHeading(): string
+    {
+        return __('filament.nav.orders');
+    }
+
     protected function getHeaderActions(): array
     {
         return [

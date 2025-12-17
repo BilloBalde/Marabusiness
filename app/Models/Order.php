@@ -9,22 +9,28 @@ class Order extends Model
 {
     protected $fillable = [
         'user_id',
+        'vendor_id',
         'order_number',
         'status',
         'grand_total',
         'payment_method',
         'payment_status',
-        'currency',
         'shipping_amount',
-        'shipping_method',
+        'shipping_carrier',
         'notes',
         'total_paid',
-        'total_remaining'
+        'total_remaining',
+        'stripe_session_id',
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function vendor()
+    {
+        return $this->belongsTo(Vendor::class);
     }
 
     public function items()
@@ -35,6 +41,16 @@ class Order extends Model
     public function address()
     {
         return $this->hasOne(Address::class);
+    }
+
+    public function shipments()
+    {
+        return $this->hasMany(Shipment::class);
+    }
+
+    public function latestShipment()
+    {
+        return $this->hasOne(Shipment::class)->latestOfMany();
     }
 
     public static function generateOrderNumber()

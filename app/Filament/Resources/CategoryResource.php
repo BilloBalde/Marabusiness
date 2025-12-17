@@ -13,6 +13,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -33,6 +34,42 @@ class CategoryResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-tag';
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('filament.groups.catalog');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament.nav.categories');
+    }
+
+    public static array $families = [
+        'Mode',
+        'Beauté',
+        'Maison',
+        'Cuisine',
+        'Électronique',
+        'Sport',
+        'Accessoires',
+        'Décoration',
+        'Jouets & Enfants',
+        'Auto & Moto',
+        'Animaux',
+        'Bricolage & Outils',
+        'Jardin & Extérieur',
+        'Bags & Luggage',
+        'Santé & Bien-être',
+        'Arts & Loisirs',
+        'Informatique',
+        'Fêtes & Événements',
+        'Bébé & Puériculture',
+        'Fournitures de Bureau',
+        'Jeux Vidéo',
+        'Équipement Industriel',
+    ];
+
     public static function form(Form $form): Form
     {
         return $form
@@ -53,6 +90,14 @@ class CategoryResource extends Resource
                                 ->dehydrated()
                                 ->unique(Category::class, 'slug', ignoreRecord: true)
                         ]),
+                    Select::make('family')
+                        ->label('Famille')
+                        ->options(array_combine(self::$families, self::$families))
+                        ->required()
+                        ->default('Maison')
+                        ->searchable()
+                        ->preload(),
+
                     FileUpload::make('image')
                         ->disk('public_uploads')
                         ->directory('categories'),
@@ -72,6 +117,11 @@ class CategoryResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('family')
+                    ->label('Famille')
+                    ->sortable()
+                    ->searchable(),
+
                 ImageColumn::make('image')
                     ->label('Image')
                     ->disk('public_uploads')
@@ -88,7 +138,10 @@ class CategoryResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('family')
+                    ->label('Famille')
+                    ->options(array_combine(self::$families, self::$families)),
+
             ])
             ->actions([
                 ActionGroup::make([

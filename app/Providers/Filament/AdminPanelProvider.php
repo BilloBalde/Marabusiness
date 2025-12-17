@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Resources\OrderResource\Widgets\OrderStats;
 use Filament\Http\Middleware\Authenticate;
+use Filament\Navigation\MenuItem;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -41,19 +42,18 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
-            ->pages([
+            /* ->pages([
                 Pages\Dashboard::class,
-            ])
+            ]) */
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
-            ->widgets([
+            /* ->widgets([
                 OrderStats::class,
-                /* Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class, */
-            ])
+            ]) */
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
+                \App\Http\Middleware\SetLocale::class,
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 VerifyCsrfToken::class,
@@ -61,6 +61,39 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+            /* ->userMenuItems([
+                 MenuItem::make()
+                    ->label(__('Language'))
+                    ->icon('heroicon-o-language')
+                    ->url(fn() => route('filament.language.menu')),
+            ]) */
+
+            ->userMenuItems([
+                \Filament\Navigation\MenuItem::make('fr')
+                    ->label('🇫🇷 Français')
+                    ->url(fn () => route('lang.switch', 'fr'))
+                    ->visible(true),
+
+                \Filament\Navigation\MenuItem::make('en')
+                    ->label('🇬🇧 English')
+                    ->url(fn () => route('lang.switch', 'en'))
+                    ->visible(true),
+
+                \Filament\Navigation\MenuItem::make('zh')
+                    ->label('🇨🇳 中文')
+                    ->url(fn () => route('lang.switch', 'zh'))
+                    ->visible(true),
+            ])
+
+
+            /* ->topbarActions([
+                LocaleSwitcher::make()
+                    ->locales([
+                        'en' => 'English',
+                        'fr' => 'Français',
+                        'zh' => '中文',
+                    ]),
+            ]) */
             ->authMiddleware([
                 Authenticate::class,
             ]);

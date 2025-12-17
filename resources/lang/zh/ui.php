@@ -1,0 +1,43 @@
+﻿<?php
+
+return [
+    'navbar' => [
+        'home' => '首页',
+        'categories' => '分类',
+        'products' => '产品',
+        'cart' => '购物车',
+        'login' => '登录',
+        'my_orders' => '我的订单',
+        'my_chats' => '我的聊天',
+        'logout' => '登出',
+        'vendors' => '供应商',
+        'currency' => '货币',
+    ],
+    'hero' => [
+        'title_line1' => '最佳手机与配件',
+        'title_line2' => '来自三星、iPhone 与 Tecno',
+        'subtitle' => '发现高端智能手机与配件的最新优惠，放心选购！',
+        'cta' => '立即选购',
+    ],
+    'popular_categories' => [
+        'title' => '按分类选购',
+        'view_all' => '查看全部分类',
+    ],
+    'popular_brands' => [
+        'title' => '按品牌选购',
+    ],
+    'footer' => [
+        'tagline' => '在 MARA-BUSINESS 选购优质设备。',
+        'company' => '公司',
+        'about' => '关于我们',
+        'privacy' => '隐私政策',
+        'terms' => '使用条款',
+        'contact' => '联系我们',
+        'download_app' => '下载我们的应用',
+        'subscribe_title' => '订阅最新优惠',
+        'subscribe_copy' => '获取最新手机与配件的独家优惠，直达您的邮箱。',
+        'subscribe_placeholder' => '您的邮箱地址',
+        'subscribe_button' => '订阅',
+        'copyright' => '© :year :app_name。保留所有权利。',
+    ],
+];

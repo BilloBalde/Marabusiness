@@ -22,6 +22,16 @@ class PaiementResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
+    public static function getNavigationGroup(): ?string
+    {
+        return __('filament.groups.sales');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament.nav.paiements');
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -42,10 +52,12 @@ class PaiementResource extends Resource
                     ->searchable()
                     ->preload()
                     ->getOptionLabelFromRecordUsing(function ($record) {
+                        $currencyCode = optional($record->vendor?->currency)->code ?? config('app.currency', 'USD');
+
                         return "{$record->order_number} | " .
                             optional($record->user)->name . " | " .
                             $record->created_at->format('Y-m-d') . " | " .
-                            $record->grand_total . ' ' . $record->currency;
+                            $record->grand_total . ' ' . $currencyCode;
                     }),
 
                 TextInput::make('amount')

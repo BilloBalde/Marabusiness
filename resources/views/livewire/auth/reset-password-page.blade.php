@@ -1,62 +1,89 @@
-<div class="w-full max-w-[85rem] py-10 px-4 sm:px-6 lg:px-8 mx-auto">
-  <div class="flex items-center h-full">
+<div class="w-full max-w-[85rem] py-10 px-4 sm:px-6 lg:px-8 mx-auto bg-gray-50">
+  <div class="flex items-center justify-center h-full">
     <main class="w-full max-w-md p-6 mx-auto">
-      <div class="bg-white border border-gray-200 shadow-sm mt-7 rounded-xl dark:bg-gray-800 dark:border-gray-700">
-        <div class="p-4 sm:p-7">
+
+      <div class="bg-white border border-gray-200 shadow-md mt-7 rounded-2xl">
+        <div class="p-6 sm:p-8">
+
+          {{-- HEADER --}}
           <div class="text-center">
-            <h1 class="block text-2xl font-bold text-gray-800 dark:text-white">Mise à Jour Mot Passe</h1>
+            <h1 class="block text-3xl font-extrabold text-gray-900">
+              Mise à jour du mot de passe
+            </h1>
           </div>
 
-          <div class="mt-5">
-            <!-- Form -->
-            <form wire:submit.prevent="save">
-                @if (session('error'))
-                    <div class="px-4 py-3 mb-4 text-sm bg-red-500 border border-red-200 rounded-lg text-white-700 dark:bg-red-800 dark:text-white-100 dark:border-red-700">
-                        {{ session('error') }}
-                    </div>
-                @endif
-              <div class="grid gap-y-4">
-                <!-- Form Group -->
-                <div>
-                  <label for="password" class="block mb-2 text-sm dark:text-white">Password</label>
-                  <div class="relative">
-                    <input type="password" id="password" wire:model="password" class="block w-full px-4 py-3 text-sm border border-gray-200 rounded-lg focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600" aria-describedby="password-error">
-                    <div class="absolute inset-y-0 flex items-center pointer-events-none end-0 pe-3">
-                      <svg class="w-5 h-5 text-red-500" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" />
-                      </svg>
-                    </div>
-                  </div>
+          {{-- ERROR MESSAGE --}}
+          @if (session('error'))
+            <div class="px-4 py-3 mt-6 text-sm text-red-900 bg-red-100 border border-red-300 rounded-lg">
+              ❌ {{ session('error') }}
+            </div>
+          @endif
+
+          {{-- FORM --}}
+          <div class="mt-8">
+            <form wire:submit.prevent="save" class="space-y-6">
+
+              {{-- NEW PASSWORD --}}
+              <div>
+                <label for="password" class="block mb-2 text-sm font-medium text-gray-700">
+                  Nouveau mot de passe
+                </label>
+
+                <div class="relative">
+                  <input type="password" id="password" wire:model="password"
+                         class="block w-full px-4 py-3 text-sm border border-gray-300 rounded-lg
+                                focus:ring-2 focus:ring-[#D4AF37] focus:border-[#D4AF37] outline-none"
+                         placeholder="Entrez votre nouveau mot de passe">
+
                   @error('password')
-                  <p class="mt-2 text-xs text-red-600" id="password-error">{{ $message }}</p>
-                  @enderror
-                </div>
-                <!-- End Form Group -->
-
-                <div>
-                  <label for="password_confirmation" class="block mb-2 text-sm dark:text-white">Confirm Password</label>
-                  <div class="relative">
-                    <input type="password" id="password_confirmation" wire:model="password_confirmation" class="block w-full px-4 py-3 text-sm border border-gray-200 rounded-lg focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600" aria-describedby="password_confirmation-error">
-<div class="absolute inset-y-0 flex items-center pointer-events-none end-0 pe-3">
-                      <svg class="w-5 h-5 text-red-500" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" />
-                      </svg>
+                    <div class="absolute inset-y-0 end-0 flex items-center pe-3 pointer-events-none">
+                      <i class="fa-solid fa-circle-exclamation text-red-500"></i>
                     </div>
-                  </div>
-                  @error('password_confirmation')
-                  <p class="mt-2 text-xs text-red-600" id="password_confirmation-error">{{ $message }}</p>
                   @enderror
                 </div>
 
-                <button type="submit" class="inline-flex items-center justify-center w-full px-4 py-3 text-sm font-semibold text-white bg-blue-600 border border-transparent rounded-lg gap-x-2 hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
-                  Save password
-                </button>
+                @error('password')
+                  <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
+                @enderror
               </div>
+
+              {{-- CONFIRM PASSWORD --}}
+              <div>
+                <label for="password_confirmation" class="block mb-2 text-sm font-medium text-gray-700">
+                  Confirmer le mot de passe
+                </label>
+
+                <div class="relative">
+                  <input type="password" id="password_confirmation" wire:model="password_confirmation"
+                         class="block w-full px-4 py-3 text-sm border border-gray-300 rounded-lg
+                                focus:ring-2 focus:ring-[#D4AF37] focus:border-[#D4AF37] outline-none"
+                         placeholder="Confirmez votre mot de passe">
+
+                  @error('password_confirmation')
+                    <div class="absolute inset-y-0 end-0 flex items-center pe-3 pointer-events-none">
+                      <i class="fa-solid fa-circle-exclamation text-red-500"></i>
+                    </div>
+                  @enderror
+                </div>
+
+                @error('password_confirmation')
+                  <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
+                @enderror
+              </div>
+
+              {{-- SUBMIT BUTTON --}}
+              <button type="submit"
+                      class="w-full py-3 text-sm font-semibold text-white rounded-lg
+                             bg-[#D4AF37] hover:bg-[#c9a227] transition">
+                🔒 Mettre à jour le mot de passe
+              </button>
+
             </form>
-            <!-- End Form -->
           </div>
+
         </div>
       </div>
+
     </main>
   </div>
 </div>

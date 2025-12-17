@@ -9,6 +9,7 @@ use Filament\Forms;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\MarkdownEditor;
 use Filament\Forms\Form;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -27,6 +28,16 @@ class ServiceResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-cog';
 
+    public static function getNavigationGroup(): ?string
+    {
+        return __('filament.groups.extras');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament.nav.services');
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -43,6 +54,17 @@ class ServiceResource extends Resource
                     ->disabled()
                     ->dehydrated()
                     ->unique(Service::class, 'slug', ignoreRecord: true),
+
+                Forms\Components\Section::make('Service Features')
+                    ->description('Add key features of this service')
+                    ->schema([
+                        Forms\Components\TagsInput::make('features')
+                            ->label('Features')
+                            ->placeholder('Type a feature and press Enter')
+                            ->splitKeys(['Tab', 'Enter'])
+                            ->helperText('Add features that describe this service. Press Enter after each feature.')
+                            ->columnSpanFull(),
+                    ]),
 
                 FileUpload::make('icon')
                     ->disk('public_uploads')
@@ -66,6 +88,30 @@ class ServiceResource extends Resource
                 Tables\Columns\TextColumn::make('slug')
                     ->sortable()
                     ->searchable(),
+                
+                Tables\Columns\TextColumn::make('features')
+                    ->label('Features')
+                    ->formatStateUsing(function ($state) {
+                        if (empty($state)) return 'No features';
+                        
+                        $features = is_string($state) ? json_decode($state, true) : $state;
+                        if (is_array($features) && count($features) > 0) {
+                            return implode(', ', array_slice($features, 0, 3)) . 
+                                (count($features) > 3 ? '...' : '');
+                        }
+                        return 'No features';
+                    })
+                    ->tooltip(function ($state) {
+                        if (empty($state)) return null;
+                        
+                        $features = is_string($state) ? json_decode($state, true) : $state;
+                        if (is_array($features) && count($features) > 0) {
+                            return implode(', ', $features);
+                        }
+                        return null;
+                    })
+                    ->color('gray')
+                    ->wrap(),
 
                 Tables\Columns\ImageColumn::make('image')
                     ->disk('public_uploads'),

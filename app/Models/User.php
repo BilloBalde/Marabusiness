@@ -8,6 +8,7 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Hash;
@@ -85,11 +86,19 @@ class User extends Authenticatable implements FilamentUser
         return $this->sentMessages->merge($this->receivedMessages);
     }
 
+    public function vendor(): HasOne
+    {
+        return $this->hasOne(Vendor::class);
+    }
+
     // app/Models/User.php
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->hasAnyRole(['admin', 'manager']);
+        return match ($panel->getId()) {
+            'vendor' => $this->hasRole('vendor') && $this->vendor()->exists(),
+            default => $this->hasAnyRole(['admin', 'manager']),
+        };
     }
 
 }

@@ -7,11 +7,14 @@ use App\Models\Shipment;
 use App\Services\Shipping\CarrierTrackingService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
+use App\Models\Order;
+use App\Models\ShippingCarrierRate;
 
 class ShipmentResource extends Resource
 {
@@ -50,9 +53,40 @@ class ShipmentResource extends Resource
                             ->label('Order')
                             ->searchable()
                             ->preload()
+                            ->live()
+                            ->afterStateUpdated(function (callable $set) {
+                                $set('carrier', null);
+                            })
                             ->required(),
                         Forms\Components\Select::make('carrier')
-                            ->options(Shipment::CARRIERS)
+                            ->options(function (Get $get) {
+                                $orderId = $get('order_id');
+                                if (!$orderId) {
+                                    return [];
+                                }
+
+                                $vendorId = Order::whereKey($orderId)->value('vendor_id');
+                                if (!$vendorId) {
+                                    return [];
+                                }
+
+                                $carriers = ShippingCarrierRate::query()
+                                    ->select('carrier')
+                                    ->where('vendor_id', $vendorId)
+                                    ->active()
+                                    ->get()
+                                    ->mapWithKeys(fn ($rate) => [
+                                        $rate->carrier => ShippingCarrierRate::CARRIERS[$rate->carrier] ?? $rate->carrier_name,
+                                    ])
+                                    ->toArray();
+
+                                // Fallback to defaults if no vendor carriers found
+                                return !empty($carriers) ? $carriers : Shipment::CARRIERS;
+                            })
+                            ->helperText('Pick a carrier configured for this order\'s vendor.')
+                            ->placeholder('Select a carrier')
+                            ->reactive()
+                            ->disabled(fn (Get $get) => blank($get('order_id')))
                             ->searchable()
                             ->required(),
                         Forms\Components\TextInput::make('tracking_number')
@@ -64,8 +98,7 @@ class ShipmentResource extends Resource
                             ->helperText('Will be overwritten when syncing with carrier.'),
                         Forms\Components\TextInput::make('current_location')
                             ->maxLength(255)
-                            ->label('Latest location')
-                            ->columnSpanFull(),
+                            ->label('Latest location'),
                         Forms\Components\DateTimePicker::make('estimated_delivery_at')
                             ->label('Estimated delivery'),
                     ])->columns(2),
@@ -78,13 +111,6 @@ class ShipmentResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('order.order_number')->label('Order')->searchable()->sortable(),
                 Tables\Columns\BadgeColumn::make('carrier')
-                    ->formatStateUsing(fn ($state) => Shipment::CARRIERS[$state] ?? ucfirst($state))
-                    ->colors([
-                        'warning' => fn ($state) => $state === 'local',
-                        'success' => fn ($state) => $state === 'dhl',
-                        'info'    => fn ($state) => $state === 'ups',
-                        'primary' => fn ($state) => $state === 'fedex',
-                    ])
                     ->sortable(),
                 Tables\Columns\TextColumn::make('tracking_number')->searchable()->copyable(),
                 Tables\Columns\TextColumn::make('status')->badge()->sortable(),

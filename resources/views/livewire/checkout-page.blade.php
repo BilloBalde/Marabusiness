@@ -1,6 +1,5 @@
 <div class="bg-gray-50 min-h-screen py-6">
     <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.checkout'])
         {{-- LEFT COLUMN — SHIPPING + PAYMENT FORM --}}
         <div class="lg:col-span-8 space-y-6">
             {{-- FLASH MESSAGES --}}

@@ -18,29 +18,37 @@ class CartPage extends Component
     public $selected_vendor_totals = [];
     public $selected_total = 0;
     public $selected_currency = 'USD';
+    public $quantity_values = [];
 
     public function mount()
     {
-          // Temporary: Clear corrupted cart data
-    if (Cookie::has('cart_items')) {
-        $cart_items = json_decode(Cookie::get('cart_items'), true);
-        $hasCorruption = false;
-        
-        foreach ($cart_items as $item) {
-            if (!isset($item['cart_key']) || !isset($item['vendor_product_id'])) {
-                $hasCorruption = true;
-                break;
+        // Temporary: Clear corrupted cart data
+        if (Cookie::has('cart_items')) {
+            $cart_items = json_decode(Cookie::get('cart_items'), true);
+            $hasCorruption = false;
+            
+            foreach ($cart_items as $item) {
+                if (!isset($item['cart_key']) || !isset($item['vendor_product_id'])) {
+                    $hasCorruption = true;
+                    break;
+                }
+            }
+            
+            if ($hasCorruption) {
+                // Clear corrupted cart
+                Cookie::queue(Cookie::forget('cart_items'));
+                $this->cart_items = [];
+                return;
             }
         }
-        
-        if ($hasCorruption) {
-            // Clear corrupted cart
-            Cookie::queue(Cookie::forget('cart_items'));
-            $this->cart_items = [];
-            return;
-        }
-    }
         $this->refreshCart();
+
+        // Initialize quantity_values
+        foreach ($this->cart_items as $item) {
+            if (isset($item['cart_key'])) {
+                $this->quantity_values[$item['cart_key']] = $item['quantity'] ?? 1;
+            }
+        }
         // Call this in your mount() methods or as a middleware
         //CartManagement::cleanupInvalidCartItems();
     }
@@ -63,21 +71,20 @@ class CartPage extends Component
 
     public function increaseQty($cart_key)
     {
-        // Update in CartManagement
-        $this->cart_items = CartManagement::incrementQuantity($cart_key);
+        $currentQty = $this->quantity_values[$cart_key] ?? 1;
+        $newQty = $currentQty + 1;
+        $this->quantity_values[$cart_key] = $newQty;
         
-        // Update local state without full refresh
-        $this->updateLocalState($cart_key, 'increase');
-        
-        // Dispatch event but don't refresh cart completely
-        $this->dispatch('cart-updated');
+        $this->updateQty($cart_key, $newQty);
     }
 
     public function decreaseQty($cart_key)
     {
-        $this->cart_items = CartManagement::decrementQuantity($cart_key);
-        $this->updateLocalState($cart_key, 'decrease');
-        $this->dispatch('cart-updated');
+        $currentQty = $this->quantity_values[$cart_key] ?? 1;
+        $newQty = max(1, $currentQty - 1);
+        $this->quantity_values[$cart_key] = $newQty;
+        
+        $this->updateQty($cart_key, $newQty);
     }
 
     private function updateLocalState($cart_key, $action)
@@ -165,11 +172,32 @@ class CartPage extends Component
         }
     }
 
-    public function updateQty($cart_key, $quantity)
+    public function updateQty($cart_key, $quantity = null)
     {
+        // If quantity is not provided, use the value from quantity_values
+        if ($quantity === null && isset($this->quantity_values[$cart_key])) {
+            $quantity = $this->quantity_values[$cart_key];
+        }
         if ($quantity < 1) $quantity = 1;
         $this->cart_items = CartManagement::updateQuantity($cart_key, $quantity);
-        $this->refreshCart();
+        // Update local state without full refresh
+        foreach ($this->cart_items as &$item) {
+            if ($item['cart_key'] === $cart_key) {
+                $item['quantity'] = $quantity;
+                $item['total_amount'] = $item['unit_amount'] * $quantity;
+                break;
+            }
+        }
+        
+        // Update grouped cart
+        $this->updateGroupedCart();
+        
+        // Update selected summary
+        $this->updateSelectedSummary();
+        
+        // Update quantity_values to ensure sync
+        $this->quantity_values[$cart_key] = $quantity;
+        $this->dispatch('cart-updated');
     }
 
     public function toggleVendor($vendor_id)

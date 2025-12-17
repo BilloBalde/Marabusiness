@@ -1,4 +1,5 @@
 <div class="bg-gray-50 min-h-screen p-4 sm:p-6 lg:p-8">
+   {{--  @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.product-detail']) --}}
     <div class="max-w-6xl mx-auto bg-white shadow rounded-lg p-6">
         @if(session()->has('success'))
             <div class="mb-4 p-3 bg-green-100 text-green-700 rounded-lg">
@@ -147,6 +148,8 @@
                     </label>
                     <div class="relative flex flex-row w-full h-10 mt-6 bg-transparent rounded-lg">
                         <button wire:click='decreaseQty' 
+                                wire:loading.attr="disabled"
+                                @if($stock <= 0) disabled @endif
                                 class="w-20 h-full text-gray-600 bg-gray-300 rounded-l outline-none cursor-pointer hover:bg-gray-400">
                             <span class="m-auto text-2xl font-thin">-</span>
                         </button>
@@ -154,7 +157,9 @@
                                type="number" 
                                readonly 
                                class="flex items-center w-full font-semibold text-center text-gray-700 placeholder-gray-700 bg-gray-300 outline-none focus:outline-none text-md">
-                        <button wire:click='increaseQty' 
+                        <button wire:click='increaseQty'
+                                wire:loading.attr="disabled"
+                                @if($stock <= 0) disabled @endif 
                                 class="w-20 h-full text-gray-600 bg-gray-300 rounded-r outline-none cursor-pointer hover:bg-gray-400">
                             <span class="m-auto text-2xl font-thin">+</span>
                         </button>

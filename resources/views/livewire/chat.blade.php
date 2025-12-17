@@ -1,6 +1,7 @@
 <div class="flex flex-col h-full overflow-hidden rounded-2xl shadow-xl bg-gradient-to-br from-gray-50 to-white">
     {{-- Chat Header --}}
     <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+        @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.chat'])
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-3">
                 <div class="relative">

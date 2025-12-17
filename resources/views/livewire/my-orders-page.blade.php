@@ -1,4 +1,5 @@
 <div class="w-full max-w-[85rem] py-10 px-4 sm:px-6 lg:px-8 mx-auto">
+    @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.orders'])
     <h1 class="text-3xl md:text-4xl font-bold text-slate-800 mb-4">
         Mes Commandes
     </h1>

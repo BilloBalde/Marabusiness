@@ -1,6 +1,7 @@
 <div class="bg-gray-50 min-h-screen py-6">
 
     <div class="max-w-7xl mx-auto px-4 flex gap-6">
+        {{-- @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.products']) --}}
 
         {{-- ======================= --}}
         {{-- SIDEBAR FILTERS --}}

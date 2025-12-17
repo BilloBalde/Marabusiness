@@ -1,5 +1,6 @@
 <div class="bg-gray-50 min-h-screen py-10">
     <div class="max-w-7xl mx-auto px-6">
+        @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.vendors'])
         <h1 class="text-3xl font-bold text-gray-800 mb-6">
             Boutiques Officielles
         </h1>

@@ -1,4 +1,5 @@
 <div class="w-full max-w-[85rem] py-10 px-4 sm:px-6 lg:px-8 mx-auto">
+    @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.chat'])
     <h2 class="text-2xl font-semibold text-gray-800">Messagerie</h2>
 
     {{-- Messages Box --}}

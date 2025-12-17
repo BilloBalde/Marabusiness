@@ -1,6 +1,7 @@
 <div class="w-full max-w-[90rem] mx-auto py-14 px-4 sm:px-6 lg:px-8">
 
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-lg p-10 max-w-3xl mx-auto text-center">
+        @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.cancel'])
 
         {{-- ICON --}}
         <div class="flex justify-center mb-6">

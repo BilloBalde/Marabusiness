@@ -6,6 +6,7 @@
 @endphp
 
 <div class="w-full max-w-[85rem] py-10 px-4 sm:px-6 lg:px-8 mx-auto">
+    @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.my-order'])
 
     <!-- HEADER -->
     <div class="flex items-center justify-between mb-8">

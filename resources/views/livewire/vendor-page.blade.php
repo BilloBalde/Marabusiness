@@ -1,6 +1,7 @@
 <div class="bg-gray-50 min-h-screen py-10">
 
     <div class="max-w-7xl mx-auto px-6">
+        @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.vendor'])
 
         <!-- Vendor Header -->
         <div class="bg-white rounded-xl shadow-sm mb-6 p-6">

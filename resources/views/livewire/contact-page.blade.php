@@ -1,5 +1,5 @@
 <div class="w-full max-w-[90rem] py-10 px-4 sm:px-6 lg:px-8 mx-auto">
-
+    @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.contact'])
     <!-- PAGE TITLE -->
     <h1 class="mb-10 text-3xl font-bold text-gray-800 tracking-tight">
         Contact Us

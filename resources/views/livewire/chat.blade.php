@@ -1,7 +1,72 @@
-<div class="flex flex-col h-full overflow-hidden rounded-2xl shadow-xl bg-gradient-to-br from-gray-50 to-white">
+@push('styles')
+<style>
+    .chat-panel {
+        background: var(--pos-surface);
+        border: 1px solid var(--pos-border);
+        box-shadow: var(--pos-shadow);
+        color: var(--pos-text);
+    }
+    .chat-panel-header {
+        background: linear-gradient(90deg, rgba(79,70,229,0.08), rgba(14,165,233,0.08));
+        border-bottom: 1px solid var(--pos-border);
+    }
+    .chat-panel-body {
+        background: var(--pos-surface-2);
+    }
+    .chat-bubble-send {
+        background: linear-gradient(120deg, #4f46e5, #2563eb);
+        color: #ffffff;
+    }
+    .chat-bubble-recv {
+        background: var(--pos-surface);
+        color: var(--pos-text);
+        border: 1px solid var(--pos-border);
+    }
+    .chat-bubble-arrow {
+        background: var(--pos-surface);
+        border-left: 1px solid var(--pos-border);
+        border-top: 1px solid var(--pos-border);
+    }
+    .chat-footer {
+        background: linear-gradient(90deg, rgba(79,70,229,0.08), rgba(14,165,233,0.08));
+        border-top: 1px solid var(--pos-border);
+    }
+    .chat-bubble-send-meta {
+        color: rgba(255,255,255,0.8);
+    }
+    .chat-input-field {
+        background: var(--pos-surface);
+        border: 1px solid var(--pos-border);
+        color: var(--pos-text);
+    }
+    .chat-input-field:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(79,70,229,0.2);
+        border-color: var(--pos-border);
+    }
+    .chat-send-btn {
+        background: linear-gradient(120deg, #4f46e5, #2563eb);
+        color: #ffffff;
+        box-shadow: 0 10px 25px rgba(37, 99, 235, 0.35);
+        transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    .chat-send-btn:hover {
+        box-shadow: 0 12px 30px rgba(37, 99, 235, 0.4);
+    }
+    .chat-send-btn:active {
+        transform: translateY(1px);
+    }
+    .chat-date-pill {
+        background: var(--pos-surface);
+        color: var(--pos-text-subtle);
+        border: 1px solid var(--pos-border);
+    }
+</style>
+@endpush
+
+<div class="flex flex-col h-full overflow-hidden rounded-2xl shadow-xl chat-panel">
     {{-- Chat Header --}}
-    <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-        @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.chat'])
+    <div class="px-6 py-4 chat-panel-header">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-3">
                 <div class="relative">
@@ -33,10 +98,10 @@
     </div>
 
     {{-- Messages Container --}}
-    <div class="flex-1 p-6 overflow-y-auto bg-gradient-to-b from-white via-blue-50/30 to-white">
+    <div class="flex-1 p-6 overflow-y-auto chat-panel-body">
         {{-- Date Separator --}}
         <div class="flex justify-center my-6">
-            <span class="px-4 py-1 text-xs font-medium text-gray-500 bg-gray-100 rounded-full">Today</span>
+            <span class="px-4 py-1 text-xs font-medium chat-date-pill rounded-full">Today</span>
         </div>
 
         <div class="space-y-4">
@@ -60,12 +125,12 @@
                         <div class="relative">
                             <div class="px-4 py-3 rounded-2xl shadow-sm
                                 {{ $isSender
-                                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-br-none'
-                                    : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none shadow-xs' }}">
+                                    ? 'chat-bubble-send rounded-br-none'
+                                    : 'chat-bubble-recv rounded-bl-none shadow-xs' }}">
                                 <p class="text-sm leading-relaxed">{{ $message->content }}</p>
                                 
                                 {{-- Message Time --}}
-                                <div class="flex items-center justify-end mt-1 {{ $isSender ? 'text-blue-100' : 'text-gray-400' }}">
+                                <div class="flex items-center justify-end mt-1 {{ $isSender ? 'chat-bubble-send-meta' : 'text-gray-400' }}">
                                     <span class="text-xs">{{ $message->created_at->format('h:i A') }}</span>
                                     @if($isSender)
                                         <svg class="w-3 h-3 ml-1" fill="currentColor" viewBox="0 0 20 20">
@@ -79,7 +144,7 @@
                             <div class="absolute w-2 h-2 transform rotate-45
                                 {{ $isSender
                                     ? 'bg-gradient-to-r from-blue-500 to-indigo-600 right-[-4px] top-3'
-                                    : 'bg-white border-l border-t border-gray-100 left-[-4px] top-3' }}">
+                                    : 'chat-bubble-arrow left-[-4px] top-3' }}">
                             </div>
                         </div>
                     </div>
@@ -89,7 +154,7 @@
     </div>
 
     {{-- Input Area --}}
-    <div class="p-4 border-t border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+    <div class="p-4 chat-footer">
         <div class="flex items-center gap-3">
             {{-- Attachment Button --}}
             <button class="p-2 text-gray-500 transition-colors rounded-full hover:bg-gray-100 hover:text-gray-700">
@@ -111,7 +176,7 @@
                     type="text"
                     wire:model="message"
                     wire:keydown.enter="sendMessage"
-                    class="w-full px-4 py-3 pl-10 text-sm bg-white border border-gray-300 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    class="w-full px-4 py-3 pl-10 text-sm chat-input-field rounded-full shadow-sm"
                     placeholder="Type your message..."
                 />
                 <div class="absolute left-3 top-3">
@@ -124,7 +189,7 @@
             {{-- Send Button --}}
             <button
                 wire:click="sendMessage"
-                class="flex items-center justify-center w-10 h-10 text-white transition-all duration-200 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full hover:from-blue-600 hover:to-indigo-700 hover:shadow-lg active:scale-95"
+                class="flex items-center justify-center w-10 h-10 rounded-full chat-send-btn"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>

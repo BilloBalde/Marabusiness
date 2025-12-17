@@ -4,8 +4,36 @@
 
 @push('styles')
 <style>
+    /* Theme tokens (light default) */
+    :root {
+        --pos-page-bg: linear-gradient(135deg, #f3f4f6 0%, #ffffff 100%);
+        --pos-surface: #ffffff;
+        --pos-surface-2: #f8fafc;
+        --pos-card: #ffffff;
+        --pos-border: #e2e8f0;
+        --pos-border-2: #e5e7eb;
+        --pos-muted: #f1f5f9;
+        --pos-text: #0f172a;
+        --pos-text-subtle: #475569;
+        --pos-shadow: 0 15px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    .dark {
+        --pos-page-bg: linear-gradient(135deg, #0f172a 0%, #111827 100%);
+        --pos-surface: #0b1220;
+        --pos-surface-2: #0f172a;
+        --pos-card: #111827;
+        --pos-border: #1f2937;
+        --pos-border-2: #1f2937;
+        --pos-muted: #0f172a;
+        --pos-text: #e2e8f0;
+        --pos-text-subtle: #94a3b8;
+        --pos-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    }
+
     body {
-        background: linear-gradient(135deg, #f3f4f6 0%, #ffffff 100%);
+        background: var(--pos-page-bg);
+        color: var(--pos-text);
     }
 
     .pos-wrapper {
@@ -13,6 +41,7 @@
         margin: 0 auto;
         padding: 1.5rem;
         margin-top: 1.5rem;
+        color: var(--pos-text);
     }
 
     .pos-shell {
@@ -22,10 +51,11 @@
     }
 
     .pos-panel {
-        background: white;
+        background: var(--pos-surface);
         border-radius: 1.15rem;
         padding: 1.5rem;
-        box-shadow: 0 15px 50px rgba(15, 23, 42, 0.08);
+        box-shadow: var(--pos-shadow);
+        border: 1px solid var(--pos-border);
     }
 
     .pos-product-grid {
@@ -39,8 +69,8 @@
 
     .pos-product-card {
         border-radius: 1rem;
-        background: white;
-        border: 1px solid #e5e7eb;
+        background: var(--pos-card);
+        border: 1px solid var(--pos-border-2);
         padding: 0.85rem;
         display: flex;
         flex-direction: column;
@@ -58,7 +88,7 @@
         width: 100%;
         height: 150px;
         object-fit: cover;
-        background: #f1f5f9;
+        background: var(--pos-muted);
     }
 
     .pos-cart-panel {
@@ -73,13 +103,13 @@
         max-height: 55vh;
         overflow-y: auto;
         border-radius: 0.75rem;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--pos-border);
         padding: 0.75rem;
-        background: #f8fafc;
+        background: var(--pos-surface-2);
     }
 
     .pos-cart-item {
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid var(--pos-border);
         padding: 0.85rem 0;
         display: flex;
         justify-content: space-between;
@@ -102,15 +132,16 @@
         border-radius: 999px;
         padding: 0.45rem 0.9rem;
         font-size: 0.85rem;
-        border: 1px solid #e2e8f0;
-        background: #f8fafc;
+        border: 1px solid var(--pos-border);
+        background: var(--pos-surface-2);
         cursor: pointer;
         transition: all 0.2s ease;
+        color: var(--pos-text);
     }
 
     .category-pill.active {
         background: var(--fi-color-primary-600);
-        color: black;
+        color: #0f172a;
         border-color: transparent;
         box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35);
     }
@@ -141,10 +172,10 @@
         width: 100%;
         padding: 0.55rem 0.75rem;
         border-radius: 0.65rem;
-        border: 1px solid #d1d5db;
-        background: white;
+        border: 1px solid var(--pos-border);
+        background: var(--pos-surface);
         font-size: 0.875rem;
-        color: #111827;
+        color: var(--pos-text);
         transition: all 0.15s ease;
         box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
@@ -167,7 +198,7 @@
     .fi-label {
         font-size: 0.85rem;
         font-weight: 600;
-        color: #374151;
+        color: var(--pos-text-subtle);
         margin-bottom: 0.25rem;
         display: inline-block;
     }
@@ -202,11 +233,17 @@
         width: 55px;
         text-align: center;
     }
+    .dark .text-gray-500 { color: var(--pos-text-subtle) !important; }
+    .dark .text-gray-800 { color: var(--pos-text) !important; }
+    .dark .bg-white { background-color: var(--pos-surface) !important; }
+    .dark .bg-gray-100 { background-color: var(--pos-muted) !important; }
+    .dark .text-gray-900 { color: var(--pos-text) !important; }
+    .dark .text-sm { color: inherit; }
 </style>
 @endpush
 
 <x-filament::page>
-    <div class="pos-wrapper">
+    <div class="pos-wrapper" id="pos-root">
         <div class="pos-shell">
 
             {{-- PRODUCTS SECTION --}}

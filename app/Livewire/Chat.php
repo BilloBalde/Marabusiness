@@ -22,6 +22,11 @@ class Chat extends Component
         }
     }
 
+    public function updatedChatWithId($value)
+    {
+        $this->loadMessages();
+    }
+
     private static function getConnectedUser(){
         return auth()->user(); // Use Laravel’s default auth outside Filament
     }
@@ -29,6 +34,11 @@ class Chat extends Component
 
     public function loadMessages()
     {
+        if (!$this->chatWithId || !self::getConnectedUser()) {
+            $this->messages = collect();
+            return;
+        }
+
         $currentUserId = self::getConnectedUser()->id;
 
         $this->messages = Message::where(function ($q) use ($currentUserId) {

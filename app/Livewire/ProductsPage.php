@@ -2,8 +2,7 @@
 
 namespace App\Livewire;
 
-use App\Helpers\CartManagement;
-use App\Livewire\Partials\Navbar;
+use App\Helpers\WishlistManagement;
 use App\Models\Product;
 use App\Models\VendorProduct;
 use App\Models\Category;
@@ -63,18 +62,22 @@ class ProductsPage extends Component
         $this->resetPage();
     }
 
-    public function addToCart($vendor_product_id)
+    public function addToWishlist($vendor_product_id)
     {
-        // Add item to cart with empty variations (since it's from homepage)
-        $total_count = \App\Helpers\CartManagement::addItemToCart(
-            vendor_product_id: $vendor_product_id,
-            quantity: 1,
-            selectedVariations: [],
-            custom_note: ''
+        if (!$vendor_product_id) {
+            $this->dispatch('show-toast', 
+                message: 'This product is not available.',
+                type: 'error'
+            );
+            return;
+        }
+        
+        WishlistManagement::addItem($vendor_product_id, null, []);
+        $this->dispatch('wishlist-updated', total_count: WishlistManagement::getCount());
+        $this->dispatch('show-toast', 
+            message: 'Added to wishlist.',
+            type: 'success'
         );
-
-        $this->dispatch('cart-updated', total_count: $total_count)->to(Navbar::class);
-        $this->dispatch('cart-added');
     }
 
     /**

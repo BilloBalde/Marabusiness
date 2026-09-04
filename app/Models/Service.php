@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Service extends Model
 {
+    use Concerns\HasTranslations;
+
     protected $fillable = [
         'name',
         'icon',
@@ -17,7 +20,22 @@ class Service extends Model
     protected $casts = [
         'features' => 'array', // Auto-cast JSON to array
     ];
-    
+
+    public function translations(): HasMany
+    {
+        return $this->hasMany(ServiceTranslation::class);
+    }
+
+    public function getNameAttribute($value)
+    {
+        return $this->translate('name', $value);
+    }
+
+    public function getDescriptionAttribute($value)
+    {
+        return $this->translate('description', $value);
+    }
+
     /**
      * Get features as array with default if empty
      */

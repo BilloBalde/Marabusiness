@@ -89,9 +89,11 @@
 
             {{-- SUBMIT BUTTON --}}
             <button type="submit"
+                    wire:loading.attr="disabled"
                     class="w-full py-3 text-sm font-semibold text-white rounded-lg 
-                           bg-[#D4AF37] hover:bg-[#c9a227] transition">
-              🔐 Se Connecter
+                           bg-[#D4AF37] hover:bg-[#c9a227] transition disabled:opacity-60">
+              <span wire:loading.remove>Se Connecter</span>
+              <span wire:loading>Connexion en cours...</span>
             </button>
 
             {{-- SOCIAL LOGIN --}}
@@ -112,3 +114,4 @@
     </main>
   </div>
 </div>
+

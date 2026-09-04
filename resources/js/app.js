@@ -1,4 +1,5 @@
 import './bootstrap';
+import './csrf-refresh'; // Add this line
 import 'preline';
 
 document.addEventListener('livewire:navigated', () => {

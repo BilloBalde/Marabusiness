@@ -1,14 +1,14 @@
 <div class="bg-gray-50 min-h-screen py-10">
 
     <div class="max-w-7xl mx-auto px-6">
-        @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.vendor'])
+        @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.vendor', 'hasSub' => true, 'subContent' => 'ui.navbar.vendors', 'subLink' => 'vendors'])
 
         <!-- Vendor Header -->
         <div class="bg-white rounded-xl shadow-sm mb-6 p-6">
             <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                 <div class="flex items-center gap-4">
                     @if($vendor->logo_path)
-                        <img src="{{ asset($vendor->logo_path) }}"
+                        <img src="{{ asset('uploads/'.$vendor->logo_path) }}"
                              class="w-20 h-20 rounded-full border shadow object-cover">
                     @else
                         <div class="w-20 h-20 rounded-full bg-gray-200 border shadow flex items-center justify-center">
@@ -154,29 +154,62 @@
                 </div>
 
                 <!-- Products Grid -->
+                <!-- Products Grid -->
                 @if($products->count() > 0)
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         @foreach($products as $product)
+                        @php
+                            $vendorProduct = $product->vendorProducts
+                                ->where('vendor_id', $vendor->id)
+                                ->first();
+                            
+                            // Check if vendor product has variations
+                            $hasVariations = $vendorProduct && $vendorProduct->has_variations && $vendorProduct->variations->count() > 0;
+                            
+                            // Get price display
+                            if ($hasVariations) {
+                                $minPrice = $vendorProduct->variations->min('price');
+                                $maxPrice = $vendorProduct->variations->max('price');
+                                $priceDisplay = $minPrice == $maxPrice 
+                                    ? number_format($minPrice, 2) 
+                                    : number_format($minPrice, 2) . ' - ' . number_format($maxPrice, 2);
+                                $salePrice = null;
+                                $discount = null;
+                            } else {
+                                $price = $vendorProduct->price ?? 0;
+                                $salePrice = $vendorProduct->sale_price ?? null;
+                                $priceDisplay = number_format($salePrice ?? $price, 2);
+                                $discount = ($salePrice && $price > $salePrice) 
+                                    ? round((($price - $salePrice) / $price) * 100) 
+                                    : null;
+                            }
+                            
+                            // Get stock status
+                            if ($hasVariations) {
+                                $totalStock = $vendorProduct->variations->sum('stock');
+                                $inStock = $totalStock > 0;
+                            } else {
+                                $inStock = ($vendorProduct->stock ?? 0) > 0;
+                            }
+                            
+                            // Get product image
+                            $firstImage = null;
+                            if ($product->images) {
+                                if (is_array($product->images)) {
+                                    $firstImage = $product->images[0] ?? null;
+                                } elseif (is_string($product->images)) {
+                                    $imagesArray = json_decode($product->images, true);
+                                    $firstImage = $imagesArray[0] ?? null;
+                                }
+                            }
+                        @endphp
+                        
                         <div class="bg-white rounded-xl shadow hover:shadow-lg transition p-4">
                             
                             <!-- Product Image -->
-                            @php
-                                $firstImage = null;
-                                
-                                // Check if images exists and get first image
-                                if ($product->images) {
-                                    if (is_array($product->images)) {
-                                        $firstImage = $product->images[0] ?? null;
-                                    } elseif (is_string($product->images)) {
-                                        $imagesArray = json_decode($product->images, true);
-                                        $firstImage = $imagesArray[0] ?? null;
-                                    }
-                                }
-                            @endphp
-
                             @if($firstImage)
                                 <img src="{{ url('uploads/' . $firstImage) }}" 
-                                     class="w-full h-48 object-cover rounded-lg mb-3">
+                                    class="w-full h-48 object-cover rounded-lg mb-3">
                             @else
                                 <div class="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center mb-3">
                                     <i class="fas fa-box-open text-gray-400 text-3xl"></i>
@@ -190,23 +223,39 @@
                             
                             <!-- Price -->
                             <div class="mt-2">
-                                <span class="text-lg font-bold text-gray-900">
-                                    {{ number_format($product->pivot->sale_price ?? $product->pivot->price, 2) }} {{ $vendor->currency_code }}
-                                </span>
-                                @if($product->pivot->sale_price && $product->pivot->price > $product->pivot->sale_price)
-                                    <span class="text-sm text-gray-500 line-through ml-2">
-                                        {{ number_format($product->pivot->price, 2) }}  {{ $vendor->currency_code }}
+                                @if($hasVariations)
+                                    <span class="text-lg font-bold text-gray-900">
+                                        {{ $priceDisplay }} {{ $vendor->currency_code }}
                                     </span>
-                                    <span class="text-sm text-green-600 ml-2">
-                                        -{{ round((($product->pivot->price - $product->pivot->sale_price) / $product->pivot->price) * 100) }}%
+                                    @if($vendorProduct->variations->count() > 1)
+                                        <span class="text-xs text-gray-500 ml-1">
+                                            ({{ $vendorProduct->variations->count() }} variants)
+                                        </span>
+                                    @endif
+                                @else
+                                    <span class="text-lg font-bold text-gray-900">
+                                        {{ $priceDisplay }} {{ $vendor->currency_code }}
                                     </span>
+                                    @if($salePrice && $price > $salePrice)
+                                        <span class="text-sm text-gray-500 line-through ml-2">
+                                            {{ number_format($price, 2) }} {{ $vendor->currency_code }}
+                                        </span>
+                                        <span class="text-sm text-green-600 ml-2">
+                                            -{{ $discount }}%
+                                        </span>
+                                    @endif
                                 @endif
                             </div>
                             
                             <!-- Stock Status -->
-                            @if($product->pivot->stock > 0)
+                            @if($inStock)
                                 <p class="text-sm text-green-600 mt-1">
-                                    <i class="fas fa-check-circle mr-1"></i> In Stock
+                                    <i class="fas fa-check-circle mr-1"></i> 
+                                    @if($hasVariations)
+                                        {{ $totalStock }} in stock
+                                    @else
+                                        In Stock
+                                    @endif
                                 </p>
                             @else
                                 <p class="text-sm text-red-600 mt-1">
@@ -214,11 +263,11 @@
                                 </p>
                             @endif
                             
-                            <!-- Add to Cart Button -->
-                            @if($product->pivot->stock > 0)
-                                <button wire:click="addToCart({{ $product->pivot->id }})"
+                            <!-- Add to Wishlist Button -->
+                            @if($inStock)
+                                <button wire:click="addToWishlist({{ $vendorProduct->id }})"
                                         class="w-full mt-3 bg-[#D4AF37] text-white py-2 rounded-lg hover:bg-[#c9a12f] transition-colors">
-                                    <i class="fas fa-cart-plus mr-2"></i> Add to Cart
+                                    <i class="fas fa-heart mr-2"></i> Add to Wishlist
                                 </button>
                             @else
                                 <div class="w-full mt-3 bg-gray-100 text-gray-500 py-2 rounded-lg text-center">
@@ -227,17 +276,12 @@
                             @endif
                             
                             <!-- View Details Link -->
-                            <a href="{{ url('/products/' . $product->slug . '/' . $product->pivot->id) }}"
-                               class="block text-center text-sm text-[#D4AF37] hover:text-[#c9a12f] mt-2">
+                            <a href="{{ route('product-show', [$product->slug, $vendorProduct->id]) }}"
+                            class="block text-center text-sm text-[#D4AF37] hover:text-[#c9a12f] mt-2">
                                 View Details
                             </a>
                         </div>
                         @endforeach
-                    </div>
-                    
-                    <!-- Pagination -->
-                    <div class="mt-8">
-                        {{ $products->links() }}
                     </div>
                 @else
                     <div class="bg-white rounded-xl shadow-sm p-8 text-center">

@@ -16,7 +16,7 @@ class TopCustomers extends TableWidget
     protected function getTableQuery(): Builder|Relation|null
     {
         return Order::query()
-            ->selectRaw('user_id, SUM(grand_total) as total_spent, COUNT(*) as orders_count')
+            ->selectRaw('user_id, SUM(grand_total_usd) as total_spent, COUNT(*) as orders_count')
             ->groupBy('user_id')
             ->orderByDesc('total_spent');
     }

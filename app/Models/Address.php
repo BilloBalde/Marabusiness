@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Address extends Model
 {
     protected $fillable = [
+        'user_id',
         'order_id',
         'first_name',
         'last_name',
@@ -18,10 +19,16 @@ class Address extends Model
         'zip_code',
         'latitude',     // 新增
         'longitude',    // 新增
-        'zone', 
+        'zone',     
+        'is_default',
     ];
 
     protected $appends = ['full_name', 'coordinates'];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function order()
     {

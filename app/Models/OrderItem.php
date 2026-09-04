@@ -33,6 +33,11 @@ class OrderItem extends Model
         return $this->belongsTo(Product::class);
     }
 
+    public function hasVariations(): bool
+    {
+        return !empty($this->variation_json) || !empty($this->variation_note);
+    }
+
     // Helper method to get formatted variations
     public function getVariationTextAttribute(): string
     {

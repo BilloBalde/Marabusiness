@@ -5,32 +5,38 @@ namespace App\Livewire;
 use Livewire\Component;
 use App\Models\Product;
 use App\Models\VendorProduct;
-use App\Models\VendorProductReview;
 use Illuminate\Support\Facades\Auth;
 use App\Livewire\Partials\Navbar;
 use App\Helpers\CartManagement;
+use App\Helpers\WishlistManagement;
 
 class ProductDetailPage extends Component
 {
     public $product;
     public $vendorProduct;
     public $vendor;
-    public $price;
-    public $stock;
+
+    public $price = 0;
+    public $stock = 0;
     public $quantity = 1;
 
     public $vendorProductId;
-    public $basePrice;
-    public $wholesaleTiers = [];
+    public $basePrice = 0;
 
-    // Variation handling using variation_json
-    public $variationOptions = [];
-    public $selectedVariations = [];
+    // ✅ Wholesale
+    public $wholesaleTiers = [];            // tiers for CURRENT selection (variation or product)
+    public $wholesaleTiersByVariation = []; // tiers per variation (for display)
+    public $useFallbackWholesale = true;    // if variation has no tiers -> fallback to product tiers
+
+    // ✅ Variations
+    public $selectedVariation = null;
+    public $availableVariations = [];
+    public $variationAttributes = []; // ['Color' => ['Black', 'White'], ...]
+    public $selectedAttributes = [];
+
+    // UI / misc
     public $customNote = '';
-
     public $similarProducts = [];
-
-    // Review state
     public $reviews;
     public $rating = 0;
     public $comment = '';
@@ -39,52 +45,65 @@ class ProductDetailPage extends Component
     public $userReviewId = null;
     public $verifiedPurchase = false;
 
+    // Media
+    public $currentImage = '';
+    public $mainMediaType = 'image'; // 'image' or 'video'
+    public $isPlayingVideo = false;
+
     public function mount($slug, $vendor_product_id)
     {
         $this->product = Product::where('slug', $slug)->firstOrFail();
 
+        if (!empty($this->product->images)) {
+            $this->currentImage = $this->product->images[0];
+        }
+
+        // ✅ eager load product tiers + variations + variation tiers
         $this->vendorProduct = VendorProduct::with([
-            'vendor.currency', 
-            'reviews.user', 
-            'vendor', 
-            'wholesaleTiers'
+            'vendor.currency',
+            'reviews.user',
+            'vendor',
+            'wholesaleTiers',
+            'variations.wholesaleTiers',
         ])->findOrFail($vendor_product_id);
 
         $this->vendor = $this->vendorProduct->vendor;
-
-        if (!$this->vendor) {
-            abort(404, "Product vendor not found.");
-        }
-
         $this->vendorProductId = $this->vendorProduct->id;
 
-        $this->basePrice = $this->vendorProduct->sale_price ?: $this->vendorProduct->price ?: 0;
+        // Variations list
+        $this->availableVariations = $this->vendorProduct->variations;
 
+        // Build UI options
+        $this->buildVariationAttributes();
+
+        // Build tiers-per-variation map (for display + logic)
+        $this->buildWholesaleTiersByVariation();
+
+        // Select default (first) variation if exists
+        if ($this->vendorProduct->has_variations && $this->availableVariations->count() > 0) {
+            $this->selectedVariation = $this->availableVariations->first();
+            $this->parseSelectedVariation();
+
+            $this->stock = (int) $this->selectedVariation->stock;
+            $this->basePrice = (float) ($this->selectedVariation->sale_price ?? $this->selectedVariation->price);
+        } else {
+            // Simple product
+            $this->stock = (int) ($this->vendorProduct->stock ?? 0);
+            $this->basePrice = (float) ($this->vendorProduct->sale_price ?: $this->vendorProduct->price ?: 0);
+        }
+
+        // ✅ set CURRENT tiers according to selection
+        $this->loadWholesaleTiersForCurrentSelection();
+
+        // Price for qty=1
         $this->quantity = 1;
-        $this->stock = $this->vendorProduct->stock ?? 0;
-
-        $this->wholesaleTiers = $this->vendorProduct->wholesaleTiers()
-            ->orderBy('min_qty')
-            ->get(['min_qty', 'max_qty', 'price'])
-            ->map(fn($t) => [
-                'min_qty' => (int) $t->min_qty,
-                'max_qty' => $t->max_qty !== null ? (int) $t->max_qty : null,
-                'price' => (float) $t->price
-            ])
-            ->toArray();
-
-        // Initialize with correct price
         $this->price = $this->getWholesaleUnitPrice($this->quantity);
 
-        $this->parseVariationJson();
-
+        // Reviews
         $this->reviews = $this->vendorProduct->reviews()->with('user')->latest()->get();
 
         if (Auth::check()) {
-            $existing = VendorProductReview::where('vendor_product_id', $this->vendorProduct->id)
-                ->where('user_id', Auth::id())
-                ->first();
-
+            $existing = $this->vendorProduct->reviews()->where('user_id', Auth::id())->first();
             if ($existing) {
                 $this->hasReviewed = true;
                 $this->rating = $existing->rating;
@@ -103,113 +122,279 @@ class ProductDetailPage extends Component
             ->get();
     }
 
-    /**
-     * Parse variation_json into usable format
-     */
-    private function parseVariationJson()
+    /* ==============================
+     | Media
+     ============================== */
+
+    public function selectImage($index)
     {
-        $variationJson = $this->vendorProduct->variation_json ?? [];
-        
-        if (!empty($variationJson) && is_array($variationJson)) {
-            $this->variationOptions = $variationJson;
-            
-            foreach ($variationJson as $attribute => $values) {
-                if (is_array($values) && count($values) > 0) {
-                    $this->selectedVariations[$attribute] = $values[0];
+        $this->mainMediaType = 'image';
+        $this->currentImage = $this->product->images[$index] ?? $this->currentImage;
+        $this->isPlayingVideo = false;
+    }
+
+    public function showVideo()
+    {
+        $this->mainMediaType = 'video';
+        $this->isPlayingVideo = true;
+    }
+
+    public function getYoutubeId($url = null)
+    {
+        $url = $url ?? $this->product->video_url;
+        preg_match('/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/', $url, $matches);
+        return $matches[1] ?? null;
+    }
+
+    public function getVimeoId($url = null)
+    {
+        $url = $url ?? $this->product->video_url;
+        preg_match('/vimeo\.com\/(?:video\/)?(\d+)/', $url, $matches);
+        return $matches[1] ?? null;
+    }
+
+    /* ==============================
+     | Variations
+     ============================== */
+
+    private function buildVariationAttributes()
+    {
+        if (!$this->vendorProduct->has_variations) {
+            return;
+        }
+
+        foreach ($this->availableVariations as $variation) {
+            $attributes = $variation->attributes ?? [];
+            foreach ($attributes as $key => $value) {
+                if (!isset($this->variationAttributes[$key])) {
+                    $this->variationAttributes[$key] = [];
+                }
+                if (!in_array($value, $this->variationAttributes[$key], true)) {
+                    $this->variationAttributes[$key][] = $value;
                 }
             }
         }
+
+        // Initialize selected attributes with first values
+        foreach ($this->variationAttributes as $attribute => $values) {
+            $this->selectedAttributes[$attribute] = $values[0] ?? null;
+        }
     }
 
-    /**
-     * Compute unit price according to wholesale tiers + quantity.
-     */
-    private function getWholesaleUnitPrice(int $qty): float
+    public function selectAttribute($attribute, $value)
     {
-        $qty = max(1, $qty);
+        $this->selectedAttributes[$attribute] = $value;
+        $this->findMatchingVariation();
+    }
 
-        if (empty($this->wholesaleTiers)) {
-            return (float) $this->basePrice;
+    private function findMatchingVariation()
+    {
+        if (!$this->vendorProduct->has_variations) {
+            return;
         }
 
-        $applicable = collect($this->wholesaleTiers)
-            ->filter(function ($tier) use ($qty) {
-                $min = (int) ($tier['min_qty'] ?? 0);
-                $max = $tier['max_qty'] !== null ? (int) $tier['max_qty'] : null;
-
-                if ($qty < $min) {
-                    return false;
+        foreach ($this->availableVariations as $variation) {
+            $match = true;
+            foreach ($this->selectedAttributes as $attr => $value) {
+                if (($variation->attributes[$attr] ?? '') !== $value) {
+                    $match = false;
+                    break;
                 }
+            }
 
-                if (!is_null($max) && $qty > $max) {
-                    return false;
-                }
+            if ($match) {
+                $this->selectedVariation = $variation;
+                $this->parseSelectedVariation();
 
-                return true;
-            })
-            ->sortByDesc('min_qty') // Get the highest applicable tier
-            ->first();
+                $this->stock = (int) $variation->stock;
+                $this->basePrice = (float) ($variation->sale_price ?? $variation->price);
 
-        if (!$applicable) {
-            return (float) $this->basePrice;
+                // ✅ update tiers for this variation
+                $this->loadWholesaleTiersForCurrentSelection();
+
+                $this->price = $this->getWholesaleUnitPrice($this->quantity);
+                $this->dispatch('variation-updated');
+                return;
+            }
         }
 
-        return (float) $applicable['price'];
+        // fallback to first variation
+        $this->selectedVariation = $this->availableVariations->first();
+        $this->parseSelectedVariation();
+
+        if ($this->selectedVariation) {
+            $this->stock = (int) $this->selectedVariation->stock;
+            $this->basePrice = (float) ($this->selectedVariation->sale_price ?? $this->selectedVariation->price);
+        }
+
+        $this->loadWholesaleTiersForCurrentSelection();
+        $this->price = $this->getWholesaleUnitPrice($this->quantity);
     }
 
-    /**
-     * Select variation value for an attribute
-     */
-    public function selectVariation($attribute, $value)
+    private function parseSelectedVariation()
     {
-        $this->selectedVariations[$attribute] = $value;
-        $this->dispatch('variation-selected');
+        if ($this->selectedVariation) {
+            $this->selectedAttributes = $this->selectedVariation->attributes ?? [];
+        }
     }
 
-    /**
-     * Get selected variations as text
-     */
     public function getSelectedVariationsText()
     {
-        if (empty($this->selectedVariations)) {
+        if (empty($this->selectedAttributes)) {
             return '';
         }
 
         $parts = [];
-        foreach ($this->selectedVariations as $attribute => $value) {
+        foreach ($this->selectedAttributes as $attribute => $value) {
             $parts[] = ucfirst($attribute) . ': ' . $value;
         }
-        
+
         return implode(', ', $parts);
     }
 
     /* ==============================
-     | Add to Cart
+     | Wholesale pricing (PRODUCT + VARIATION)
      ============================== */
-    public function addToCart()
+
+    private function normalizeTiers($tiers): array
     {
-        //dd($this->vendorProductId);
-        $qty = (int) $this->quantity;
-        if ($qty < 1) {
-            $qty = 1;
-        }
-        
-        // Check stock availability
-        if ($this->stock > 0) {
-            $qty = min($qty, (int) $this->stock);
+        return collect($tiers)
+            ->sortBy('min_qty')
+            ->map(function ($tier) {
+                return [
+                    'min_qty' => (int) $tier->min_qty,
+                    'max_qty' => $tier->max_qty !== null ? (int) $tier->max_qty : null,
+                    'price'   => (float) $tier->price,
+                ];
+            })
+            ->values()
+            ->toArray();
+    }
+
+    private function buildWholesaleTiersByVariation(): void
+    {
+        $map = [];
+
+        foreach ($this->availableVariations as $v) {
+            // $v->wholesaleTiers is eager loaded
+            $map[$v->id] = $this->normalizeTiers($v->wholesaleTiers ?? []);
         }
 
-        $count = CartManagement::addItemToCart(
+        $this->wholesaleTiersByVariation = $map;
+    }
+
+    private function loadWholesaleTiersForCurrentSelection(): void
+    {
+        // product has variations
+        if ($this->vendorProduct->has_variations && $this->selectedVariation) {
+            $tiers = $this->wholesaleTiersByVariation[$this->selectedVariation->id] ?? [];
+
+            // fallback to product tiers if variation tiers missing
+            if (empty($tiers) && $this->useFallbackWholesale) {
+                $tiers = $this->normalizeTiers($this->vendorProduct->wholesaleTiers ?? []);
+            }
+
+            $this->wholesaleTiers = $tiers;
+            return;
+        }
+
+        // simple product tiers
+        $this->wholesaleTiers = $this->normalizeTiers($this->vendorProduct->wholesaleTiers ?? []);
+    }
+
+    /**
+     * ✅ Final unit price:
+     * - if variation: use variation tier for qty
+     * - else fallback to product tier for qty (optional)
+     * - else base price
+     */
+    private function getWholesaleUnitPrice($quantity)
+    {
+        $qty = (int) $quantity;
+
+        // Variation first
+        if ($this->vendorProduct->has_variations && $this->selectedVariation) {
+            $variationWholesale = $this->selectedVariation->getWholesalePriceForQty($qty);
+            if ($variationWholesale !== null) {
+                return (float) $variationWholesale;
+            }
+
+            // optional fallback to product tiers
+            if ($this->useFallbackWholesale) {
+                $productWholesale = $this->vendorProduct->getWholesalePriceForQty($qty);
+                if ($productWholesale !== null) {
+                    return (float) $productWholesale;
+                }
+            }
+
+            return (float) ($this->selectedVariation->sale_price ?? $this->selectedVariation->price ?? 0);
+        }
+
+        // Simple product tiers
+        $productWholesale = $this->vendorProduct->getWholesalePriceForQty($qty);
+        if ($productWholesale !== null) {
+            return (float) $productWholesale;
+        }
+
+        return (float) ($this->vendorProduct->sale_price ?: $this->vendorProduct->price ?: 0);
+    }
+
+    /* ==============================
+     | Cart / wishlist
+     ============================== */
+
+    public function addToCart()
+    {
+        if (!Auth::check()) {
+            $this->dispatch('show-toast', message: 'Please login to add items to cart.', type: 'warning');
+            return $this->redirectRoute('customer_login');
+        }
+
+        $qty = (int) $this->quantity;
+        if ($qty < 1) $qty = 1;
+
+        // Stock check (if you track stock)
+        if ($this->stock > 0 && $qty > $this->stock) {
+            $this->dispatch('show-toast', message: "Only {$this->stock} items available in stock.", type: 'error');
+            return;
+        }
+
+        $variationId = $this->selectedVariation ? $this->selectedVariation->id : null;
+
+        $result = CartManagement::addItemToCart(
             vendor_product_id: $this->vendorProductId,
             quantity: $qty,
-            selectedVariations: $this->selectedVariations,
+            variation_id: $variationId,
+            selectedAttributes: $this->selectedAttributes,
             custom_note: $this->customNote
         );
 
-        $this->dispatch('cart-updated', total_count: $count)->to(Navbar::class);
-        $this->dispatch('cart-added');
-        
-        session()->flash('success', 'Produit ajouté au panier!');
+        if (!$result || !is_array($result)) {
+            $this->dispatch('show-toast', message: 'Error adding item to cart. Please try again.', type: 'error');
+            return;
+        }
+
+        if ($result['success']) {
+            $this->dispatch('cart-updated', total_count: $result['cart_count'])->to(Navbar::class);
+            $this->dispatch('cart-added');
+            $this->dispatch('show-toast', message: $result['message'], type: 'success');
+        } else {
+            $this->dispatch('show-toast', message: $result['message'], type: 'error');
+        }
+    }
+
+    public function addToWishlist()
+    {
+        $variationId = $this->selectedVariation ? $this->selectedVariation->id : null;
+
+        WishlistManagement::addItem(
+            $this->vendorProductId,
+            $variationId,
+            $this->selectedAttributes
+        );
+
+        $this->dispatch('wishlist-updated', total_count: WishlistManagement::getCount());
+        $this->dispatch('show-toast', message: 'Added to wishlist.', type: 'success');
     }
 
     public function increaseQty()
@@ -220,7 +405,6 @@ class ProductDetailPage extends Component
 
         $this->quantity++;
         $this->price = $this->getWholesaleUnitPrice($this->quantity);
-        $this->dispatch('price-updated', price: $this->price);
     }
 
     public function decreaseQty()
@@ -228,12 +412,11 @@ class ProductDetailPage extends Component
         if ($this->quantity > 1) {
             $this->quantity--;
             $this->price = $this->getWholesaleUnitPrice($this->quantity);
-            $this->dispatch('price-updated', price: $this->price);
         }
     }
 
     /* ==============================
-     | Reviews
+     | Reviews (keep yours, simplified)
      ============================== */
 
     public function submitReview()
@@ -245,7 +428,7 @@ class ProductDetailPage extends Component
             'comment' => 'required|string|min:3',
         ]);
 
-        VendorProductReview::create([
+        \App\Models\VendorProductReview::create([
             'vendor_product_id' => $this->vendorProductId,
             'user_id' => Auth::id(),
             'rating' => $this->rating,
@@ -269,11 +452,13 @@ class ProductDetailPage extends Component
             'comment' => 'required|min:3',
         ]);
 
-        $review = VendorProductReview::find($this->userReviewId);
-        $review->update([
-            'rating' => $this->rating,
-            'comment' => $this->comment,
-        ]);
+        $review = \App\Models\VendorProductReview::find($this->userReviewId);
+        if ($review) {
+            $review->update([
+                'rating' => $this->rating,
+                'comment' => $this->comment,
+            ]);
+        }
 
         $this->editingReview = false;
         $this->reviews = $this->vendorProduct->reviews()->with('user')->latest()->get();
@@ -284,8 +469,14 @@ class ProductDetailPage extends Component
         return view('livewire.product-detail-page', [
             'avgRating' => $this->product->globalRating(),
             'totalReviews' => $this->product->totalReviews(),
+
+            // ✅ show current tiers (variation/product)
             'wholesaleTiers' => $this->wholesaleTiers,
-            'vendorProductID' => $this->vendorProduct->id,
+
+            // ✅ show tiers per variation if you want
+            'wholesaleTiersByVariation' => $this->wholesaleTiersByVariation,
+            'availableVariations' => $this->availableVariations,
+
             'selectedVariationsText' => $this->getSelectedVariationsText(),
         ]);
     }

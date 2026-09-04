@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Vendor extends Model
 {
+    use Concerns\HasTranslations;
     protected $fillable = [
         'user_id',
         'currency_id',
@@ -38,6 +39,21 @@ class Vendor extends Model
         'shipping_zones' => 'array',
         'carrier_rates' => 'array',
     ];
+
+    public function translations(): HasMany
+    {
+        return $this->hasMany(VendorTranslation::class);
+    }
+
+    public function getStoreNameAttribute($value)
+    {
+        return $this->translate('store_name', $value);
+    }
+
+    public function getDescriptionAttribute($value)
+    {
+        return $this->translate('description', $value);
+    }
 
     public function user(): BelongsTo
     {

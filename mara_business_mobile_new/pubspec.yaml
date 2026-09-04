@@ -1,0 +1,62 @@
+name: mara_business_mobile_new
+description: "A new Flutter project."
+publish_to: "none" #
+version: 1.0.8+15
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.6
+  provider: ^6.1.1
+  dio: ^5.4.0
+  shared_preferences: ^2.2.2
+  cached_network_image: ^3.3.0
+  url_launcher: ^6.3.2
+  go_router: ^17.1.0
+  carousel_slider: ^5.1.2
+  shimmer: ^3.0.0
+  intl: ^0.20.2
+  image_picker: ^1.0.5
+  flutter_secure_storage: ^9.0.0 # Add this line
+  flutter_html: ^3.0.0-beta.2
+  crypto: ^3.0.3
+  dio_cookie_manager: ^3.0.0
+  cookie_jar: ^4.0.8
+  universal_html: ^2.2.4
+  share_plus: ^10.1.4
+  video_player: ^2.8.1
+  chewie: ^1.7.4
+  path_provider: ^2.1.5
+  open_filex: ^4.5.0
+  flutter_web_auth_2: ^5.0.3
+  app_links: ^6.0.0
+  # url_launcher: ^6.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1 # ADD THIS LINE
+  change_app_package_name: ^1.5.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/images/logo.png
+    - assets/CommissionContract.pdf
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/android-chrome-512x512.png"
+  adaptive_icon_background: "#D4AF37" # Use your brand color
+  # adaptive_icon_foreground: "assets/icons/icon-foreground.png"  # Optional, for Android adaptive icons
+  min_sdk_android: 21
+  remove_alpha_ios: true

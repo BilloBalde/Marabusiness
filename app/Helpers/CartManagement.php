@@ -2,110 +2,272 @@
 
 namespace App\Helpers;
 
+use App\Models\CartItem;
 use App\Models\VendorProduct;
-use Illuminate\Support\Facades\Cookie;
+use App\Models\VendorProductVariation;
+use Illuminate\Support\Facades\Auth;
 
 class CartManagement
 {
     /**
-     * Get cart items from cookie
+     * Get cart items from database (authenticated users only)
      */
-    // In CartManagement.php, update getCartItemsFromCookie method:
     static public function getCartItemsFromCookie()
     {
-        $cart_items = json_decode(Cookie::get('cart_items') ?? '[]', true);
-        $cart_items = is_array($cart_items) ? $cart_items : [];
-        
-        // Add missing cart_key for backward compatibility
-        foreach ($cart_items as &$item) {
-            if (!isset($item['cart_key']) && isset($item['vendor_product_id'])) {
-                $variation_note = $item['variation_note'] ?? '';
-                $item['cart_key'] = self::generateCartKey($item['vendor_product_id'], $variation_note);
-            }
+        if (!Auth::check()) {
+            return [];
         }
-        
+
+        $cart_items = [];
+        $userId = Auth::id();
+        $items = CartItem::where('user_id', $userId)->get();
+
+        foreach ($items as $item) {
+            $productData = self::getVendorProductData(
+                $item->vendor_product_id,
+                $item->variation_id
+            );
+
+            if (!$productData) {
+                continue;
+            }
+
+            $selectedVariations = $item->selected_variations ?? [];
+            $variationNote = '';
+
+            if ($productData['has_variations']) {
+                if ($productData['variation']) {
+                    $variationNote = self::formatVariationAttributes($productData['variation']->attributes ?? []);
+                } elseif (!empty($selectedVariations)) {
+                    $variationNote = self::formatVariationAttributes($selectedVariations);
+                }
+            }
+
+            if (!empty($item->custom_note)) {
+                $variationNote = $variationNote ? $variationNote . ' | ' . $item->custom_note : $item->custom_note;
+            }
+
+            $unitAmount = self::calculateWholesalePrice(
+                $productData['wholesale_tiers'],
+                $productData['base_price'],
+                $item->quantity
+            );
+
+            $cart_items[] = [
+                'vendor_product_id' => $productData['vendor_product_id'],
+                'product_id' => $productData['product_id'],
+                'vendor_id' => $productData['vendor_id'],
+                'product_name' => $productData['product_name'],
+                'image' => $productData['image'],
+                'quantity' => (int) $item->quantity,
+                'base_price' => $productData['base_price'],
+                'currency' => $productData['currency'],
+                'rate_to_usd' => $productData['rate_to_usd'],
+                'variation_id' => $item->variation_id,
+                'selected_variations' => $selectedVariations,
+                'variation_note' => $variationNote,
+                'wholesale_applied' => abs($unitAmount - $productData['base_price']) > 0.001,
+                'cart_key' => $item->cart_key ?: self::generateCartKey(
+                    $productData['vendor_product_id'],
+                    $item->variation_id,
+                    $selectedVariations
+                ),
+                'wholesale_tiers' => $productData['wholesale_tiers'] ? $productData['wholesale_tiers']->toArray() : [],
+                'unit_amount' => $unitAmount,
+                'total_amount' => $unitAmount * $item->quantity,
+            ];
+        }
+
         return $cart_items;
     }
 
     /**
      * Save cart items to cookie
      */
-    static public function addCartItemsToCookie($cart_items)
+    /* static public function addCartItemsToCookie($cart_items)
     {
         $cookie = cookie('cart_items', json_encode(array_values($cart_items)), 60 * 24 * 30);
         Cookie::queue($cookie);
         return true;
+    } */
+    static public function addCartItemsToCookie($cart_items, $force = false)
+    {
+        if (!Auth::check()) {
+            return false;
+        }
+
+        $userId = Auth::id();
+        $cart_items = array_values(is_array($cart_items) ? $cart_items : []);
+
+        CartItem::where('user_id', $userId)->delete();
+
+        foreach ($cart_items as $item) {
+            if (!isset($item['vendor_product_id'])) {
+                continue;
+            }
+
+            $variationId = $item['variation_id'] ?? null;
+            $selectedVariations = $item['selected_variations'] ?? [];
+
+            CartItem::create([
+                'user_id' => $userId,
+                'vendor_product_id' => $item['vendor_product_id'],
+                'variation_id' => $variationId,
+                'quantity' => isset($item['quantity']) ? (int) $item['quantity'] : 1,
+                'selected_variations' => $selectedVariations,
+                'custom_note' => $item['custom_note'] ?? null,
+                'cart_key' => $item['cart_key'] ?? self::generateCartKey(
+                    $item['vendor_product_id'],
+                    $variationId,
+                    $selectedVariations
+                ),
+            ]);
+        }
+
+        return true;
     }
 
     /**
-     * Get vendor product data
+     * Get vendor product data with variation support
      */
-    static private function getVendorProductData($vendor_product_id)
+    static private function getVendorProductData($vendor_product_id, $variation_id = null)
     {
-        $vendorProduct = VendorProduct::with([
-            'product', 
-            'vendor', 
-            'vendor.currency',
-            'wholesaleTiers'
-        ])->find($vendor_product_id);
+        $request_id = uniqid('req_', true);
+        try {
+            $vendorProduct = VendorProduct::with([
+                'product', 
+                'vendor', 
+                'vendor.currency',
+                'wholesaleTiers',
+                'variations',
+                'variations.wholesaleTiers',
+            ])->find($vendor_product_id);
 
-        if (!$vendorProduct) {
+            if (!$vendorProduct) {
+                \Log::warning('CartManagement: Vendor product not found', ['id' => $vendor_product_id]);
+                return null;
+            }
+
+            // REMOVE THIS ERRONEOUS LINE:
+            // \Log::info('CartManagement addCartItemsToCookie: Completed', [
+            //     'request_id' => $request_id,
+            //     'final_item_count' => count($cart_items)
+            // ]);
+
+            // Or if you want to keep some logging, use correct variables:
+            \Log::info('CartManagement getVendorProductData: Retrieved product', [
+                'request_id' => $request_id,
+                'vendor_product_id' => $vendor_product_id,
+                'variation_id' => $variation_id,
+                'product_name' => $vendorProduct->product->name ?? 'Unknown'
+            ]);
+
+            // Initialize defaults
+            $price = $vendorProduct->sale_price ?: $vendorProduct->price;
+            $stock = $vendorProduct->stock;
+            $variation = null;
+
+            if ($variation_id) {
+                // Try to find the variation
+                $variation = $vendorProduct->variations
+                    ->where('id', $variation_id)
+                    ->first();
+                
+                if ($variation) {
+                    $price = $variation->price;
+                    $stock = $variation->stock;
+                    \Log::info('CartManagement: Found variation', [
+                        'variation_id' => $variation_id,
+                        'price' => $price,
+                        'stock' => $stock
+                    ]);
+                } else {
+                    \Log::warning('CartManagement: Variation not found', [
+                        'vendor_product_id' => $vendor_product_id,
+                        'variation_id' => $variation_id
+                    ]);
+                    // Variation not found, but we'll continue with base product
+                }
+            } elseif ($vendorProduct->has_variations) {
+                // Default to a first available variation when none is provided
+                $variation = $vendorProduct->variations
+                    ->firstWhere('stock', '>', 0) ?? $vendorProduct->variations->first();
+
+                if ($variation) {
+                    $variation_id = $variation->id;
+                    $price = $variation->price;
+                    $stock = $variation->stock;
+                    \Log::info('CartManagement: Defaulted variation', [
+                        'variation_id' => $variation_id,
+                        'price' => $price,
+                        'stock' => $stock
+                    ]);
+                }
+            }
+
+            // Get first product image
+            $image = null;
+            $productImages = $vendorProduct->product->images ?? [];
+            if (is_array($productImages) && count($productImages)) {
+                $image = $productImages[0];
+            }
+
+            return [
+                'vendor_product_id' => $vendorProduct->id,
+                'product_id' => $vendorProduct->product_id,
+                'vendor_id' => $vendorProduct->vendor_id,
+                'product_name' => $vendorProduct->product->name ?? 'Unknown Product',
+                'image' => $image,
+                'base_price' => (float) $price,
+                'stock' => $stock,
+                'currency' => $vendorProduct->vendor->currency->code ?? 'USD',
+                'rate_to_usd' => $vendorProduct->vendor->currency->rate_to_usd ?? 1,
+                'wholesale_tiers' => ($vendorProduct->has_variations && $variation)
+                    ? ($variation->wholesaleTiers ?? collect([]))     // ✅ variation tiers
+                    : ($vendorProduct->wholesaleTiers ?? collect([])) // ✅ simple product tiers
+                ,
+                'has_variations' => $vendorProduct->has_variations,
+                'variation_id' => $variation_id,
+                'variation' => $variation,
+                'vendor' => [
+                    'id' => $vendorProduct->vendor->id,
+                    'store_name' => $vendorProduct->vendor->store_name,
+                ]
+            ];
+
+        } catch (\Exception $e) {
+            \Log::error('CartManagement: Error getting product data', [
+                'vendor_product_id' => $vendor_product_id,
+                'variation_id' => $variation_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return null;
         }
-
-        // Get first product image
-        $image = null;
-        $productImages = $vendorProduct->product->images ?? [];
-        if (is_array($productImages) && count($productImages)) {
-            $image = $productImages[0];
-        }
-
-        // Get base price (from vendor_product)
-        $basePrice = $vendorProduct->sale_price ?: $vendorProduct->price;
-
-        return [
-            'vendor_product_id' => $vendorProduct->id,
-            'product_id' => $vendorProduct->product_id,
-            'vendor_id' => $vendorProduct->vendor_id,
-            'product_name' => $vendorProduct->product->name,
-            'image' => $image,
-            'base_price' => (float) $basePrice,
-            'currency' => $vendorProduct->vendor->currency->code,
-            'rate_to_usd' => $vendorProduct->vendor->currency->rate_to_usd ?? 1,
-            'wholesale_tiers' => $vendorProduct->wholesaleTiers,
-            'variation_json' => $vendorProduct->variation_json ?? [],
-            'vendor' => [
-                'id' => $vendorProduct->vendor->id,
-                'store_name' => $vendorProduct->vendor->store_name,
-            ]
-        ];
     }
 
     /**
-     * Parse selected variations from array to note string
+     * Generate unique cart key based on vendor product and variation
      */
-    static private function parseVariationsToNote($selectedVariations = [], $variation_json = [])
+    static private function generateCartKey($vendor_product_id, $variation_id = null, $selectedVariations = [])
     {
-        if (empty($selectedVariations)) {
-            return '';
-        }
-
-        $noteParts = [];
-        
-        foreach ($selectedVariations as $attribute => $value) {
-            // Check if this attribute exists in the variation_json
-            if (isset($variation_json[$attribute])) {
-                $noteParts[] = ucfirst($attribute) . ': ' . $value;
-            }
+        if ($variation_id) {
+            return 'cart_' . $vendor_product_id . '_var_' . $variation_id;
         }
         
-        return implode(', ', $noteParts);
+        // If no variation ID but we have selected variations, create a hash
+        if (!empty($selectedVariations)) {
+            ksort($selectedVariations); // Sort for consistency
+            return 'cart_' . $vendor_product_id . '_' . md5(json_encode($selectedVariations));
+        }
+        
+        return 'cart_' . $vendor_product_id . '_simple';
     }
 
     /**
      * Calculate wholesale price for given quantity
      */
-    static private function calculateWholesalePrice($wholesaleTiers, $basePrice, $quantity)
+    /* static private function calculateWholesalePrice($wholesaleTiers, $basePrice, $quantity)
     {
         if (!$wholesaleTiers || $wholesaleTiers->isEmpty()) {
             return (float) $basePrice;
@@ -121,95 +283,346 @@ class CartManagement
         }
 
         return $applicableTier ? (float) $applicableTier->price : (float) $basePrice;
-    }
-
-    
-    /**
-     * Generate unique cart key based on vendor product and variation note
-     */
-    static private function generateCartKey($vendor_product_id, $variation_note = '')
-    {
-        // Use variation note if provided, otherwise just vendor_product_id
-        return 'cart_' . $vendor_product_id . '_' . md5($variation_note);
-    }
+    } */
 
     /**
-     * Add item to cart with vendor_product_id and optional variations
+     * Add item to cart with variation support
+     * Returns array with status and message
      */
-    static public function addItemToCart($vendor_product_id, $quantity = 1, $selectedVariations = [], $custom_note = '')
-    {
-        $cart_items = self::getCartItemsFromCookie();
-        $productData = self::getVendorProductData($vendor_product_id);
-        
-        if (!$productData) {
-            return count($cart_items);
-        }
-
-        // Parse variations to note string
-        $variationNote = self::parseVariationsToNote($selectedVariations, $productData['variation_json']);
-        
-        // Add custom note if provided
-        if (!empty($custom_note)) {
-            if (!empty($variationNote)) {
-                $variationNote .= ' | ' . $custom_note;
-            } else {
-                $variationNote = $custom_note;
-            }
-        }
-
-        // Generate cart key BEFORE checking existing items
-        $cartKey = self::generateCartKey($vendor_product_id, $variationNote);
-        
-        // Check if item already exists in cart (same vendor_product + same variation note)
-        $existingKey = null;
-        foreach ($cart_items as $key => $item) {
-            if (isset($item['cart_key']) && $item['cart_key'] === $cartKey) {
-                $existingKey = $key;
-                break;
-            }
-        }
-
-        if ($existingKey !== null) {
-            // Update existing item (same variation note)
-            $newQuantity = $cart_items[$existingKey]['quantity'] + $quantity;
-            
-            $cart_items[$existingKey]['quantity'] = $newQuantity;
-        } else {
-            // Add new item (new variation note combination)
-            $cart_items[] = [
-                'vendor_product_id' => $vendor_product_id,
-                'product_id' => $productData['product_id'],
-                'vendor_id' => $productData['vendor_id'],
-                'product_name' => $productData['product_name'],
-                'image' => $productData['image'],
-                'quantity' => $quantity,
-                'base_price' => $productData['base_price'], // Store original base price
-                'currency' => $productData['currency'],
-                'rate_to_usd' => $productData['rate_to_usd'],
-                'selected_variations' => $selectedVariations,
-                'variation_note' => $variationNote,
-                'wholesale_applied' => false,
-                'cart_key' => $cartKey,
-                'wholesale_tiers' => $productData['wholesale_tiers']->toArray(),
+    /**
+ * Add item to cart with variation support
+ * Returns array with status and message
+ */
+static public function addItemToCart($vendor_product_id, $quantity = 1, $variation_id = null, $selectedAttributes = [], $custom_note = '') 
+{
+    try {
+        if (!Auth::check()) {
+            return [
+                'success' => false,
+                'message' => 'Please login to add items to cart.',
+                'requires_auth' => true,
+                'cart_count' => 0,
+                'items_count' => 0
             ];
         }
 
-        // Update wholesale prices for ALL items of this vendor_product
-        self::updateWholesalePricesForVendorProduct($cart_items, $vendor_product_id, $productData);
+        \Log::info('CartManagement: Adding item to cart', [
+            'vendor_product_id' => $vendor_product_id,
+            'quantity' => $quantity,
+            'variation_id' => $variation_id,
+            'selectedAttributes' => $selectedAttributes,
+        ]);
+
+        $productData = self::getVendorProductData($vendor_product_id, $variation_id);
         
-        self::addCartItemsToCookie($cart_items);
-        return count($cart_items);
+        if (!$productData) {
+            \Log::error('CartManagement: Could not get product data', [
+                'vendor_product_id' => $vendor_product_id,
+                'variation_id' => $variation_id
+            ]);
+            return [
+                'success' => false,
+                'message' => 'Product not found or error loading product data',
+                'cart_count' => self::getCartCount(),
+                'items_count' => count(self::getCartItemsFromCookie())
+            ];
+        }
+
+        // Default variation when listing pages don't pass it
+        if ($variation_id === null && ($productData['has_variations'] ?? false) && !empty($productData['variation'])) {
+            $variation_id = $productData['variation']->id;
+            if (empty($selectedAttributes) && !empty($productData['variation']->attributes)) {
+                $selectedAttributes = $productData['variation']->attributes;
+            }
+        }
+
+        // Generate cart key for the new item
+        $newCartKey = self::generateCartKey($vendor_product_id, $variation_id, $selectedAttributes);
+
+        // Check stock availability
+        $availableStock = $productData['stock'];
+        if ($availableStock > 0) {
+            if ($quantity > $availableStock) {
+                $quantity = $availableStock;
+            }
+        }
+
+        $cartItem = CartItem::where('user_id', Auth::id())
+            ->where('cart_key', $newCartKey)
+            ->first();
+
+        if ($cartItem) {
+            $newQuantity = $cartItem->quantity + $quantity;
+            if ($availableStock > 0 && $newQuantity > $availableStock) {
+                $newQuantity = $availableStock;
+            }
+
+            if ($availableStock > 0 && $newQuantity <= 0) {
+                return [
+                    'success' => false,
+                    'message' => "Stock limit reached! Only $availableStock available.",
+                    'cart_count' => self::getCartCount(),
+                    'items_count' => count(self::getCartItemsFromCookie())
+                ];
+            }
+
+            $cartItem->quantity = $newQuantity;
+        } else {
+            if ($availableStock > 0 && $quantity > $availableStock) {
+                $quantity = $availableStock;
+            }
+
+            $cartItem = new CartItem([
+                'user_id' => Auth::id(),
+                'vendor_product_id' => $vendor_product_id,
+                'variation_id' => $variation_id,
+                'quantity' => $quantity,
+                'selected_variations' => $selectedAttributes,
+                'custom_note' => $custom_note,
+                'cart_key' => $newCartKey,
+            ]);
+        }
+
+        $cartItem->selected_variations = $selectedAttributes;
+        $cartItem->custom_note = $custom_note;
+        $cartItem->variation_id = $variation_id;
+        $cartItem->save();
+
+        // Get updated cart count
+        $updated_cart_items = self::getCartItemsFromCookie();
+        
+        \Log::info('CartManagement: Item added successfully', [
+            'cart_key' => $newCartKey,
+            'final_cart_count' => self::getCartCount(),
+            'final_items_count' => count($updated_cart_items)
+        ]);
+        
+        return [
+            'success' => true,
+            'message' => 'Item added to cart successfully!',
+            'cart_count' => self::getCartCount(),
+            'items_count' => count($updated_cart_items)
+        ];
+        
+    } catch (\Exception $e) {
+        \Log::error('CartManagement: Error in addItemToCart', [
+            'vendor_product_id' => $vendor_product_id,
+            'variation_id' => $variation_id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return [
+            'success' => false,
+            'message' => 'An error occurred while adding item to cart. Please try again.',
+            'cart_count' => self::getCartCount(),
+            'items_count' => 0
+        ];
     }
-    // Update the getTotalVendorProductQuantity method
+}
+/**
+ * Calculate wholesale price for given quantity (per variation)
+ */
+static private function calculateWholesalePrice($wholesaleTiers, $basePrice, $quantity)
+{
+    if (!$wholesaleTiers || $wholesaleTiers->isEmpty()) {
+        return (float) $basePrice;
+    }
+
+    // Find the applicable tier
+    $applicableTier = null;
+    foreach ($wholesaleTiers->sortBy('min_qty') as $tier) {
+        if ($quantity >= $tier->min_qty && 
+            (is_null($tier->max_qty) || $quantity <= $tier->max_qty)) {
+            $applicableTier = $tier;
+        }
+    }
+
+    return $applicableTier ? (float) $applicableTier->price : (float) $basePrice;
+}
+
+/**
+ * Update wholesale prices for a specific cart item (per variation)
+ */
+static private function updateWholesalePriceForItem(&$item, $productData)
+{
+    if (!isset($item['vendor_product_id']) || !isset($item['cart_key'])) {
+        return;
+    }
+    
+    // Calculate wholesale price for THIS ITEM'S QUANTITY ONLY
+    $itemQuantity = $item['quantity'] ?? 1;
+    
+    $newWholesalePrice = self::calculateWholesalePrice(
+        $productData['wholesale_tiers'],
+        $productData['base_price'],
+        $itemQuantity  // Use individual item quantity
+    );
+
+    $item['unit_amount'] = $newWholesalePrice;
+    $item['total_amount'] = $newWholesalePrice * $itemQuantity;
+    $item['wholesale_applied'] = abs($newWholesalePrice - $productData['base_price']) > 0.001;
+}
+
+/**
+ * Get total quantity for a specific variation combination
+ */
+static private function getTotalVariationQuantity($cart_items, $vendor_product_id, $cart_key)
+{
+    $totalQuantity = 0;
+    foreach ($cart_items as $item) {
+        if (isset($item['vendor_product_id']) && 
+            $item['vendor_product_id'] == $vendor_product_id &&
+            isset($item['cart_key']) &&
+            $item['cart_key'] == $cart_key) {
+            $totalQuantity += $item['quantity'] ?? 0;
+        }
+    }
+    return $totalQuantity;
+}
+
+/**
+ * Update wholesale prices for all cart items individually
+ */
+static private function updateWholesalePricesForCart(&$cart_items)
+{
+    // Group items by vendor_product_id and cart_key
+    $productGroups = [];
+    
+    foreach ($cart_items as $item) {
+        if (isset($item['vendor_product_id']) && isset($item['cart_key'])) {
+            $key = $item['vendor_product_id'] . '_' . $item['cart_key'];
+            if (!isset($productGroups[$key])) {
+                $productGroups[$key] = [
+                    'vendor_product_id' => $item['vendor_product_id'],
+                    'cart_key' => $item['cart_key'],
+                    'items' => [],
+                    'total_quantity' => 0
+                ];
+            }
+            $productGroups[$key]['items'][] = &$item;
+            $productGroups[$key]['total_quantity'] += $item['quantity'] ?? 0;
+        }
+    }
+    
+    // Update each group individually
+    foreach ($productGroups as $group) {
+        if (!empty($group['items'])) {
+            // Get product data for this vendor product
+            $productData = self::getVendorProductData($group['vendor_product_id']);
+            
+            if ($productData) {
+                // Calculate wholesale price for this specific group
+                $groupWholesalePrice = self::calculateWholesalePrice(
+                    $productData['wholesale_tiers'],
+                    $productData['base_price'],
+                    $group['total_quantity']
+                );
+                
+                // Apply to all items in this group
+                foreach ($group['items'] as &$item) {
+                    $item['unit_amount'] = $groupWholesalePrice;
+                    $item['total_amount'] = $groupWholesalePrice * $item['quantity'];
+                    $item['wholesale_applied'] = abs($groupWholesalePrice - $productData['base_price']) > 0.001;
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Update quantity for specific cart item
+ */
+    static public function updateQuantity($cart_key, $new_quantity)
+    {
+        if (!Auth::check()) {
+            return [];
+        }
+
+        $item = CartItem::where('user_id', Auth::id())
+            ->where('cart_key', $cart_key)
+            ->first();
+
+        if (!$item) {
+            return self::getCartItemsFromCookie();
+        }
+
+        $new_quantity = max(1, (int) $new_quantity);
+        $productData = self::getVendorProductData($item->vendor_product_id, $item->variation_id);
+        $availableStock = $productData['stock'] ?? null;
+        if ($availableStock && $new_quantity > $availableStock) {
+            $new_quantity = $availableStock;
+        }
+
+        $item->quantity = $new_quantity;
+        $item->save();
+
+        return self::getCartItemsFromCookie();
+    }
+
+/**
+ * Remove item from cart using cart_key
+ */
+static public function removeCartItem($cart_key)
+{
+    if (!Auth::check()) {
+        return [];
+    }
+
+    CartItem::where('user_id', Auth::id())
+        ->where('cart_key', $cart_key)
+        ->delete();
+
+    return self::getCartItemsFromCookie();
+}
     /**
-         * Get total quantity of a vendor_product in cart (across all variations)
-         */
+     * Format variation attributes for display
+     */
+    static private function formatVariationAttributes($attributes)
+    {
+        if (empty($attributes)) {
+            return '';
+        }
         
+        $parts = [];
+        foreach ($attributes as $attribute => $value) {
+            $parts[] = ucfirst($attribute) . ': ' . $value;
+        }
+        
+        return implode(', ', $parts);
+    }
+
+    /**
+     * Update wholesale prices for EACH ITEM INDIVIDUALLY
+     * (not combined across variations)
+     */
+    static private function updateWholesalePricesForEachItem(&$cart_items, $vendor_product_id, $productData)
+    {
+        foreach ($cart_items as &$item) {
+            if (isset($item['vendor_product_id']) && $item['vendor_product_id'] == $vendor_product_id) {
+                // Calculate wholesale price for THIS ITEM'S QUANTITY ONLY
+                $itemQuantity = $item['quantity'] ?? 1;
+                
+                $newWholesalePrice = self::calculateWholesalePrice(
+                    $productData['wholesale_tiers'],
+                    $productData['base_price'],
+                    $itemQuantity  // Use individual item quantity
+                );
+
+                $item['unit_amount'] = $newWholesalePrice;
+                $item['total_amount'] = $newWholesalePrice * $itemQuantity;
+                $item['wholesale_applied'] = abs($newWholesalePrice - $productData['base_price']) > 0.001;
+            }
+        }
+    }
+
+    /**
+     * Get total quantity of a vendor_product in cart (across all variations)
+     */
     static private function getTotalVendorProductQuantity($cart_items, $vendor_product_id)
     {
         $totalQuantity = 0;
         foreach ($cart_items as $item) {
-            // Check if vendor_product_id exists and matches
             if (isset($item['vendor_product_id']) && $item['vendor_product_id'] == $vendor_product_id) {
                 $totalQuantity += $item['quantity'] ?? 0;
             }
@@ -217,7 +630,9 @@ class CartManagement
         return $totalQuantity;
     }
 
-    // Also update the updateWholesalePricesForVendorProduct method for consistency
+    /**
+     * Update wholesale prices for all items of a vendor product
+     */
     static private function updateWholesalePricesForVendorProduct(&$cart_items, $vendor_product_id, $productData)
     {
         $totalQuantity = self::getTotalVendorProductQuantity($cart_items, $vendor_product_id);
@@ -231,7 +646,6 @@ class CartManagement
 
         // Update all items of this vendor_product
         foreach ($cart_items as &$item) {
-            // Check if vendor_product_id exists before comparing
             if (isset($item['vendor_product_id']) && $item['vendor_product_id'] == $vendor_product_id) {
                 $item['unit_amount'] = $newWholesalePrice;
                 $item['total_amount'] = $newWholesalePrice * $item['quantity'];
@@ -266,7 +680,7 @@ class CartManagement
      * Remove item from cart using cart_key
      */
 
-    static public function removeCartItem($cart_key)
+    /* static public function removeCartItem($cart_key)
     {
         $cart_items = self::getCartItemsFromCookie();
 
@@ -299,14 +713,16 @@ class CartManagement
         
         // Return the updated cart items
         return $cart_items;
-    }
+    } */
 
     /**
      * Clear all cart items
      */
     static public function clearCartItems()
     {
-        Cookie::queue(Cookie::forget('cart_items'));
+        if (Auth::check()) {
+            CartItem::where('user_id', Auth::id())->delete();
+        }
     }
 
     /**
@@ -314,27 +730,29 @@ class CartManagement
      */
     static public function incrementQuantity($cart_key)
     {
-        $cart_items = self::getCartItemsFromCookie();
-        $vendor_product_id = null;
-
-        foreach ($cart_items as $key => &$item) {
-            if (($item['cart_key'] ?? '') === $cart_key) {
-                $vendor_product_id = $item['vendor_product_id'];
-                $item['quantity']++;
-                break;
-            }
+        if (!Auth::check()) {
+            return [];
         }
 
-        if ($vendor_product_id) {
-            // Update wholesale prices for all items of this vendor_product
-            $productData = self::getVendorProductData($vendor_product_id);
-            if ($productData) {
-                self::updateWholesalePricesForVendorProduct($cart_items, $vendor_product_id, $productData);
-            }
+        $item = CartItem::where('user_id', Auth::id())
+            ->where('cart_key', $cart_key)
+            ->first();
+
+        if (!$item) {
+            return self::getCartItemsFromCookie();
         }
 
-        self::addCartItemsToCookie($cart_items);
-        return $cart_items;
+        $new_quantity = $item->quantity + 1;
+        $productData = self::getVendorProductData($item->vendor_product_id, $item->variation_id);
+        $availableStock = $productData['stock'] ?? null;
+        if ($availableStock && $new_quantity > $availableStock) {
+            $new_quantity = $availableStock;
+        }
+
+        $item->quantity = $new_quantity;
+        $item->save();
+
+        return self::getCartItemsFromCookie();
     }
 
     /**
@@ -342,27 +760,23 @@ class CartManagement
      */
     static public function decrementQuantity($cart_key)
     {
-        $cart_items = self::getCartItemsFromCookie();
-        $vendor_product_id = null;
-
-        foreach ($cart_items as $key => &$item) {
-            if (($item['cart_key'] ?? '') === $cart_key && $item['quantity'] > 1) {
-                $vendor_product_id = $item['vendor_product_id'];
-                $item['quantity']--;
-                break;
-            }
+        if (!Auth::check()) {
+            return [];
         }
 
-        if ($vendor_product_id) {
-            // Update wholesale prices for all items of this vendor_product
-            $productData = self::getVendorProductData($vendor_product_id);
-            if ($productData) {
-                self::updateWholesalePricesForVendorProduct($cart_items, $vendor_product_id, $productData);
-            }
+        $item = CartItem::where('user_id', Auth::id())
+            ->where('cart_key', $cart_key)
+            ->first();
+
+        if (!$item) {
+            return self::getCartItemsFromCookie();
         }
 
-        self::addCartItemsToCookie($cart_items);
-        return $cart_items;
+        $new_quantity = max(1, $item->quantity - 1);
+        $item->quantity = $new_quantity;
+        $item->save();
+
+        return self::getCartItemsFromCookie();
     }
 
     /**
@@ -370,14 +784,11 @@ class CartManagement
      */
     static public function getCartCount(): int
     {
-        $cart_items = self::getCartItemsFromCookie();
-        $totalCount = 0;
-        
-        foreach ($cart_items as $item) {
-            $totalCount += $item['quantity'] ?? 0;
+        if (!Auth::check()) {
+            return 0;
         }
-        
-        return $totalCount;
+
+        return (int) CartItem::where('user_id', Auth::id())->sum('quantity');
     }
 
     /**
@@ -405,7 +816,10 @@ class CartManagement
         $grouped = [];
 
         foreach ($items as $item) {
-            $vendorId = $item['vendor_id'];
+            $vendorId = $item['vendor_id'] ?? null;
+            if (!$vendorId) {
+                continue;
+            }
             
             if (!isset($grouped[$vendorId])) {
                 $grouped[$vendorId] = [
@@ -446,7 +860,7 @@ class CartManagement
     /**
      * Update quantity for specific cart item
      */
-    static public function updateQuantity($cart_key, $new_quantity)
+    /* static public function updateQuantity($cart_key, $new_quantity)
     {
         $cart_items = self::getCartItemsFromCookie();
         $vendor_product_id = null;
@@ -469,20 +883,13 @@ class CartManagement
 
         self::addCartItemsToCookie($cart_items);
         return $cart_items;
-    }
+    } */
 
     /**
      * Get cart item count for navbar (sum of quantities)
      */
     static public function getNavbarCartCount()
     {
-        $cart_items = self::getCartItemsFromCookie();
-        $total = 0;
-        
-        foreach ($cart_items as $item) {
-            $total += $item['quantity'] ?? 0;
-        }
-        
-        return $total;
+        return self::getCartCount();
     }
 }

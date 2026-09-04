@@ -103,7 +103,6 @@ class SiteSettingResource extends Resource
                                         ->label('Image')
                                         ->disk('public_uploads')
                                         ->directory('settings')
-                                        ->image()
                                         ->helperText('Upload an image for this setting')
                                 ];
                                 

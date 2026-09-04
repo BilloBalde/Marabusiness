@@ -11,6 +11,14 @@ return [
         'my_chats' => 'Mes discussions',
         'logout' => 'Déconnexion',
         'vendors' => 'Vendeurs',
+        'wishlist' => 'Liste de souhaits',
+        'contact' => 'Contactez-Nous',
+        'privacy' => 'Politique de confidentialité',
+        'terms' => "Conditions d'utilisation",
+        'orders' => 'Commandes',
+        'my_order' => 'Ma Commande',
+        'vendor' => 'Vendeur',
+        'settings' => 'Paramètres',
         'currency' => 'Monnaies'
     ],
     'hero' => [

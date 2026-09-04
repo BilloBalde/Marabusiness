@@ -24,6 +24,53 @@
             {{-- SHIPPING ADDRESS FORM --}}
             <div class="bg-white shadow-md rounded-xl p-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-4">Delivery Address</h2>
+                @auth
+                <div class="bg-white shadow-md rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-xl font-bold text-gray-800">Saved Addresses</h2>
+
+                        <button type="button"
+                                wire:click="clearSelectedAddress"
+                                class="text-sm px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
+                            Use new address
+                        </button>
+                    </div>
+
+                    @if(!empty($savedAddresses))
+                        <div class="relative">
+                            <select
+                                wire:model="selected_address_id"
+                                wire:change="applyAddress($event.target.value)"
+                                class="w-full appearance-none rounded-xl border border-[#E6D8A3] bg-gradient-to-r from-[#FFF7DF] to-white px-4 py-3 pr-10 text-gray-800 shadow-sm transition focus:border-[#D4AF37] focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40">
+                                <option value="">Choose a saved address</option>
+                                @foreach($savedAddresses as $addr)
+                                    <option value="{{ $addr['id'] }}">
+                                        {{ $addr['first_name'] }} {{ $addr['last_name'] }} — {{ $addr['street_address'] }}, {{ $addr['city'] }}
+                                        @if(!empty($addr['is_default'])) (Default) @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[#8a6a00]">
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 flex items-center gap-2">
+                            <input type="checkbox" wire:model="save_address" class="rounded">
+                            <span class="text-sm text-gray-700">Save new address to my profile</span>
+                        </div>
+                    @else
+                        <p class="text-sm text-gray-600">No saved addresses yet. Fill the form below to add one.</p>
+                        <div class="mt-3 flex items-center gap-2">
+                            <input type="checkbox" wire:model="save_address" class="rounded" checked>
+                            <span class="text-sm text-gray-700">Save this address to my profile</span>
+                        </div>
+                    @endif
+                </div>
+                @endauth
+                <br>
                 
                 <div class="grid grid-cols-2 gap-4">
                     <div>

@@ -8,8 +8,9 @@ use App\Models\Currency;
 use App\Models\Category;
 use App\Models\Vendor;
 use App\Models\Service;
+use App\Models\SiteSetting;
 use Livewire\Component;
-use App\Livewire\Partials\Navbar;
+use App\Helpers\WishlistManagement;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\On;
 
@@ -191,26 +192,22 @@ class HomePage extends Component
     /**
      * Add to cart
      */
-    public function addToCart($vendor_product_id)
+    public function addToWishlist($vendor_product_id)
     {
         if (!$vendor_product_id) {
             $this->dispatch('show-toast', 
-                message: 'This product is not available for purchase.',
+                message: 'This product is not available.',
                 type: 'error'
             );
             return;
         }
         
-        // Add item to cart with empty variations (since it's from homepage)
-        $total_count = \App\Helpers\CartManagement::addItemToCart(
-            vendor_product_id: $vendor_product_id,
-            quantity: 1,
-            selectedVariations: [],
-            custom_note: ''
+        WishlistManagement::addItem($vendor_product_id, null, []);
+        $this->dispatch('wishlist-updated', total_count: WishlistManagement::getCount());
+        $this->dispatch('show-toast', 
+            message: 'Added to wishlist.',
+            type: 'success'
         );
-
-        $this->dispatch('cart-updated', total_count: $total_count)->to(Navbar::class);
-        $this->dispatch('cart-added');
     }
 
     public function render()
@@ -245,6 +242,15 @@ class HomePage extends Component
 
         // Get services
         $services = Service::all();
+        // Get banners
+        $banners = SiteSetting::whereIn('key', [
+            'home-page-banner-1',
+            'home-page-banner-2',
+            'home-page-banner-3',
+        ])->get();
+
+
+        //dd($banners);
 
         return view('livewire.home-page', [
             'featuredProducts' => $featuredProducts,
@@ -252,6 +258,7 @@ class HomePage extends Component
             'categories' => $categories,
             'vendors' => $vendors,
             'services' => $services,
+            'banners' => $banners,
         ]);
     }
 }

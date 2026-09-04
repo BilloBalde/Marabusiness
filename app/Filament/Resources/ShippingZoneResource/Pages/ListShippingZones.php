@@ -16,4 +16,13 @@ class ListShippingZones extends ListRecords
             Actions\CreateAction::make(),
         ];
     }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            \App\Filament\Widgets\ShippingZonesOverview::class,
+            \App\Filament\Widgets\TopVendorsByZones::class,
+            \App\Filament\Widgets\AvgZoneBasePriceByCurrency::class,
+        ];
+    }
 }

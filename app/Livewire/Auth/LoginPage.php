@@ -17,17 +17,14 @@ class LoginPage extends Component
 
     public function mount()
     {
-        // Store current URL if coming from cart or other protected page
-        $previousUrl = url()->previous();
+        // Store current URL for redirect after login
+        $redirectUrl = request()->query('redirect', url()->previous());
         $currentUrl = url()->current();
         
         // Only store if previous URL is different from login and is from our app
-        if ($previousUrl !== $currentUrl && 
-            str_contains($previousUrl, config('app.url')) &&
-            !str_contains($previousUrl, '/login') &&
-            !str_contains($previousUrl, '/register')) {
-            
-            session()->put('login_redirect', $previousUrl);
+        if ($redirectUrl !== $currentUrl && 
+            $this->isValidRedirect($redirectUrl)) {
+            session()->put('url.intended', $redirectUrl);
         }
     }
 
@@ -39,7 +36,7 @@ class LoginPage extends Component
         ]);
         if (Auth::attempt(['email' => $this->email, 'password' => $this->password], $this->remember)) {
             // Get redirect URL from session
-            $redirectTo = session()->pull('login_redirect', null);
+            $redirectTo = session()->pull('url.intended', null);
             
             // Check if it's a valid redirect (not auth pages)
             if ($redirectTo && $this->isValidRedirect($redirectTo)) {
@@ -62,10 +59,6 @@ class LoginPage extends Component
                 return redirect()->route('filament.admin.pages.dashboard');
             }
             
-            // For regular users, check if they have pending cart
-            if (session()->has('cart_items') && count(session()->get('cart_items', [])) > 0) {
-                return redirect()->route('cart');
-            }
             return redirect('/');
         } else {
             session()->flash('error', 'Invalid credentials');

@@ -66,20 +66,20 @@ class PaiementsRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make()
                     ->after(function ($record, $livewire) {
                         $this->updateOrderTotals($livewire->ownerRecord);
-                        $livewire->ownerRecord->refresh();   // 👈 VERY IMPORTANT
+                        $this->refreshForm($livewire);
                     }),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
                     ->after(function ($record, $livewire) {
                         $this->updateOrderTotals($livewire->ownerRecord);
-                        $livewire->ownerRecord->refresh();
+                        $this->refreshForm($livewire);
                     }),
 
                 Tables\Actions\DeleteAction::make()
                     ->after(function ($record, $livewire) {
                         $this->updateOrderTotals($livewire->ownerRecord);
-                        $livewire->ownerRecord->refresh();
+                        $this->refreshForm($livewire);
                     }),
             ]);
     }
@@ -89,10 +89,33 @@ class PaiementsRelationManager extends RelationManager
         $totalPaid = $order->paiements()->sum('amount');
         $remaining = max(0, $order->grand_total - $totalPaid);
 
+        // Correct payment status logic
+        if ($remaining <= 0 && $totalPaid > 0) {
+            $paymentStatus = 'paid';
+        } elseif ($totalPaid > 0 && $totalPaid < $order->grand_total) {
+            $paymentStatus = 'partial';
+        } else {
+            $paymentStatus = 'pending';
+        }
+
         $order->update([
             'total_paid'      => $totalPaid,
             'total_remaining' => $remaining,
-            'payment_status'  => $remaining <= 0 ? 'paid' : ($totalPaid > 0 ? 'partial' : 'unpaid'),
+            'payment_status'  => $paymentStatus,
         ]);
+    }
+
+    private function refreshForm($livewire)
+    {
+        // Refresh the owner record to get updated payment totals
+        $livewire->ownerRecord->refresh();
+        
+        // This will trigger the form to recalculate
+        if (method_exists($livewire, 'dispatchFormEvent')) {
+            $livewire->dispatchFormEvent('refresh');
+        }
+        
+        // Also send a browser event to refresh the form
+        $this->dispatch('refresh');
     }
 }

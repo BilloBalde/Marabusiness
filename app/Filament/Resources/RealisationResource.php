@@ -20,6 +20,12 @@ class RealisationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        // Hide from admin navigation
+        return false;
+    }
+
     public static function getNavigationGroup(): ?string
     {
         return __('filament.groups.civil_eng');

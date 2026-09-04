@@ -8,7 +8,9 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Paiement;
 use App\Models\Vendor;
+use App\Models\FinancialTransaction; // Add this
 use App\Services\ShippingCalculator;
+use App\Services\FinanceCalculator; // Add this
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -23,6 +25,8 @@ class CheckoutPage extends Component
 {
     use WithFileUploads;
 
+    private $financeCalculator;
+
     // Address fields
     public $first_name;
     public $last_name;
@@ -33,6 +37,12 @@ class CheckoutPage extends Component
     public $zip_code;
     public $country = 'Guinea';
     public $selectedCurrency = '';
+
+    // Saved addresses
+    public $savedAddresses = [];
+    public $selected_address_id = null;
+    public $save_address = true; // optional: save entered address to profile
+
     
     // Geolocation fields
     public $latitude;
@@ -51,6 +61,7 @@ class CheckoutPage extends Component
     // Shipping results cache
     public $shippingResults = [];
     public $availableCarriers = [];
+    public $grandTotalUSD = 0;
     
     // Loading states
     public $calculatingShipping = false;
@@ -66,27 +77,30 @@ class CheckoutPage extends Component
         
         // Initialize shipping calculator
         $this->shippingCalculator = new ShippingCalculator();
+        //$this->financeCalculator = new FinanceCalculator();
         
         // Pre-fill user address if logged in
         $user = Auth::user();
         if ($user) {
-            $this->first_name = $user->first_name ?? '';
-            $this->last_name = $user->last_name ?? '';
-            $this->phone = $user->phone ?? '';
-            $this->city = $user->city ?? '';
-            $this->state = $user->state ?? '';
-            $this->country = $user->country ?? 'Guinea';
-            
-            // Try to get user's last address
-            $lastAddress = Address::whereHas('order', function($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })->latest()->first();
-            
-            if ($lastAddress) {
-                $this->street_address = $lastAddress->street_address;
-                $this->zip_code = $lastAddress->zip_code;
-                $this->latitude = $lastAddress->latitude;
-                $this->longitude = $lastAddress->longitude;
+
+            $this->savedAddresses = Address::where('user_id', $user->id)
+            ->orderByDesc('is_default')
+            ->latest()
+            ->get()
+            ->toArray();
+
+            // auto-select default / first address
+            $default = Address::where('user_id', $user->id)->orderByDesc('is_default')->first();
+            if ($default) {
+                $this->applyAddress($default->id);
+            } else {
+                // fallback: prefill from user profile
+                $this->first_name = $user->first_name ?? '';
+                $this->last_name  = $user->last_name ?? '';
+                $this->phone      = $user->phone ?? '';
+                $this->city       = $user->city ?? '';
+                $this->state      = $user->state ?? '';
+                $this->country    = $user->country ?? 'Guinea';
             }
         }
         
@@ -95,6 +109,40 @@ class CheckoutPage extends Component
         if (empty($selectedItems)) {
             return redirect()->route('cart');
         }
+    }
+
+    public function applyAddress(int $addressId): void
+    {
+        $address = Address::where('user_id', Auth::id())->findOrFail($addressId);
+
+        $this->selected_address_id = $address->id;
+
+        $this->first_name      = $address->first_name;
+        $this->last_name       = $address->last_name;
+        $this->phone           = $address->phone;
+        $this->street_address  = $address->street_address;
+        $this->city            = $address->city;
+        $this->state           = $address->state;
+        $this->zip_code        = $address->zip_code;
+        $this->country         = $address->country ?? 'Guinea';
+        $this->latitude        = $address->latitude;
+        $this->longitude       = $address->longitude;
+
+        // Shipping depends on destination -> recalc
+        $this->calculateShipping();
+    }
+
+    public function clearSelectedAddress(): void
+    {
+        $this->selected_address_id = null;
+    }
+
+    protected function getFinanceCalculator()
+    {
+        if (!$this->financeCalculator) {
+            $this->financeCalculator = new FinanceCalculator();
+        }
+        return $this->financeCalculator;
     }
 
     // OR use a boot method to initialize
@@ -338,6 +386,11 @@ class CheckoutPage extends Component
             $user = Auth::user();
             $redirect_url = '';
             $orders = [];
+            $sourceAddress = null;
+
+            if ($this->selected_address_id) {
+                $sourceAddress = Address::where('user_id', $user->id)->find($this->selected_address_id);
+            }
             
             /** Create orders for each vendor */
             foreach ($groups as $vendorId => $group) {
@@ -351,7 +404,11 @@ class CheckoutPage extends Component
                 
                 $vendorSubtotal = $group['subtotal'];
                 $vendorTotal = $vendorSubtotal + $vendorShippingLocal;
+
+                $vendorSubtotalUSD = $vendorSubtotal * $rate;
+                $vendorTotalUSD    = $vendorSubtotalUSD + $vendorShippingUSD;
                 
+                //dd($vendorSubtotal, $vendorShippingLocal, $vendorTotal, $vendorSubtotalUSD, $vendorShippingUSD, $vendorTotalUSD);
                 // Create order
                 $order = Order::create([
                     'order_number' => Order::generateOrderNumber(),
@@ -359,6 +416,9 @@ class CheckoutPage extends Component
                     'vendor_id' => $vendorId,
                     'grand_total' => $vendorTotal,
                     'total_remaining' => $vendorTotal,
+                    'grand_total_usd' => $vendorTotalUSD,
+                    'shipping_amount_usd' => $vendorShippingUSD,
+                    'rate_to_usd' => $rate,
                     'payment_method' => $this->payment_method,
                     'payment_status' => 'pending',
                     'status' => 'new',
@@ -367,30 +427,35 @@ class CheckoutPage extends Component
                     'notes' => "Marketplace order — Vendor: {$vendor->store_name}",
                     'currency_id' => $vendor->currency_id ?? null,
                 ]);
-                
+
                 $orders[] = $order;
                 
                 /** CREATE ADDRESS WITH ZONE */
                 $addressData = [
-                    'order_id' => $order->id,
-                    'first_name' => $this->first_name,
-                    'last_name' => $this->last_name,
-                    'city' => $this->city,
-                    'phone' => $this->phone,
-                    'street_address' => $this->street_address,
-                    'state' => $this->state,
-                    'zip_code' => $this->zip_code,
-                    'country' => $this->country,
-                    'latitude' => $this->latitude,
-                    'longitude' => $this->longitude,
+                    'order_id'        => $order->id,
+                    'user_id'         => $user->id, // if your table has it
+                    'first_name'      => $sourceAddress?->first_name ?? $this->first_name,
+                    'last_name'       => $sourceAddress?->last_name ?? $this->last_name,
+                    'city'            => $sourceAddress?->city ?? $this->city,
+                    'phone'           => $sourceAddress?->phone ?? $this->phone,
+                    'street_address'  => $sourceAddress?->street_address ?? $this->street_address,
+                    'state'           => $sourceAddress?->state ?? $this->state,
+                    'zip_code'        => $sourceAddress?->zip_code ?? $this->zip_code,
+                    'country'         => $sourceAddress?->country ?? $this->country,
+                    'latitude'        => $sourceAddress?->latitude ?? $this->latitude,
+                    'longitude'       => $sourceAddress?->longitude ?? $this->longitude,
                 ];
+
                 
                 // Add zone if available from shipping calculation
                 if (isset($shippingBreakdown[$vendorId]['zone'])) {
                     $addressData['zone'] = $shippingBreakdown[$vendorId]['zone'];
                 }
                 
-                Address::create($addressData);
+                if (!$this->selected_address_id) {
+                    // ✅ Create address for order
+                    $orderAddress = Address::create($addressData);
+                }
                 
                 /** SAVE ORDER ITEMS WITH VARIATIONS */
                 foreach ($group['items'] as $item) {
@@ -419,6 +484,8 @@ class CheckoutPage extends Component
                     
                     OrderItem::create($orderItemData);
                 }
+
+                $this->createFinancialTransactionsForOrder($order, $vendorTotal);
                 
                 /** PAYMENT HANDLING */
                 if ($this->payment_method === 'stripe') {
@@ -452,24 +519,77 @@ class CheckoutPage extends Component
                             'quantity' => 1,
                         ];
                     }
+                    // Calculate total USD amount for Stripe
+                    $totalUsdAmount = 0;
+                    foreach ($group['items'] as $item) {
+                        $itemRate = $item['rate_to_usd'] ?? $rate;
+                        $totalUsdAmount += ($item['unit_amount'] * $itemRate) * $item['quantity'];
+                    }
+                    $totalUsdAmount += $vendorShippingUSD;
                     
+                    $stripeAmount = intval(round($totalUsdAmount * 100));
+                    
+                    // Validate Stripe amount limits
+                    if ($stripeAmount <= 0) {
+                        $this->addError('amount', 'Invalid payment amount.');
+                        $this->placingOrder = false;
+                        return;
+                    }
+                    
+                    if ($stripeAmount > 99999999) {
+                        $this->addError('amount', 'Payment amount exceeds Stripe limit. Please contact support.');
+                        $this->placingOrder = false;
+                        return;
+                    }
                     Stripe::setApiKey(env('STRIPE_SECRET'));
-                    
-                    $session = Session::create([
-                        'payment_method_types' => ['card'],
-                        'customer_email' => $user->email,
-                        'line_items' => $stripeItems,
-                        'mode' => 'payment',
-                        'success_url' => route('success') . '?session_id={CHECKOUT_SESSION_ID}',
-                        'cancel_url' => route('cancel'),
-                    ]);
-                    
-                    $redirect_url = $session->url;
-                    $order->update([
-                        'total_paid' => $vendorTotal,
-                        'total_remaining' => 0,
-                        'payment_status' => 'paid',
-                    ]);
+
+                    try {
+                        $session = Session::create([
+                            'payment_method_types' => ['card'],
+                            'customer_email' => $user->email,
+                            'line_items' => $stripeItems,
+                            'mode' => 'payment',
+                            'success_url' => route('success') . '?session_id={CHECKOUT_SESSION_ID}&order_id=' . $order->id,
+                            'cancel_url' => url('/checkout'),
+                            'metadata' => [
+                                'order_id' => $order->id,
+                                'order_number' => $order->order_number,
+                                'user_id' => $user->id,
+                                'vendor_id' => $vendorId,
+                                'total_usd' => $totalUsdAmount,
+                            ],
+                        ]);
+                        
+                        Log::info('Stripe session created for checkout', [
+                            'session_id' => $session->id,
+                            'order_id' => $order->id,
+                            'user_id' => $user->id,
+                            'total_usd' => $totalUsdAmount,
+                        ]);
+                        // Save Stripe session ID to order but DON'T create payment record
+                        $order->update([
+                            'stripe_session_id' => $session->id,
+                            // DO NOT update total_paid or total_remaining here
+                            // DO NOT create a Paiement record here
+                        ]);
+                        
+                        // Update financial transaction status
+                        $this->updateFinancialTransactionStatus($order, 'pending', 'Stripe payment initiated');
+                        
+                        // Set redirect URL to Stripe Checkout
+                        $redirect_url = $session->url;
+                        
+                    } catch (\Stripe\Exception\InvalidRequestException $e) {
+                        Log::error('Stripe session creation failed', [
+                            'error' => $e->getMessage(),
+                            'order_id' => $order->id,
+                        ]);
+                        
+                        $this->addError('payment_method', 'Payment gateway error: ' . $e->getMessage());
+                        $this->placingOrder = false;
+                        return;
+                    }
+
                 } elseif ($this->payment_method === 'om') {
                     //$vendorGroup = reset($this->groups);
                     //$exactAmount = $vendorGroup['total'];
@@ -509,6 +629,8 @@ class CheckoutPage extends Component
                         'total_remaining' => $remaining,
                         'payment_status' => $paymentStatus,
                     ]);
+
+                    $this->handleOMPaymentFinancialTransactions($order, $this->amount, $currency);
                     
                     $redirect_url = route('success');
                 } else {
@@ -516,18 +638,42 @@ class CheckoutPage extends Component
                     $order->update([
                         'payment_status' => 'pending',
                     ]);
+                    $this->updateFinancialTransactionStatus($order, 'pending', 'Cash/COD payment pending');
                     $redirect_url = route('success');
                 }
                 
                 /** UPDATE STOCK */
                 foreach ($group['items'] as $item) {
-                    $vp = \App\Models\VendorProduct::where('vendor_id', $vendorId)
-                        ->where('product_id', $item['product_id'])
-                        ->first();
-                    
-                    if ($vp) {
-                        $vp->stock = max(0, $vp->stock - $item['quantity']);
-                        $vp->save();
+                    // Check if this is a variation
+                    if (!empty($item['variation_id'])) {
+                        // Update variation stock
+                        $variation = \App\Models\VendorProductVariation::where('vendor_product_id', $item['vendor_product_id'])
+                            ->where('id', $item['variation_id'])
+                            ->first();
+                        
+                        if ($variation) {
+                            $variation->stock = max(0, $variation->stock - $item['quantity']);
+                            $variation->save();
+                            
+                            // Also update parent vendor product stock (sum of all variations)
+                            $totalVariationStock = \App\Models\VendorProductVariation::where('vendor_product_id', $item['vendor_product_id'])
+                                ->sum('stock');
+                            
+                            $vp = \App\Models\VendorProduct::find($item['vendor_product_id']);
+                            if ($vp) {
+                                $vp->stock = $totalVariationStock;
+                                $vp->save();
+                            }
+                        }
+                    } else {
+                        $vp = \App\Models\VendorProduct::where('vendor_id', $vendorId)
+                            ->where('product_id', $item['product_id'])
+                            ->first();
+                        
+                        if ($vp) {
+                            $vp->stock = max(0, $vp->stock - $item['quantity']);
+                            $vp->save();
+                        }
                     }
                 }
             }
@@ -594,6 +740,161 @@ class CheckoutPage extends Component
             Log::error('Checkout Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
             session()->flash('error', 'Checkout failed: ' . $e->getMessage());
             return redirect()->back();
+        }
+    }
+
+    /** -------------------------------------------------------------
+     *   CREATE FINANCIAL TRANSACTIONS FOR NEW ORDER
+     * ------------------------------------------------------------- */
+    private function createFinancialTransactionsForOrder($order, $orderAmount)
+    {
+        $financeCalculator = $this->getFinanceCalculator(); // USE GETTER HERE
+        $vendor = $order->vendor;
+        $currency = $vendor->currency->code ?? 'USD';
+        
+        // Calculate all fees using FinanceCalculator
+        $breakdown = $financeCalculator->calculateOrderBreakdown($order);
+        
+        // 1. Order Revenue Transaction (GROSS AMOUNT)
+        FinancialTransaction::create([
+            'order_id' => $order->id,
+            'vendor_id' => $vendor->id,
+            'transaction_type' => FinancialTransaction::TYPE_ORDER,
+            'amount' => $breakdown['gross_amount'],
+            'currency' => $currency,
+            'description' => "Order #{$order->order_number} - Gross revenue",
+            'reference_number' => $order->order_number . '-REV',
+            'gateway_fee' => 0, // Will be calculated separately
+            'commission_fee' => 0, // Will be calculated separately
+            'wire_fee' => 0, // Will be calculated separately
+            'net_amount' => $breakdown['gross_amount'],
+            'status' => FinancialTransaction::STATUS_PENDING,
+            'metadata' => [
+                'order_number' => $order->order_number,
+                'customer_id' => $order->user_id,
+                'payment_method' => $order->payment_method,
+            ],
+        ]);
+        
+        // 2. Commission Fee Transaction
+        if ($breakdown['commission'] > 0) {
+            FinancialTransaction::create([
+                'order_id' => $order->id,
+                'vendor_id' => $vendor->id,
+                'transaction_type' => FinancialTransaction::TYPE_COMMISSION,
+                'amount' => $breakdown['commission'] * -1, // Negative amount (deduction)
+                'currency' => $currency,
+                'description' => "Commission for Order #{$order->order_number}",
+                'reference_number' => $order->order_number . '-COMM',
+                'gateway_fee' => 0,
+                'commission_fee' => $breakdown['commission'],
+                'wire_fee' => 0,
+                'net_amount' => $breakdown['commission'] * -1,
+                'status' => FinancialTransaction::STATUS_PENDING,
+                'metadata' => [
+                    'order_number' => $order->order_number,
+                    'commission_rate' => $breakdown['breakdown']['commission_percentage'] . '%',
+                    'commission_type' => 'percentage',
+                ],
+            ]);
+        }
+        
+        // 3. Gateway Fee Transaction (if any)
+        if ($breakdown['gateway_fee'] > 0) {
+            FinancialTransaction::create([
+                'order_id' => $order->id,
+                'vendor_id' => $vendor->id,
+                'transaction_type' => FinancialTransaction::TYPE_GATEWAY_FEE,
+                'amount' => $breakdown['gateway_fee'] * -1, // Negative amount (deduction)
+                'currency' => $currency,
+                'description' => "Payment gateway fee for Order #{$order->order_number}",
+                'reference_number' => $order->order_number . '-GATE',
+                'gateway_fee' => $breakdown['gateway_fee'],
+                'commission_fee' => 0,
+                'wire_fee' => 0,
+                'net_amount' => $breakdown['gateway_fee'] * -1,
+                'status' => FinancialTransaction::STATUS_PENDING,
+                'metadata' => [
+                    'order_number' => $order->order_number,
+                    'payment_method' => $order->payment_method,
+                    'gateway_fee_percentage' => $breakdown['breakdown']['gateway_fee_percentage'] . '%',
+                ],
+            ]);
+        }
+        
+        // 4. Wire Fee Transaction (if any - this will be calculated at payout time)
+        // We'll create this when payout is initiated
+        
+        Log::info('Financial transactions created for order', [
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'gross_amount' => $breakdown['gross_amount'],
+            'commission' => $breakdown['commission'],
+            'gateway_fee' => $breakdown['gateway_fee'],
+        ]);
+    }
+    
+    /** -------------------------------------------------------------
+     *   UPDATE FINANCIAL TRANSACTION STATUS
+     * ------------------------------------------------------------- */
+    private function updateFinancialTransactionStatus($order, $status, $description = null)
+    {
+        FinancialTransaction::where('order_id', $order->id)
+            ->update([
+                'status' => $status,
+                'processed_at' => $status === FinancialTransaction::STATUS_PROCESSED ? now() : null,
+            ]);
+            
+        if ($description) {
+            Log::info($description, ['order_id' => $order->id]);
+        }
+    }
+    
+    /** -------------------------------------------------------------
+     *   HANDLE OM PAYMENT FINANCIAL TRANSACTIONS
+     * ------------------------------------------------------------- */
+    private function handleOMPaymentFinancialTransactions($order, $amountPaid, $currency)
+    {
+        $breakdown = $this->financeCalculator->calculateOrderBreakdown($order);
+        $totalAmount = $order->grand_total;
+        
+        // Calculate percentages
+        $paymentPercentage = ($amountPaid / $totalAmount) * 100;
+        
+        // Update order revenue transaction based on payment
+        $revenueTransaction = FinancialTransaction::where('order_id', $order->id)
+            ->where('transaction_type', FinancialTransaction::TYPE_ORDER)
+            ->first();
+            
+        if ($revenueTransaction) {
+            // If partial payment, adjust the transaction
+            if ($paymentPercentage < 100) {
+                $revenueTransaction->update([
+                    'status' => FinancialTransaction::STATUS_PENDING,
+                    'description' => "Partial payment received for Order #{$order->order_number}",
+                    'metadata' => array_merge($revenueTransaction->metadata ?? [], [
+                        'partial_payment_amount' => $amountPaid,
+                        'partial_payment_percentage' => $paymentPercentage . '%',
+                    ]),
+                ]);
+            } else {
+                // Full payment
+                $revenueTransaction->update([
+                    'status' => FinancialTransaction::STATUS_PROCESSED,
+                    'processed_at' => now(),
+                ]);
+                
+                // Mark commission and gateway fees as processed
+                FinancialTransaction::where('order_id', $order->id)
+                    ->whereIn('transaction_type', [
+                        FinancialTransaction::TYPE_COMMISSION,
+                        FinancialTransaction::TYPE_GATEWAY_FEE,
+                    ])
+                    ->update([
+                        'status' => FinancialTransaction::STATUS_PROCESSED,
+                        'processed_at' => now(),
+                    ]);
+            }
         }
     }
     

@@ -30,8 +30,10 @@ class LatestOrders extends TableWidget
                 ->label('Customer'),
 
             Tables\Columns\TextColumn::make('grand_total')
-                ->money('USD')
                 ->label('Total'),
+
+            Tables\Columns\TextColumn::make('vendor.currency.code')
+                ->label('Currency'),
 
             Tables\Columns\BadgeColumn::make('status')
                 ->colors([

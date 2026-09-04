@@ -18,12 +18,8 @@ class ListProducts extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        if (!static::isVendorPanel()) {
-            return [
-                Actions\CreateAction::make(),
-            ];
-        }else {
-            return [];
-        }
+        return [
+            Actions\CreateAction::make(),
+        ];
     }
 }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use App\Services\FinanceCalculator;
 
 class Order extends Model
 {
@@ -21,7 +22,49 @@ class Order extends Model
         'total_paid',
         'total_remaining',
         'stripe_session_id',
+        'grand_total_usd',
+        'shipping_amount_usd',
+        'rate_to_usd',
     ];
+
+    protected static function booted()
+    {
+        static::updated(function ($order) {
+            // When order is marked as delivered, create financial transactions if not exists
+            if ($order->wasChanged('status') && $order->status === 'delivered') {
+                $financeCalculator = new FinanceCalculator();
+                $existingTransactions = FinancialTransaction::where('order_id', $order->id)->count();
+                
+                if ($existingTransactions === 0) {
+                    // Create financial transactions for delivered order
+                    $financeCalculator->createFinancialTransactionsForOrder($order);
+                }
+            }
+            
+            // When payment status changes to paid, update financial transactions
+            if ($order->wasChanged('payment_status') && $order->payment_status === 'paid') {
+                FinancialTransaction::where('order_id', $order->id)
+                    ->update([
+                        'status' => FinancialTransaction::STATUS_PROCESSED,
+                        'processed_at' => now(),
+                    ]);
+            }
+        });
+        
+        static::created(function ($order) {
+            // Create initial financial transactions for new order
+            // (This will be handled by CheckoutPage, but added here as backup)
+            $existingTransactions = FinancialTransaction::where('order_id', $order->id)->count();
+            
+            if ($existingTransactions === 0) {
+                // These will be created by CheckoutPage, so we log if they're missing
+                \Log::warning('Order created without financial transactions', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                ]);
+            }
+        });
+    }
 
     public function user()
     {
@@ -104,5 +147,10 @@ class Order extends Model
     public function paiements()
     {
         return $this->hasMany(Paiement::class);
+    }
+
+    public function financialTransactions()
+    {
+        return $this->hasMany(FinancialTransaction::class);
     }
 }

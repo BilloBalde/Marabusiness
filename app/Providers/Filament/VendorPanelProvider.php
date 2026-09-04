@@ -6,10 +6,12 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use App\Filament\Resources\ProductResource;
+use App\Filament\Resources\CategoryResource;
 use Filament\Panel;
 use Filament\Pages\Auth\EditProfile;
 use Filament\Navigation\MenuItem;
 use Filament\PanelProvider;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -32,6 +34,10 @@ class VendorPanelProvider extends PanelProvider
             ->darkModeBrandLogo(asset('assets/images/logo.png'))
             ->favicon(asset('assets/images/favicon.ico'))
             ->brandLogoHeight('4rem')
+            ->renderHook(
+                PanelsRenderHook::TOPBAR_END,
+                fn () => view('filament.partials.view-website-link')
+            )
             ->discoverResources(in: app_path('Filament/Vendor/Resources'), for: 'App\\Filament\\Vendor\\Resources')
             ->discoverPages(in: app_path('Filament/Vendor/Pages'), for: 'App\\Filament\\Vendor\\Pages')
             ->discoverWidgets(in: app_path('Filament/Vendor/Widgets'), for: 'App\\Filament\\Vendor\\Widgets')
@@ -77,6 +83,9 @@ class VendorPanelProvider extends PanelProvider
             ->resources([
                 \App\Filament\Vendor\Resources\BulkRfqResource::class,
                 ProductResource::class,
+                CategoryResource::class,
+                \App\Filament\Resources\BrandResource::class,
+                \App\Filament\Vendor\Resources\VendorReviewResource::class,
             ]);
     }
 }

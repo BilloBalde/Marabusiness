@@ -15,6 +15,7 @@
     "filament/widgets": "3.2.*",
     "jantinnerezo/livewire-alert": "^4.0",
     "laravel/framework": "^11.0",
+    "laravel/sanctum": "^4.3",
     "laravel/socialite": "^5.23",
     "laravel/tinker": "^2.10",
     "livewire/livewire": "^3.5",

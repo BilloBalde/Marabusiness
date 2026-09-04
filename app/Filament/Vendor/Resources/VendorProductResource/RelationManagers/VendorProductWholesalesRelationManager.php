@@ -6,6 +6,7 @@ use Filament\Forms;
 use Filament\Tables;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Filament\Resources\RelationManagers\RelationManager;
 
 class VendorProductWholesalesRelationManager extends RelationManager
@@ -14,6 +15,12 @@ class VendorProductWholesalesRelationManager extends RelationManager
     protected static string $relationship = 'wholesaleTiers';
 
     protected static ?string $title = 'Wholesale Prices';
+
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return ! (bool) $ownerRecord->has_variations;
+    }
+
 
     /**
      * Get vendor currency code for this product (ownerRecord).

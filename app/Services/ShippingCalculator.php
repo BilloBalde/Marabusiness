@@ -14,90 +14,106 @@ class ShippingCalculator
      * Calculate shipping cost for a vendor's items
      */
     public function calculateVendorShipping(
-        Vendor $vendor,
-        array $cartItems, // Items from this vendor
-        array $destinationAddress,
-        string $preferredCarrier = null
-    ): array
-    {
-        //dd($cartItems);
-        try{
-            // 1. Determine shipping zone based on destination
-            $zone = $this->determineShippingZone($vendor, $destinationAddress);
-            
-            // 2. Calculate total weight and volume
-            $totals = $this->calculateTotals($cartItems['items'] ?? $cartItems);
-            
-            // 3. Get available carriers for this zone
-            $carriers = $this->getAvailableCarriers($vendor, $zone);
-            
-            // 4. Calculate costs for each carrier
-            $options = [];
-            foreach ($carriers as $carrier) {
-                // Debug: Check what $carrier actually is
-                \Log::info('Carrier data type:', [
-                    'is_array' => is_array($carrier),
-                    'is_object' => is_object($carrier),
-                    'type' => gettype($carrier),
-                    'class' => is_object($carrier) ? get_class($carrier) : 'not object',
-                    'data' => $carrier
-                ]);
-                
-                $cost = $this->calculateCarrierCost($carrier, $totals);
-                
-                // Extract values safely
-                if (is_array($carrier)) {
-                    $carrierCode = $carrier['carrier'] ?? 'unknown';
-                    $deliveryDays = $carrier['delivery_days'] ?? 5; // Default
-                } else {
-                    $carrierCode = $carrier->carrier ?? 'unknown';
-                    $deliveryDays = $carrier->delivery_days ?? 5; // Default
-                }
-                
-                $options[] = [
-                    'carrier' => $carrierCode,
-                    'name' => Shipment::CARRIERS[$carrierCode] ?? $carrierCode,
-                    'cost' => $cost,
-                    'cost_local' => $cost * ($vendor->rate_to_usd ?? 1),
-                    'delivery_days' => $deliveryDays,
-                    'zone' => $zone->name,
-                    'total_weight' => $totals['weight'],
-                    'total_cbm' => $totals['cbm'],
-                    'total_items' => $totals['items'],
-                    'total_cartons' => $totals['cartons'],
-                ];
-            }
-            
-            // 5. Sort by cost (cheapest first)
-            usort($options, fn($a, $b) => $a['cost'] <=> $b['cost']);
-            
-            // 6. Return cheapest option or preferred carrier option
-            $selectedOption = $options[0] ?? null;
-            
-            if ($preferredCarrier) {
-                foreach ($options as $option) {
-                    if ($option['carrier'] === $preferredCarrier) {
-                        $selectedOption = $option;
-                        break;
-                    }
-                }
-            }
-            
-            return [
-                'options' => $options,
-                'selected' => $selectedOption,
-                'zone' => $zone,
-                'totals' => $totals,
+            Vendor $vendor,
+            array $cartItems,
+            array $destinationAddress,
+            string $preferredCarrier = null
+        ): array {
+        $zone = $this->determineShippingZone($vendor, $destinationAddress);
+
+        // IMPORTANT: your CheckoutPage passes plain items array per vendor
+        $items = $cartItems['items'] ?? $cartItems;
+
+        $totals = $this->calculateTotals($items);
+
+        $carriers = $this->getAvailableCarriers($vendor, $zone);
+
+        $options = [];
+
+        foreach ($carriers as $carrier) {
+            $costLocal = $this->calculateCarrierCostLocal(
+                $carrier,
+                $totals,
+                $cartItems['subtotal'] ?? null // optional if you ever pass subtotal
+            );
+
+            $rateToUsd = (float) ($vendor?->currency?->rate_to_usd ?? $vendor->rate_to_usd ?? 1);
+
+            // Local -> USD (if rate invalid, fallback 1)
+            $costUsd = ($rateToUsd > 0) ? ($costLocal * $rateToUsd) : $costLocal;
+
+            $options[] = [
+                'carrier'        => $carrier->carrier,
+                'name'           => Shipment::CARRIERS[$carrier->carrier] ?? $carrier->carrier,
+                'cost'           => $costUsd,        // USD (used by checkout)
+                'cost_local'     => $costLocal,      // vendor currency
+                'delivery_days'  => (int) ($carrier->delivery_days ?? 5),
+                'zone'           => $zone->name,
+                'total_weight'   => $totals['weight'],
+                'total_cbm'      => $totals['cbm'],
+                'total_items'    => $totals['items'],
+                'total_cartons'  => $totals['cartons'],
             ];
-        }catch (\Exception $e) {
-            \Log::error('Shipping calculation error details:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'cart_items' => $cartItems,
-            ]);
-            throw $e;
         }
+
+        // Sort by USD cost
+        usort($options, fn ($a, $b) => $a['cost'] <=> $b['cost']);
+
+        $selectedOption = $options[0] ?? null;
+
+        if ($preferredCarrier) {
+            foreach ($options as $option) {
+                if ($option['carrier'] === $preferredCarrier) {
+                    $selectedOption = $option;
+                    break;
+                }
+            }
+        }
+
+        return [
+            'options'  => $options,
+            'selected' => $selectedOption,
+            'zone'     => $zone,
+            'totals'   => $totals,
+        ];
     }
+
+    /**
+     * Calculate carrier cost in vendor's local currency
+     */
+    private function calculateCarrierCostLocal(
+            ShippingCarrierRate $carrier,
+            array $totals,
+            ?float $orderSubtotalLocal = null
+        ): float {
+        // Free shipping check (if subtotal provided)
+        if (
+            $orderSubtotalLocal !== null
+            && (float) $carrier->free_shipping_threshold > 0
+            && $orderSubtotalLocal >= (float) $carrier->free_shipping_threshold
+        ) {
+            return 0.0;
+        }
+
+        $cost =
+            (float) $carrier->base_rate
+            + ((float) $carrier->rate_per_kg     * (float) $totals['weight'])
+            + ((float) $carrier->rate_per_cbm    * (float) $totals['cbm'])
+            + ((float) $carrier->rate_per_item   * (int) $totals['items'])
+            + ((float) $carrier->rate_per_carton * (int) $totals['cartons']);
+
+        // Apply min/max from DB
+        if ((float) $carrier->min_rate > 0 && $cost < (float) $carrier->min_rate) {
+            $cost = (float) $carrier->min_rate;
+        }
+
+        if ((float) $carrier->max_rate > 0 && $cost > (float) $carrier->max_rate) {
+            $cost = (float) $carrier->max_rate;
+        }
+
+        return round($cost, 2);
+    }
+
     
     /**
      * Determine shipping zone based on destination
@@ -133,29 +149,29 @@ class ShippingCalculator
      */
     private function findCustomZone(Vendor $vendor, array $address): ?ShippingZone
     {
-        // Check by country
-        if ($address['country']) {
+        $countryCode = $address['country_code'] ?? null;
+
+        if ($countryCode) {
             $zone = ShippingZone::where('vendor_id', $vendor->id)
-                ->where('country_code', $address['country'])
+                ->where('country_code', $countryCode)
                 ->where('is_active', true)
                 ->first();
-            
+
             if ($zone) return $zone;
         }
-        
-        // Check by city
-        if ($address['city']) {
+
+        if (!empty($address['city'])) {
             $zone = ShippingZone::where('vendor_id', $vendor->id)
                 ->where('is_active', true)
                 ->where(function($query) use ($address) {
                     $query->where('cities', 'LIKE', "%{$address['city']}%")
-                          ->orWhere('region', $address['state'] ?? '');
+                        ->orWhere('region', $address['state'] ?? '');
                 })
                 ->first();
-            
+
             if ($zone) return $zone;
         }
-        
+
         return null;
     }
     
@@ -311,14 +327,17 @@ class ShippingCalculator
     /**
      * Get available carriers for a zone
      */
-    private function getAvailableCarriers(Vendor $vendor, ShippingZone $zone): array
+    private function getAvailableCarriers(Vendor $vendor, ShippingZone $zone)
     {
-        return ShippingCarrierRate::where('vendor_id', $vendor->id)
+        return ShippingCarrierRate::query()
+            ->where('vendor_id', $vendor->id)
             ->where('zone_name', $zone->name)
             ->where('is_active', true)
-            ->get()
-            ->toArray();
+            ->orderByDesc('is_default') // default first
+            ->orderBy('base_rate')      // then cheapest-ish
+            ->get();
     }
+
     
     /**
      * Calculate carrier cost

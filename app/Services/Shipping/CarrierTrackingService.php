@@ -15,6 +15,13 @@ class CarrierTrackingService
 
     public function sync(Shipment $shipment): Shipment
     {
+        // Check what credentials you're using
+        \Log::info('DHL Credentials Check:', [
+            'api_key' => config('services.dhl.api_key'),
+            'api_secret' => config('services.dhl.api_secret'),
+            'account_number' => config('services.dhl.account_number'),
+            'environment' => config('services.dhl.environment'), // sandbox or production
+        ]);
         $payload = match ($shipment->carrier) {
             'dhl' => $this->dhlClient->track($shipment->tracking_number),
             default => throw new \RuntimeException("Carrier {$shipment->carrier} not supported for sync."),

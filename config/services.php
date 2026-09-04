@@ -37,7 +37,21 @@ return [
 
     'dhl' => [
         'api_key' => env('DHL_API_KEY'),
+        'api_secret' => env('DHL_API_SECRET'),
+        'account_number' => env('DHL_ACCOUNT_NUMBER'), // Add this
+        'environment' => env('DHL_ENVIRONMENT', 'sandbox'), // Add this
+        // For tracking API specifically
+        'tracking_url' => env('DHL_TRACKING_URL', 'https://api-eu.dhl.com/track/shipments'),
         'base_url' => env('DHL_BASE_URL', 'https://api-eu.dhl.com'),
+        // DHL Express specific
+        'express_url' => env('DHL_EXPRESS_URL', 'https://api-eu.dhl.com/dhlexpress'),
+    ],
+
+    'lengopay' => [
+        'base_url'    => env('LENGOPAY_BASE_URL', 'https://portal.lengopay.com'),
+        'license_key' => env('LENGOPAY_LICENSE_KEY'),
+        'website_id'  => env('LENGOPAY_WEBSITE_ID'),
+        'currency'    => env('LENGOPAY_CURRENCY', 'GNF'),
     ],
 
     'google' => [

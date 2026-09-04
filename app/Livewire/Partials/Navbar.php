@@ -3,6 +3,7 @@
 namespace App\Livewire\Partials;
 
 use App\Helpers\CartManagement;
+use App\Helpers\WishlistManagement;
 use App\Models\Currency;
 use App\Models\Category;
 use Livewire\Component;
@@ -11,6 +12,7 @@ use Livewire\Attributes\On;
 class Navbar extends Component
 {
     public $total_count = 0;
+    public $wishlist_count = 0;
     public $currencyCode = '';
     public $currencies = [];
 
@@ -34,6 +36,7 @@ class Navbar extends Component
 
         // 2. Load initial cart count
         $this->total_count = CartManagement::getCartCount();
+        $this->wishlist_count = WishlistManagement::getCount();
 
         // 3. Handle currency from session (fallback to first currency)
         $default = Currency::first()?->code ?? 'USD';
@@ -85,8 +88,18 @@ class Navbar extends Component
     #[On('cart-updated')]
     public function updateCartCount($total_count = null)
     {
+        \Log::info('Navbar updateCartCount: Called', [
+            'passed_total_count' => $total_count,
+            'session_count' => count(session('cart_items', []))
+        ]);
         $this->total_count = $total_count ?? CartManagement::getCartCount();
         logger()->info("CART MOUNTED!");
+    }
+
+    #[On('wishlist-updated')]
+    public function updateWishlistCount($total_count = null)
+    {
+        $this->wishlist_count = $total_count ?? WishlistManagement::getCount();
     }
 
     public function render()

@@ -20,7 +20,7 @@ class SalesChart extends ChartWidget
 
             $months[] = $date->format('M');
             $totals[] = Order::whereRaw("strftime('%Y-%m', created_at) = ?", [$date->format('Y-m')])
-                ->sum('grand_total');
+                ->sum('grand_total_usd');
         }
 
         return [

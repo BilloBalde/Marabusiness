@@ -1,9 +1,17 @@
 <div class="bg-gray-50 min-h-screen py-10">
     <div class="max-w-7xl mx-auto px-6">
-        @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.vendors'])
+        @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.vendors', 'hasSub' => false, 'subContent' => '', 'subLink' => ''])
         <h1 class="text-3xl font-bold text-gray-800 mb-6">
             Boutiques Officielles
         </h1>
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-2xl font-bold">All Vendors</h1>
+
+            <a href="{{ route('vendor.apply') }}"
+            class="px-4 py-2 rounded-lg bg-[#D4AF37] text-white font-semibold hover:bg-[#c9a12f] transition">
+                Become a Vendor
+            </a>
+        </div>
 
         <!-- 🔍 SEARCH BAR -->
         <div class="mb-6">
@@ -32,7 +40,7 @@
                 <!-- LOGO -->
                 <div class="flex justify-center mb-3">
                     @if($vendor->logo_path)
-                        <img src="{{ asset($vendor->logo_path) }}"
+                        <img src="{{ asset('uploads/'.$vendor->logo_path) }}"
                              class="w-20 h-20 rounded-full border shadow object-cover">
                     @else
                         <div class="w-20 h-20 rounded-full bg-gray-200 border shadow flex items-center justify-center">

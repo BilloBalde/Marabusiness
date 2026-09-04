@@ -30,6 +30,7 @@ class VendorsPage extends Component
             ->when($this->search !== '', function ($q) {
                 $q->where('store_name', 'like', '%' . $this->search . '%');
             })
+            ->where('is_active', true)
             ->paginate(16);
 
         return view('livewire.vendors-page', [

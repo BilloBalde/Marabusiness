@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Vendor;
 use App\Models\VendorFollow;
 use App\Models\VendorReview;
+use App\Helpers\WishlistManagement;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\Auth;
@@ -224,11 +225,21 @@ class VendorPage extends Component
         ]);
     }
 
-    public function addToCart($vendorProductId)
+    public function addToWishlist($vendor_product_id)
     {
-        $total_count = \App\Helpers\CartManagement::addItemToCart($vendorProductId);
+        if (!$vendor_product_id) {
+            $this->dispatch('show-toast', 
+                message: 'This product is not available.',
+                type: 'error'
+            );
+            return;
+        }
         
-        $this->dispatch('cart-updated');
-        $this->dispatch('cart-added');
+        WishlistManagement::addItem($vendor_product_id, null, []);
+        $this->dispatch('wishlist-updated', total_count: WishlistManagement::getCount());
+        $this->dispatch('show-toast', 
+            message: 'Added to wishlist.',
+            type: 'success'
+        );
     }
 }

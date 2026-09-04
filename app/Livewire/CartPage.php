@@ -5,7 +5,6 @@ namespace App\Livewire;
 use Livewire\Component;
 use Livewire\Attributes\Title;
 use App\Helpers\CartManagement;
-use Illuminate\Support\Facades\Cookie;
 
 class CartPage extends Component
 {
@@ -13,34 +12,18 @@ class CartPage extends Component
 
     public $cart_items = [];
     public $grouped_cart = [];
-    public $selected_items = []; // Contains cart_key values
-    public $selected_ids = [];   // Contains vendor_product_id values for checkout
+    public $selected_items = [];
+    public $selected_ids = [];
     public $selected_vendor_totals = [];
     public $selected_total = 0;
     public $selected_currency = 'USD';
     public $quantity_values = [];
+    public $showDeleteSelectedModal = false;
 
     public function mount()
     {
-        // Temporary: Clear corrupted cart data
-        if (Cookie::has('cart_items')) {
-            $cart_items = json_decode(Cookie::get('cart_items'), true);
-            $hasCorruption = false;
-            
-            foreach ($cart_items as $item) {
-                if (!isset($item['cart_key']) || !isset($item['vendor_product_id'])) {
-                    $hasCorruption = true;
-                    break;
-                }
-            }
-            
-            if ($hasCorruption) {
-                // Clear corrupted cart
-                Cookie::queue(Cookie::forget('cart_items'));
-                $this->cart_items = [];
-                return;
-            }
-        }
+        \Log::info('CartPage mount: Starting cart refresh');
+    
         $this->refreshCart();
 
         // Initialize quantity_values
@@ -49,8 +32,35 @@ class CartPage extends Component
                 $this->quantity_values[$item['cart_key']] = $item['quantity'] ?? 1;
             }
         }
-        // Call this in your mount() methods or as a middleware
-        //CartManagement::cleanupInvalidCartItems();
+        
+        \Log::info('CartPage mount: Cart items after refresh', [
+            'cart_items_count' => count($this->cart_items),
+            'cart_items' => $this->cart_items,
+            'grouped_cart_count' => count($this->grouped_cart)
+        ]);
+        /* $this->refreshCart();
+
+        // Initialize quantity_values
+        foreach ($this->cart_items as $item) {
+            if (isset($item['cart_key'])) {
+                $this->quantity_values[$item['cart_key']] = $item['quantity'] ?? 1;
+            }
+        } */
+    }
+
+    public function hydrate()
+    {
+        \Log::info('CartPage hydrate: Called', [
+            'current_cart_items' => count($this->cart_items),
+            'session_count' => count(session('cart_items', []))
+        ]);
+    }
+
+    public function dehydrate()
+    {
+        \Log::info('CartPage dehydrate: Called', [
+            'current_cart_items' => count($this->cart_items)
+        ]);
     }
 
     private function refreshCart()
@@ -59,7 +69,13 @@ class CartPage extends Component
         
         // Clean up any items missing cart_key before processing
         $this->cart_items = array_filter($this->cart_items, function($item) {
-            return isset($item['cart_key']);
+            if (is_array($item)) {
+                return isset($item['cart_key']);
+            }
+            if (is_object($item)) {
+                return isset($item->cart_key);
+            }
+            return false;
         });
 
         $this->cart_items = array_values($this->cart_items); // Re-index array
@@ -87,51 +103,6 @@ class CartPage extends Component
         $this->updateQty($cart_key, $newQty);
     }
 
-    private function updateLocalState($cart_key, $action)
-    {
-        // Update the specific item in cart_items
-        foreach ($this->cart_items as &$item) {
-            if ($item['cart_key'] === $cart_key) {
-                if ($action === 'increase') {
-                    $item['quantity']++;
-                } elseif ($action === 'decrease' && $item['quantity'] > 1) {
-                    $item['quantity']--;
-                }
-                
-                $item['total_amount'] = $item['unit_amount'] * $item['quantity'];
-                
-                // Update grouped cart
-                $this->updateGroupedCart();
-                
-                // Update selected summary
-                $this->updateSelectedSummary();
-                break;
-            }
-        }
-    }
-
-    private function updateGroupedCart()
-    {
-        // Update grouped cart without full re-fetch
-        $this->grouped_cart = [];
-        
-        foreach ($this->cart_items as $item) {
-            $vendorId = $item['vendor_id'];
-            
-            if (!isset($this->grouped_cart[$vendorId])) {
-                $this->grouped_cart[$vendorId] = [
-                    'items' => [],
-                    'subtotal' => 0,
-                    'subtotal_usd' => 0
-                ];
-            }
-            
-            $this->grouped_cart[$vendorId]['items'][] = $item;
-            $this->grouped_cart[$vendorId]['subtotal'] += $item['total_amount'];
-            $this->grouped_cart[$vendorId]['subtotal_usd'] += ($item['total_amount'] * ($item['rate_to_usd'] ?? 1));
-        }
-    }
-
     public function removeItem($cart_key)
     {
         // Remove the item using CartManagement
@@ -143,7 +114,7 @@ class CartPage extends Component
         });
         $this->cart_items = array_values($this->cart_items);
         
-        // IMPORTANT: Re-group the cart after removal
+        // Re-group the cart after removal
         $this->grouped_cart = CartManagement::groupCartByVendor($this->cart_items);
         
         // Remove the item from selected items if it was selected
@@ -179,24 +150,51 @@ class CartPage extends Component
             $quantity = $this->quantity_values[$cart_key];
         }
         if ($quantity < 1) $quantity = 1;
+        
+        $previous_items = $this->cart_items;
         $this->cart_items = CartManagement::updateQuantity($cart_key, $quantity);
-        // Update local state without full refresh
+        if (empty($this->cart_items)) {
+            $this->cart_items = $previous_items;
+            $this->grouped_cart = CartManagement::groupCartByVendor($this->cart_items);
+            $this->updateSelectedSummary();
+            $this->dispatch('cart-updated');
+            return;
+        }
+
+        $hasUpdatedItem = false;
+        foreach ($this->cart_items as $item) {
+            if (($item['cart_key'] ?? null) === $cart_key) {
+                $hasUpdatedItem = true;
+                break;
+            }
+        }
+        if (!$hasUpdatedItem) {
+            $this->cart_items = $previous_items;
+            $this->grouped_cart = CartManagement::groupCartByVendor($this->cart_items);
+            $this->updateSelectedSummary();
+            $this->dispatch('cart-updated');
+            return;
+        }
+        
+        // Update local state
         foreach ($this->cart_items as &$item) {
-            if ($item['cart_key'] === $cart_key) {
-                $item['quantity'] = $quantity;
-                $item['total_amount'] = $item['unit_amount'] * $quantity;
+            if (($item['cart_key'] ?? null) === $cart_key) {
+                $actualQty = $item['quantity'] ?? $quantity;
+                $unitAmount = $item['unit_amount'] ?? ($item['base_price'] ?? 0);
+                $item['quantity'] = $actualQty;
+                $item['total_amount'] = $unitAmount * $actualQty;
                 break;
             }
         }
         
         // Update grouped cart
-        $this->updateGroupedCart();
+        $this->grouped_cart = CartManagement::groupCartByVendor($this->cart_items);
         
         // Update selected summary
         $this->updateSelectedSummary();
         
         // Update quantity_values to ensure sync
-        $this->quantity_values[$cart_key] = $quantity;
+        $this->quantity_values[$cart_key] = $actualQty ?? $quantity;
         $this->dispatch('cart-updated');
     }
 
@@ -271,7 +269,7 @@ class CartPage extends Component
     public function updateSelectedSummary()
     {
         $totalUSD = 0;
-        $this->selected_ids = []; // Reset selected_ids
+        $this->selected_ids = [];
 
         // Reset if no cart items
         if (empty($this->cart_items)) {
@@ -282,7 +280,7 @@ class CartPage extends Component
             return;
         }
         
-        // Get all valid cart keys - ensure item has cart_key
+        // Get all valid cart keys
         $validCartKeys = array_filter(array_map(function($item) {
             return $item['cart_key'] ?? null;
         }, $this->cart_items));
@@ -296,18 +294,78 @@ class CartPage extends Component
                 $rate = $item['rate_to_usd'] ?? 1;
                 $totalUSD += ($item['total_amount'] ?? 0) * $rate;
                 
-                // Store vendor_product_id for checkout
                 if (isset($item['vendor_product_id'])) {
                     $this->selected_ids[] = $item['vendor_product_id'];
                 }
             }
         }
 
-        // Update vendor checkboxes based on current selection
+        // Update vendor checkboxes
         $this->updateVendorCheckboxes();
         
         $this->selected_total = $totalUSD;
         $this->selected_currency = 'USD';
+    }
+
+    public function removeSelectedItems()
+    {
+        if (empty($this->selected_items)) {
+            return;
+        }
+
+        $cart_items = CartManagement::getCartItemsFromCookie();
+        $remaining_items = array_values(array_filter($cart_items, function ($item) {
+            $cartKey = $item['cart_key'] ?? null;
+            return $cartKey && !in_array($cartKey, $this->selected_items, true);
+        }));
+
+        CartManagement::addCartItemsToCookie($remaining_items, true);
+
+        $this->cart_items = $remaining_items;
+        $this->grouped_cart = CartManagement::groupCartByVendor($this->cart_items);
+        $this->selected_items = [];
+        $this->selected_ids = [];
+        $this->selected_vendor_totals = [];
+        $this->selected_total = 0;
+        $this->quantity_values = [];
+
+        foreach ($this->cart_items as $item) {
+            if (isset($item['cart_key'])) {
+                $this->quantity_values[$item['cart_key']] = $item['quantity'] ?? 1;
+            }
+        }
+
+        $this->showDeleteSelectedModal = false;
+        $this->dispatch('cart-updated');
+    }
+
+    public function confirmDeleteSelected()
+    {
+        if (empty($this->selected_items)) {
+            return;
+        }
+
+        $this->showDeleteSelectedModal = true;
+    }
+
+    public function cancelDeleteSelected()
+    {
+        $this->showDeleteSelectedModal = false;
+    }
+
+    public function clearCartItems()
+    {
+        CartManagement::addCartItemsToCookie([], true);
+
+        $this->cart_items = [];
+        $this->grouped_cart = [];
+        $this->selected_items = [];
+        $this->selected_ids = [];
+        $this->selected_vendor_totals = [];
+        $this->selected_total = 0;
+        $this->quantity_values = [];
+
+        $this->dispatch('cart-updated');
     }
 
     /**
@@ -319,28 +377,38 @@ class CartPage extends Component
             return '#';
         }
         
-        // Pass vendor_product_id values to checkout
         return '/checkout?selected=' . urlencode(implode(',', $this->selected_ids));
     }
 
     /**
-     * Get variation display text
+     * Get variation display text WITH QUANTITY
      */
     public function getVariationText($item)
     {
+        $text = '';
+    
         if (!empty($item['variation_note'])) {
-            return $item['variation_note'];
+            $text = $item['variation_note'];
         }
         
-        if (!empty($item['selected_variations'])) {
-            $variations = [];
+        // For backward compatibility: also check selected_variations
+        if (empty($text) && !empty($item['selected_variations'])) {
+            $parts = [];
             foreach ($item['selected_variations'] as $attribute => $value) {
-                $variations[] = ucfirst($attribute) . ': ' . $value;
+                // Skip any meta attributes
+                if (in_array($attribute, ['note', 'custom_note'])) {
+                    continue;
+                }
+                $parts[] = ucfirst($attribute) . ': ' . $value;
             }
-            return implode(', ', $variations);
+            if (!empty($parts)) {
+                $text = implode(', ', $parts);
+            }
         }
         
-        return '';
+        // Always show quantity separately, not in the variation text
+        // The quantity is displayed in the template, not here
+        return $text;
     }
 
     public function render()

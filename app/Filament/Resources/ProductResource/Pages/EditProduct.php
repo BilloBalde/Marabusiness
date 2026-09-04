@@ -7,24 +7,50 @@ use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use App\Models\VendorProduct;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class EditProduct extends EditRecord
 {
     protected static string $resource = ProductResource::class;
+    protected static function isVendorPanel(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === 'vendor';
+    }
+
+    protected function authorizeAccess(): void
+    {
+        $user = Filament::auth()->user();
+        $record = $this->getRecord();
+        
+        // Admin can access everything (not in vendor panel)
+        if (!static::isVendorPanel()) {
+            return;
+        }
+        
+        // Vendor can only access if they created it
+        if ($record->created_by !== $user->id) {
+            Notification::make()
+                ->title('Access Denied')
+                ->body('You are not authorized to edit this product. You can only edit products that you created.')
+                ->danger()
+                ->persistent()
+                ->send();
+            
+            // Redirect back to index
+            $this->redirect(ProductResource::getUrl('index'));
+        }
+    }
 
     protected function getHeaderActions(): array
     {
-        return [
-            Actions\DeleteAction::make(),
-        ];
-    }
-
-    /**
-     * Vendor Panel detection
-     */
-    protected function isVendorPanel(): bool
-    {
-        return Filament::getCurrentPanel()?->getId() === 'vendor';
+        if (!static::isVendorPanel()) {
+            return [
+                Actions\DeleteAction::make(),
+            ];
+        }else {
+            return [];
+        }
     }
 
     protected function vendorId(): ?int
@@ -38,12 +64,31 @@ class EditProduct extends EditRecord
      */
     protected function afterSave(): void
     {
+        $record = $this->record;
+
+        $record->syncTranslations([
+            'en' => [
+                'name' => $this->data['name_en'] ?? null,
+                'short_description' => $this->data['short_description_en'] ?? null,
+                'description' => $this->data['description_en'] ?? null,
+            ],
+            'fr' => [
+                'name' => $this->data['name_fr'] ?? null,
+                'short_description' => $this->data['short_description_fr'] ?? null,
+                'description' => $this->data['description_fr'] ?? null,
+            ],
+            'zh' => [
+                'name' => $this->data['name_zh'] ?? null,
+                'short_description' => $this->data['short_description_zh'] ?? null,
+                'description' => $this->data['description_zh'] ?? null,
+            ],
+        ]);
+        
         // ADMIN PANEL → stop here
         if (! $this->isVendorPanel()) {
             return;
         }
 
-        $record = $this->record;
         $vendorId = $this->vendorId();
         $productId = $this->record->id;
 
@@ -87,6 +132,20 @@ class EditProduct extends EditRecord
      */
     protected function mutateFormDataBeforeFill(array $data): array
     {
+        $record = $this->record;
+
+        $data['name_en'] = $record->getTranslation('name', 'en');
+        $data['name_fr'] = $record->getTranslation('name', 'fr');
+        $data['name_zh'] = $record->getTranslation('name', 'zh');
+
+        $data['short_description_en'] = $record->getTranslation('short_description', 'en');
+        $data['short_description_fr'] = $record->getTranslation('short_description', 'fr');
+        $data['short_description_zh'] = $record->getTranslation('short_description', 'zh');
+
+        $data['description_en'] = $record->getTranslation('description', 'en');
+        $data['description_fr'] = $record->getTranslation('description', 'fr');
+        $data['description_zh'] = $record->getTranslation('description', 'zh');
+
         if (! $this->isVendorPanel()) {
             return $data;
         }
@@ -108,6 +167,8 @@ class EditProduct extends EditRecord
 
         return $data;
     }
+
+
 
     /**
      * Prevent product fields being overwritten in vendor panel

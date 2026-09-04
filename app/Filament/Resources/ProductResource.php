@@ -18,6 +18,12 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables;
 use Filament\Resources\Resource;
+use Filament\Forms\Components\Tabs;
+use Filament\Forms\Components\Tabs\Tab;
+use Filament\Forms\Components\Textarea;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Forms\Set;
+use Illuminate\Support\Str;
 use Filament\Tables\Table;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +33,7 @@ class ProductResource extends Resource
     protected static ?string $model = Product::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-squares-2x2';
+    
 
     /* -------------------------------------------------------------
      | PANEL HELPERS
@@ -52,12 +59,14 @@ class ProductResource extends Resource
         return __('filament.nav.products');
     }
 
+
     /* -------------------------------------------------------------
      | FORM
      | ------------------------------------------------------------- */
     public static function form(Form $form): Form
     {
         $isVendor = static::isVendorPanel();
+        $userId = Filament::auth()->id();
 
         /* ==========================================================
          | ADMIN PANEL — FULL PRODUCT FORM
@@ -65,62 +74,246 @@ class ProductResource extends Resource
         return $form->schema([
             Forms\Components\Section::make("General Info")
                 ->schema([
-                    TextInput::make('name')
-                        ->required()
-                        ->live(onBlur: true)
-                        ->afterStateUpdated(function ($state, Forms\Set $set, $context) {
-                            if ($context === 'create') {
-                                $set('slug', \Illuminate\Support\Str::slug($state));
-                            }
-                        })
-                        ->disabled(fn() => $isVendor),
+                    Tabs::make('Translations')
+                        ->columnSpanFull()
+                        ->tabs([
+                            Tab::make('EN')->schema([
+                                TextInput::make('name_en')
+                                ->label('Name (EN)')
+                                ->required()
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(function (string $operation, $state, Set $set) {
+                                    if ($operation === 'create') {
+                                        $set('slug', Str::slug($state));
+                                    }
+                                }),
+
+                            Textarea::make('short_description_en')
+                                ->label('Short Description (EN)')
+                                ->rows(3),
+
+                            Forms\Components\RichEditor::make('description_en')
+                                ->label('Description (EN)')
+                                ->columnSpanFull()
+                                ->toolbarButtons([
+                                    'bold',
+                                    'italic',
+                                    'strike',
+                                    'underline',
+                                    'bulletList',
+                                    'orderedList',
+                                    'link',
+                                    'blockquote',
+                                    'codeBlock',
+                                    'redo',
+                                    'undo',
+                                ])
+                                ->maxLength(5000)
+                                ->extraInputAttributes(['style' => 'min-height: 200px;']),
+                            ]),
+
+                            Tab::make('FR')->schema([
+                                TextInput::make('name_fr')->label('Nom (FR)'),
+                                Textarea::make('short_description_fr')->label('Description courte (FR)')->rows(3),
+                                Forms\Components\RichEditor::make('description_fr')
+                                    ->label('Description (FR)')
+                                    ->columnSpanFull()
+                                    ->toolbarButtons([
+                                        'bold',
+                                        'italic',
+                                        'strike',
+                                        'underline',
+                                        'bulletList',
+                                        'orderedList',
+                                        'link',
+                                        'blockquote',
+                                        'codeBlock',
+                                        'redo',
+                                        'undo',
+                                    ])
+                                    ->maxLength(5000)
+                                    ->extraInputAttributes(['style' => 'min-height: 200px;']),
+                            ]),
+
+                            Tab::make('ZH')->schema([
+                                TextInput::make('name_zh')->label('名称 (ZH)'),
+                                Textarea::make('short_description_zh')->label('短描述 (ZH)')->rows(3),
+                                Forms\Components\RichEditor::make('description_zh')
+                                    ->label('描述 (ZH)')
+                                    ->columnSpanFull()
+                                    ->toolbarButtons([
+                                        'bold',
+                                        'italic',
+                                        'strike',
+                                        'underline',
+                                        'bulletList',
+                                        'orderedList',
+                                        'link',
+                                        'blockquote',
+                                        'codeBlock',
+                                        'redo',
+                                        'undo',
+                                    ])
+                                    ->maxLength(5000)
+                                    ->extraInputAttributes(['style' => 'min-height: 200px;']),
+                            ]),
+                    ]),
 
                     TextInput::make('slug')
                         ->disabled()
                         ->required()
                         ->dehydrated()
                         ->maxLength(255)
-                        ->disabled(fn() => $isVendor),
+                        ->columnSpanFull()
+                        ->unique(Product::class, 'slug', ignoreRecord: true),
 
                     Select::make('category_id')
                         ->label('Category')
                         ->options(Category::orderBy('name')->pluck('name', 'id'))
                         ->required()
-                        ->disabled(fn() => $isVendor),
+                        ->searchable()
+                        /* ->createOptionForm([
+                            TextInput::make('name_en')
+                                ->label('Name (EN)')
+                                ->required()
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(function ($state, Set $set) {
+                                    $set('slug', Str::slug($state));
+                                }),
+                            TextInput::make('name_fr')
+                                ->label('Name (FR)'),
+                            TextInput::make('name_zh')
+                                ->label('Name (ZH)'),
+                            TextInput::make('slug')
+                                ->required()
+                                ->disabled()
+                                ->dehydrated(),
+                            TextInput::make('family_en')
+                                ->label('Family (EN)')
+                                ->maxLength(255),
+                            TextInput::make('family_fr')
+                                ->label('Family (FR)')
+                                ->maxLength(255),
+                            TextInput::make('family_zh')
+                                ->label('Family (ZH)')
+                                ->maxLength(255),
+                        ])
+                        ->createOptionUsing(function (array $data) {
+                            $data['created_by'] = Filament::auth()->id();
+                            $data['name'] = $data['name_en'] ?? $data['name'] ?? null;
+                            $data['family'] = $data['family_en'] ?? $data['family'] ?? null;
+
+                            $category = Category::create($data);
+                            $category->syncTranslations([
+                                'en' => [
+                                    'name' => $data['name_en'] ?? null,
+                                    'family' => $data['family_en'] ?? null,
+                                ],
+                                'fr' => [
+                                    'name' => $data['name_fr'] ?? null,
+                                    'family' => $data['family_fr'] ?? null,
+                                ],
+                                'zh' => [
+                                    'name' => $data['name_zh'] ?? null,
+                                    'family' => $data['family_zh'] ?? null,
+                                ],
+                            ]);
+
+                            return $category->getKey();
+                        }) */,
 
                     Select::make('brand_id')
                         ->label('Brand')
                         ->options(Brand::orderBy('name')->pluck('name', 'id'))
                         ->searchable()
-                        ->disabled(fn() => $isVendor),
-
-                    Forms\Components\RichEditor::make('description')
-                        ->label('Product Description')
-                        ->columnSpanFull()
-                        ->toolbarButtons([
-                            'bold',
-                            'italic',
-                            'strike',
-                            'underline',
-                            'bulletList',
-                            'orderedList',
-                            'link',
-                            'blockquote',
-                            'codeBlock',
-                            'redo',
-                            'undo',
+                        ->createOptionForm([
+                            TextInput::make('name_en')
+                                ->label('Name (EN)')
+                                ->required()
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(function ($state, Set $set) {
+                                    $set('slug', Str::slug($state));
+                                }),
+                            TextInput::make('name_fr')
+                                ->label('Name (FR)'),
+                            TextInput::make('name_zh')
+                                ->label('Name (ZH)'),
+                            TextInput::make('slug')
+                                ->required()
+                                ->disabled()
+                                ->dehydrated(),
                         ])
-                        ->disabled(fn() => $isVendor),
+                        ->createOptionUsing(function (array $data) {
+                            $data['created_by'] = Filament::auth()->id();
+                            $data['name'] = $data['name_en'] ?? $data['name'] ?? null;
+
+                            $brand = Brand::create($data);
+                            $brand->syncTranslations([
+                                'en' => [
+                                    'name' => $data['name_en'] ?? null,
+                                ],
+                                'fr' => [
+                                    'name' => $data['name_fr'] ?? null,
+                                ],
+                                'zh' => [
+                                    'name' => $data['name_zh'] ?? null,
+                                ],
+                            ]);
+
+                            return $brand->getKey();
+                        }),
 
                     FileUpload::make('images')
                         ->multiple()
                         ->disk('public_uploads')
                         ->directory('products')
                         ->visibility('public')
-                        ->columnSpanFull()
-                        ->disabled(fn() => $isVendor),
+                        ->columnSpanFull(),
                 ])
                 ->columns(2),
+
+            // Video Section
+            Forms\Components\Section::make('Product Video')
+                ->description('Add a product demonstration video')
+                ->schema([
+                    Forms\Components\FileUpload::make('video')
+                        ->label('Upload Video')
+                        ->disk('public_uploads')
+                        ->directory('products/videos')
+                        ->visibility('public')
+                        ->maxSize(51200)
+                        ->helperText('Upload any video file (MP4, MOV, AVI, etc.) up to 50MB')
+                        ->reactive(),
+                        
+                    Forms\Components\TextInput::make('video_url')
+                        ->label('OR Video URL')
+                        ->placeholder('https://youtube.com/watch?v=... or https://vimeo.com/...')
+                        ->url()
+                        ->helperText('YouTube or Vimeo URL'),
+                        
+                    Forms\Components\FileUpload::make('video_thumbnail')
+                        ->label('Video Thumbnail')
+                        ->disk('public_uploads')
+                        ->directory('products/video-thumbnails')
+                        ->visibility('public')
+                        ->visible(fn ($get) => $get('video_url') || $get('video')),
+                ])->collapsible(),
+
+            // Description Images Section
+            Forms\Components\Section::make('Description Images')
+                ->description('Images that appear within the product description')
+                ->schema([
+                    Forms\Components\FileUpload::make('description_images')
+                        ->multiple()
+                        ->disk('public_uploads')
+                        ->directory('products/description-images')
+                        ->visibility('public')
+                        ->columnSpanFull()
+                        ->maxFiles(20)
+                        ->reorderable()
+                        ->panelLayout('grid')
+                        ->helperText('These images can be inserted into the rich text description'),
+                ])->collapsed(),
 
             // NEW: Shipping & Dimensions Section
             Forms\Components\Section::make("Shipping & Dimensions")
@@ -134,7 +327,6 @@ class ProductResource extends Resource
                                 ->step(0.01)
                                 ->suffix(fn($get) => $get('weight_unit') ?? 'kg')
                                 ->helperText('Product weight for shipping calculations')
-                                ->disabled(fn() => $isVendor)
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function ($state, Forms\Set $set, Forms\Get $get) {
                                     self::updateCalculatedFields($set, $get);
@@ -149,7 +341,6 @@ class ProductResource extends Resource
                                     'oz' => 'Ounces (oz)',
                                 ])
                                 ->default('kg')
-                                ->disabled(fn() => $isVendor)
                                 ->live()
                                 ->afterStateUpdated(function ($state, Forms\Set $set, Forms\Get $get) {
                                     self::updateCalculatedFields($set, $get);
@@ -166,7 +357,6 @@ class ProductResource extends Resource
                                 ->step(0.01)
                                 ->suffix(fn($get) => $get('dimension_unit') ?? 'cm')
                                 ->helperText('Product length')
-                                ->disabled(fn() => $isVendor)
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function ($state, Forms\Set $set, Forms\Get $get) {
                                     self::updateCalculatedFields($set, $get);
@@ -178,7 +368,6 @@ class ProductResource extends Resource
                                 ->step(0.01)
                                 ->suffix(fn($get) => $get('dimension_unit') ?? 'cm')
                                 ->helperText('Product width')
-                                ->disabled(fn() => $isVendor)
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function ($state, Forms\Set $set, Forms\Get $get) {
                                     self::updateCalculatedFields($set, $get);
@@ -190,7 +379,6 @@ class ProductResource extends Resource
                                 ->step(0.01)
                                 ->suffix(fn($get) => $get('dimension_unit') ?? 'cm')
                                 ->helperText('Product height')
-                                ->disabled(fn() => $isVendor)
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function ($state, Forms\Set $set, Forms\Get $get) {
                                     self::updateCalculatedFields($set, $get);
@@ -205,7 +393,6 @@ class ProductResource extends Resource
                                     'ft' => 'Feet (ft)',
                                 ])
                                 ->default('cm')
-                                ->disabled(fn() => $isVendor)
                                 ->live()
                                 ->afterStateUpdated(function ($state, Forms\Set $set, Forms\Get $get) {
                                     self::updateCalculatedFields($set, $get);
@@ -222,7 +409,6 @@ class ProductResource extends Resource
                                 ->readOnly()
                                 ->dehydrated(false)
                                 ->helperText('Automatically calculated from dimensions')
-                                ->disabled(fn() => $isVendor)
                                 ->default(0),
 
                             TextInput::make('shipping_weight')
@@ -231,7 +417,6 @@ class ProductResource extends Resource
                                 ->readOnly()
                                 ->dehydrated(false)
                                 ->helperText('Weight used for shipping calculations')
-                                ->disabled(fn() => $isVendor)
                                 ->default(0),
                         ])
                         ->columns(2)
@@ -239,7 +424,6 @@ class ProductResource extends Resource
                 ])
                 ->collapsible()
                 ->collapsed(fn() => !static::isVendorPanel())
-                ->disabled(fn() => $isVendor)
                 ->afterStateHydrated(function ($state, Forms\Set $set, Forms\Get $get) {
                     // Initialize calculated fields when section loads
                     self::updateCalculatedFields($set, $get);
@@ -250,24 +434,21 @@ class ProductResource extends Resource
                 ->schema([
                     Toggle::make('is_active')
                         ->label('Active')
-                        ->default(true)
-                        ->disabled(fn() => $isVendor),
+                        ->default(true),
 
                     Toggle::make('is_featured')
                         ->label('Featured')
-                        ->disabled(fn() => $isVendor),
+                        ->default(true),
 
                     Toggle::make('in_stock')
                         ->label('In Stock')
-                        ->default(true)
-                        ->disabled(fn() => $isVendor),
+                        ->default(true),
 
                     Toggle::make('on_sale')
                         ->label('On Sale')
-                        ->disabled(fn() => $isVendor),
+                        ->default(false),
                 ])
-                ->columns(4)
-                ->disabled(fn() => $isVendor),
+                ->columns(4),
         ]);
     }
 
@@ -384,25 +565,62 @@ class ProductResource extends Resource
      | ------------------------------------------------------------- */
     public static function table(Table $table): Table
     {
+        $isVendorPanel = static::isVendorPanel();
+        
         return $table
             ->columns([
+                // Show creator name only in admin panel
+                Tables\Columns\TextColumn::make('creator.name')
+                    ->label('Created By')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->visible(fn() => !$isVendorPanel),
+                    
                 Tables\Columns\ImageColumn::make('images')
                     ->disk('public_uploads')
                     ->visibility('public')
                     ->circular()
                     ->size(50),
-                Tables\Columns\TextColumn::make('name')->sortable()->searchable(),
+                    
+                Tables\Columns\TextColumn::make('name')
+                    ->wrap() // Uses 'wrap' instead of 'wordwrap' (Filament 3+)
+                    ->extraAttributes([
+                        'style' => 'max-width: 300px; white-space: normal;'
+                    ])
+                    ->sortable()
+                    ->searchable(
+                        query: function (Builder $query, string $search): Builder {
+                            $locale   = app()->getLocale();
+                            $fallback = config('app.fallback_locale', 'en');
+
+                            return $query->where(function ($q) use ($search, $locale, $fallback) {
+                                $q->whereHas('translations', function ($t) use ($search, $locale) {
+                                    $t->where('locale', $locale)
+                                    ->where('name', 'like', "%{$search}%");
+                                })
+                                ->orWhereHas('translations', function ($t) use ($search, $fallback) {
+                                    $t->where('locale', $fallback)
+                                    ->where('name', 'like', "%{$search}%");
+                                })
+                                ->orWhere('name', 'like', "%{$search}%");
+                            });
+                        }
+                    ),
+                    
                 Tables\Columns\TextColumn::make('category.name'),
+                Tables\Columns\TextColumn::make('brand.name'),
+                Tables\Columns\TextColumn::make('short_description')
+                    ->wrap() // Uses 'wrap' instead of 'wordwrap' (Filament 3+)
+                    ->extraAttributes([
+                        'style' => 'max-width: 200px; white-space: normal;'
+                    ]),
+                    
                 Tables\Columns\TextColumn::make('price')
                     ->label('Price')
-                    ->getStateUsing(function (Product $record) {
-
-                        // ================
-                        // Vendor Panel
-                        // ================
-                        if (ProductResource::isVendorPanel()) {
-                            $vendorId = ProductResource::vendorId();
-
+                    ->getStateUsing(function (Product $record) use ($isVendorPanel) {
+                        // Vendor Panel - show their price
+                        if ($isVendorPanel) {
+                            $vendorId = static::vendorId();
                             $vendor = $record->vendors()
                                 ->where('vendors.id', $vendorId)
                                 ->with('currency')
@@ -414,28 +632,20 @@ class ProductResource extends Resource
                             }
                         }
 
-                        // ================
-                        // Admin Panel - take first vendor price
-                        // ================
-                        $vendor = $record->vendors()
-                            ->with('currency')
-                            ->first();
-
+                        // Admin Panel - show first vendor price or base price
+                        $vendor = $record->vendors()->with('currency')->first();
                         if ($vendor) {
                             return number_format($vendor->pivot->price, 2) . ' ' .
                                 ($vendor->currency?->code ?? 'USD');
                         }
 
-                        // ================
-                        // Fallback – product base price
-                        // ================
                         return number_format($record->price, 2) . ' USD';
                     })
                     ->sortable(),
-                // NEW: Shipping Columns
+                    
                 Tables\Columns\TextColumn::make('weight_formatted')
                     ->label('Weight')
-                    ->sortable(['weight']) // Sort by the actual weight field
+                    ->sortable(['weight'])
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('dimensions_formatted')
@@ -444,85 +654,94 @@ class ProductResource extends Resource
 
                 Tables\Columns\TextColumn::make('cbm_formatted')
                     ->label('CBM')
-                    ->sortable(['cbm']) // Sort by the actual cbm field
+                    ->sortable(['cbm'])
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\IconColumn::make('on_sale')
                     ->label('Sale')
                     ->boolean(),
-                // ⭐ show is_active
+                    
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean(),
 
-                // ⭐ show is_featured
                 Tables\Columns\IconColumn::make('is_featured')
                     ->label('Featured')
                     ->boolean(),
 
-                // ⭐ show in_stock
                 Tables\Columns\IconColumn::make('in_stock')
                     ->label('In Stock')
                     ->boolean(),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-            ])
-            // allows selecting rows
-            ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make(),
-                BulkAction::make('edit')
-                ->label('Bulk Edit')
-                ->icon('heroicon-o-pencil-square')
-                ->form([
-                    Forms\Components\Select::make('category_id')
-                        ->label('Category')
-                        ->options(\App\Models\Category::pluck('name', 'id'))
-                        ->searchable(),
-
-                    Forms\Components\Select::make('brand_id')
-                        ->label('Brand')
-                        ->options(\App\Models\Brand::pluck('name', 'id'))
-                        ->searchable(),
-
-                    Forms\Components\Toggle::make('is_active')
-                        ->label('Active'),
-
-                    Forms\Components\Toggle::make('is_featured')
-                        ->label('Featured'),
-                        Forms\Components\RichEditor::make('description')
-                        ->label('Product Description')
-                        ->columnSpanFull()
-                        ->toolbarButtons([
-                            'bold',
-                            'italic',
-                            'strike',
-                            'underline',
-                            'bulletList',
-                            'orderedList',
-                            'link',
-                            'blockquote',
-                            'codeBlock',
-                            'redo',
-                            'undo',
-                        ]),
+                ActionGroup::make([
+                    Tables\Actions\ViewAction::make()
+                        ->icon('heroicon-o-eye')
+                        ->color('gray'),
+                    Tables\Actions\EditAction::make()
+                        ->visible(function ($record) use ($isVendorPanel) {
+                            $user = Filament::auth()->user();
+                            
+                            // Admin can edit everything
+                            if (!$isVendorPanel) {
+                                return true;
+                            }
+                            
+                            // Vendor can only edit their own products
+                            return $record->created_by === $user->id;
+                        }),
+                        
+                    Tables\Actions\DeleteAction::make()
+                        ->visible(fn() => !$isVendorPanel), // Only admin can delete
                 ])
-                ->action(function (array $data, $records) {
+            ])
+            ->bulkActions([
+                Tables\Actions\DeleteBulkAction::make()
+                    ->visible(fn() => !static::isVendorPanel()), // Only admin can bulk delete
+                    
+                BulkAction::make('edit')
+                    ->label('Bulk Edit')
+                    ->icon('heroicon-o-pencil-square')
+                    ->form([
+                        Forms\Components\Select::make('category_id')
+                            ->label('Category')
+                            ->options(Category::pluck('name', 'id'))
+                            ->searchable(),
 
-                    // CLEAN THE DATA — remove null values so we don't overwrite with null
-                    $cleanData = collect($data)->filter(fn ($v) => $v !== null)->toArray();
+                        Forms\Components\Select::make('brand_id')
+                            ->label('Brand')
+                            ->options(Brand::pluck('name', 'id'))
+                            ->searchable(),
 
-                    if (empty($cleanData)) {
-                        return;
-                    }
+                        Forms\Components\Toggle::make('is_active')
+                            ->label('Active')
+                            ->visible(fn() => !static::isVendorPanel()),
 
-                    foreach ($records as $record) {
-                        $record->update($cleanData);
-                    }
-                })
-                ->requiresConfirmation()
-                ->modalHeading('Bulk Edit Products')
-                ->modalSubmitActionLabel('Update Selected'),
+                        Forms\Components\Toggle::make('is_featured')
+                            ->label('Featured')
+                            ->visible(fn() => !static::isVendorPanel()),
+                            
+                        Forms\Components\RichEditor::make('description')
+                            ->label('Product Description')
+                            ->columnSpanFull()
+                            ->toolbarButtons([
+                                'bold', 'italic', 'strike', 'underline',
+                                'bulletList', 'orderedList', 'link',
+                                'blockquote', 'codeBlock', 'redo', 'undo',
+                            ]),
+                    ])
+                    ->action(function (array $data, $records) {
+                        $cleanData = collect($data)->filter(fn ($v) => $v !== null)->toArray();
+                        if (empty($cleanData)) return;
+
+                        foreach ($records as $record) {
+                            $record->update($cleanData);
+                        }
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Bulk Edit Products')
+                    ->modalSubmitActionLabel('Update Selected')
+                    ->visible(fn() => !static::isVendorPanel()), // Only admin can bulk edit
             ]);
     }
 
@@ -534,6 +753,7 @@ class ProductResource extends Resource
         return [
             'index'  => Pages\ListProducts::route('/'),
             'create' => Pages\CreateProduct::route('/create'),
+            'view'   => Pages\ViewProduct::route('/{record}'),
             'edit'   => Pages\EditProduct::route('/{record}/edit'),
         ];
     }
@@ -545,5 +765,4 @@ class ProductResource extends Resource
             \App\Filament\Resources\ProductResource\RelationManagers\VendorProductsRelationManager::class,
         ];
     }
-
 }

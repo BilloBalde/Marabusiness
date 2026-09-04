@@ -25,7 +25,7 @@
                         : 'https://via.placeholder.com/40';
                 @endphp
 
-                <a href="/products/{{ $product->slug }}"
+                <a href="/products/{{ $product->slug }}/{{ $product->vendorProducts[0]->id }}"
                    class="flex items-center gap-3 px-3 py-2 hover:bg-gray-100">
 
                     <img src="{{ $img }}" class="w-10 h-10 rounded object-cover">

@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use App\Models\Vendor;
 use Illuminate\Database\Eloquent\Builder;
 
 class ShippingZoneResource extends Resource
@@ -28,6 +29,15 @@ class ShippingZoneResource extends Resource
         return static::getModel()::count();
     }
 
+    public static function getVendorCurrencyCode(?int $vendorId): string
+    {
+        if (! $vendorId) return 'USD';
+
+        $vendor = Vendor::with('currency')->find($vendorId);
+        return $vendor?->currency?->code ?? 'USD';
+    }
+
+
     public static function form(Form $form): Form
     {
         return $form
@@ -40,6 +50,7 @@ class ShippingZoneResource extends Resource
                             ->preload()
                             ->required()
                             ->label('Vendor')
+                            ->live()
                             ->columnSpanFull(),
 
                         Forms\Components\TextInput::make('name')
@@ -98,21 +109,21 @@ class ShippingZoneResource extends Resource
                                 Forms\Components\TextInput::make('base_price')
                                     ->required()
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Forms\Get $get) => self::getVendorCurrencyCode($get('vendor_id')))
                                     ->default(0)
                                     ->label('Base Price'),
 
                                 Forms\Components\TextInput::make('price_per_kg')
                                     ->required()
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Forms\Get $get) => self::getVendorCurrencyCode($get('vendor_id')))
                                     ->default(0)
                                     ->label('Price per kg'),
 
                                 Forms\Components\TextInput::make('price_per_cbm')
                                     ->required()
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Forms\Get $get) => self::getVendorCurrencyCode($get('vendor_id')))
                                     ->default(0)
                                     ->label('Price per CBM'),
                             ]),
@@ -121,13 +132,13 @@ class ShippingZoneResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('price_per_item')
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Forms\Get $get) => self::getVendorCurrencyCode($get('vendor_id')))
                                     ->default(0)
                                     ->label('Price per item'),
 
                                 Forms\Components\TextInput::make('price_per_carton')
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Forms\Get $get) => self::getVendorCurrencyCode($get('vendor_id')))
                                     ->default(0)
                                     ->label('Price per carton'),
                             ]),
@@ -205,8 +216,10 @@ class ShippingZoneResource extends Resource
 
                 Tables\Columns\TextColumn::make('base_price')
                     ->label('Base Price')
-                    ->money('USD')
-                    ->sortable(),
+                    ->sortable()
+                    ->formatStateUsing(fn ($record) =>
+                            number_format((float) $record->base_price, 2) . ' ' . ($record->vendor?->currency?->code ?? 'USD')
+                        ),
 
                 Tables\Columns\TextColumn::make('delivery_time')
                     ->label('Delivery Time')

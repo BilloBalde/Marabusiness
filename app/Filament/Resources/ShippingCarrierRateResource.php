@@ -10,6 +10,8 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use App\Models\Vendor;
+use Filament\Forms\Get;
 use Illuminate\Database\Eloquent\Builder;
 
 class ShippingCarrierRateResource extends Resource
@@ -29,6 +31,14 @@ class ShippingCarrierRateResource extends Resource
         return static::getModel()::count();
     }
 
+    public static function vendorCurrencyCode(?int $vendorId): string
+    {
+        if (! $vendorId) return 'USD';
+
+        $vendor = Vendor::with('currency')->find($vendorId);
+        return $vendor?->currency?->code ?? 'USD';
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -40,8 +50,8 @@ class ShippingCarrierRateResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->reactive()
                             ->label('Vendor')
+                            ->live()
                             ->afterStateUpdated(function (callable $set) {
                                 $set('zone_name', null);
                             }),
@@ -60,14 +70,15 @@ class ShippingCarrierRateResource extends Resource
                             ->searchable()
                             ->required()
                             ->reactive()
-                            ->afterStateUpdated(function (callable $set, $state) {
+                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                 // Load zone details when zone is selected
-                                if ($state) {
-                                    $zone = ShippingZone::where('name', $state)->first();
-                                    if ($zone) {
-                                        // You could auto-fill some values here if needed
-                                    }
-                                }
+                                if (! $state) return;
+
+                                $vendorId = $get('vendor_id');
+
+                                $zone = ShippingZone::where('vendor_id', $vendorId)
+                                    ->where('name', $state)
+                                    ->first();
                             }),
 
                         Forms\Components\Select::make('carrier')
@@ -101,7 +112,7 @@ class ShippingCarrierRateResource extends Resource
                                 Forms\Components\TextInput::make('base_rate')
                                     ->required()
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Get $get) => self::vendorCurrencyCode($get('vendor_id')))
                                     ->default(0)
                                     ->label('Base Rate')
                                     ->helperText('Fixed base rate'),
@@ -109,20 +120,20 @@ class ShippingCarrierRateResource extends Resource
                                 Forms\Components\TextInput::make('rate_per_kg')
                                     ->required()
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Get $get) => self::vendorCurrencyCode($get('vendor_id')))
                                     ->default(0)
                                     ->label('Rate per kg'),
 
                                 Forms\Components\TextInput::make('rate_per_cbm')
                                     ->required()
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Get $get) => self::vendorCurrencyCode($get('vendor_id')))
                                     ->default(0)
                                     ->label('Rate per CBM'),
 
                                 Forms\Components\TextInput::make('rate_per_item')
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Get $get) => self::vendorCurrencyCode($get('vendor_id')))
                                     ->default(0)
                                     ->label('Rate per item'),
                             ]),
@@ -131,20 +142,20 @@ class ShippingCarrierRateResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('rate_per_carton')
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Get $get) => self::vendorCurrencyCode($get('vendor_id')))
                                     ->default(0)
                                     ->label('Rate per carton'),
 
                                 Forms\Components\TextInput::make('min_rate')
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Get $get) => self::vendorCurrencyCode($get('vendor_id')))
                                     ->default(0)
                                     ->label('Minimum Rate')
                                     ->helperText('Minimum charge for this carrier'),
 
                                 Forms\Components\TextInput::make('max_rate')
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Get $get) => self::vendorCurrencyCode($get('vendor_id')))
                                     ->label('Maximum Rate')
                                     ->helperText('Maximum charge (optional)'),
                             ]),
@@ -164,7 +175,7 @@ class ShippingCarrierRateResource extends Resource
 
                                 Forms\Components\TextInput::make('free_shipping_threshold')
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->suffix(fn (Get $get) => self::vendorCurrencyCode($get('vendor_id')))
                                     ->label('Free Shipping Threshold')
                                     ->helperText('Order amount for free shipping'),
 
@@ -182,6 +193,7 @@ class ShippingCarrierRateResource extends Resource
                         Forms\Components\Placeholder::make('example_calculation')
                             ->label('Example Calculation')
                             ->content(function (callable $get) {
+                                $currency = self::vendorCurrencyCode($get('vendor_id'));
                                 $weight = 5; // kg
                                 $cbm = 0.1; // cubic meters
                                 $items = 3;
@@ -209,7 +221,8 @@ class ShippingCarrierRateResource extends Resource
                                     $total = $max;
                                 }
 
-                                return "Example for 5kg, 0.1m³, 3 items, 1 carton: $" . number_format($total, 2);
+                                return "Example for 5kg, 0.1m³, 3 items, 1 carton: "
+                                        . number_format($total, 2) . " {$currency}";
                             }),
                     ]),
             ]);
@@ -244,12 +257,16 @@ class ShippingCarrierRateResource extends Resource
 
                 Tables\Columns\TextColumn::make('base_rate')
                     ->label('Base Rate')
-                    ->money('USD')
+                    ->formatStateUsing(fn ($record) =>
+                        number_format((float) $record->base_rate, 2) . ' ' . ($record->vendor?->currency?->code ?? 'USD')
+                    )
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('rate_per_kg')
                     ->label('Rate/kg')
-                    ->money('USD')
+                    ->formatStateUsing(fn ($record) =>
+                        number_format((float) $record->rate_per_kg, 2) . ' ' . ($record->vendor?->currency?->code ?? 'USD')
+                    )
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('delivery_days')
@@ -274,7 +291,9 @@ class ShippingCarrierRateResource extends Resource
 
                 Tables\Columns\TextColumn::make('free_shipping_threshold')
                     ->label('Free Ship >')
-                    ->money('USD')
+                    ->formatStateUsing(fn ($record) =>
+                        number_format((float) $record->free_shipping_threshold, 2) . ' ' . ($record->vendor?->currency?->code ?? 'USD')
+                    )
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('created_at')
@@ -340,10 +359,12 @@ class ShippingCarrierRateResource extends Resource
                             $data['items'],
                             $data['cartons']
                         );
+
+                        $currency = $record->vendor?->currency?->code ?? 'USD';
                         
                         \Filament\Notifications\Notification::make()
                             ->title('Shipping Cost Calculation')
-                            ->body("Estimated cost: $" . number_format($cost, 2))
+                            ->body("Estimated cost: " . number_format($cost, 2) . " {$currency}")
                             ->info()
                             ->send();
                     }),

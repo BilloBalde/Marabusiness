@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class SetLocale
 {
@@ -15,6 +16,10 @@ class SetLocale
 
         if (! in_array($locale, $this->supportedLocales, true)) {
             $locale = config('app.locale');
+        }
+
+        elseif (Auth::check() && Auth::user()->locale) {
+            $locale = Auth::user()->locale;
         }
 
         app()->setLocale($locale);

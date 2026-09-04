@@ -12,13 +12,14 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
-    use HasRoles;
+    use HasApiTokens, HasRoles;
 
     public function setPasswordAttribute($value)
     {
@@ -36,6 +37,7 @@ class User extends Authenticatable implements FilamentUser
         'email',
         'password',
         'email_verified_at',
+        'phone'
     ];
 
     /**
@@ -60,6 +62,12 @@ class User extends Authenticatable implements FilamentUser
             'password' => 'hashed',
         ];
     }
+
+    public function addresses()
+    {
+        return $this->hasMany(Address::class);
+    }
+
 
     public function orders() : HasMany
     {
@@ -89,6 +97,12 @@ class User extends Authenticatable implements FilamentUser
     public function vendor(): HasOne
     {
         return $this->hasOne(Vendor::class);
+    }
+
+    public function following()
+    {
+        return $this->belongsToMany(Vendor::class, 'vendor_follows', 'user_id', 'vendor_id')
+                    ->withTimestamps();
     }
 
     // app/Models/User.php

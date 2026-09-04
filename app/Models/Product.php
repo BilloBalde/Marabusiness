@@ -4,12 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
+    use Concerns\HasTranslations;
     protected $fillable = [
+        'created_by',
         'name',
         'slug',
+        'short_description',
         'description',
         'quantity',
         'images',
@@ -26,7 +30,12 @@ class Product extends Model
         'cbm',
         'weight_unit',
         'dimension_unit',
+        'video',              // ADD THIS
+        'video_url',          // ADD THIS
+        'video_thumbnail',    // ADD THIS
+        'description_images', // ADD THIS
     ];
+    protected $with = ['translations'];
 
     protected $casts = [
         'images' => 'array',
@@ -35,9 +44,90 @@ class Product extends Model
         'width' => 'decimal:2',
         'height' => 'decimal:2',
         'cbm' => 'decimal:4',
+        'short_description' => 'string',
+        'description' => 'string',
+        'description_images' => 'array',
+        'description_images' => 'array',  // ADD THIS
+        'video_thumbnail' => 'string',    // ADD THIS
+        'video' => 'string',              // ADD THIS
+        'video_url' => 'string',    
     ];
-    
 
+    public function translations(): HasMany
+    {
+        return $this->hasMany(ProductTranslation::class);
+    }
+
+    public function getNameAttribute($value)
+    {
+        return $this->translate('name') ?? $value;
+    }
+
+    public function getDescriptionAttribute($value)
+    {
+        return $this->translate('description') ?? $value;
+    }
+
+    public function getShortDescriptionAttribute($value)
+    {
+        return $this->translate('short_description') ?? $value;
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    // Scope for user's products
+    public function scopeCreatedBy($query, $userId)
+    {
+        return $query->where('created_by', $userId);
+    }
+    
+    // For video handling
+    public function getVideoTypeAttribute()
+    {
+        if ($this->video_url) {
+            if (str_contains($this->video_url, 'youtube.com') || str_contains($this->video_url, 'youtu.be')) {
+                return 'youtube';
+            }
+            if (str_contains($this->video_url, 'vimeo.com')) {
+                return 'vimeo';
+            }
+        }
+        return $this->video ? 'uploaded' : null;
+    }
+    
+    public function getYoutubeId()
+    {
+        if ($this->video_type !== 'youtube') return null;
+        
+        preg_match('/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/', $this->video_url, $matches);
+        return $matches[1] ?? null;
+    }
+    
+    public function getVimeoId()
+    {
+        if ($this->video_type !== 'vimeo') return null;
+        
+        preg_match('/vimeo\.com\/(?:video\/)?(\d+)/', $this->video_url, $matches);
+        return $matches[1] ?? null;
+    }
+    
+    public function getDescriptionImagesAttribute($value)
+    {
+        if (!$value) return [];
+        try {
+            $decoded = json_decode($value, true);
+            return is_array($decoded) ? $decoded : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Calculate CBM (Cubic Meters)
+     */
     public function calculateCBM()
     {
         if (!$this->length || !$this->width || !$this->height) {
@@ -219,6 +309,32 @@ class Product extends Model
             return [];
         }
     }
+    // In Product.php model, add:
+    public function getVariationsByVendor($vendorId)
+    {
+        $vendorProduct = $this->vendors()->where('vendors.id', $vendorId)->first();
+        
+        if (!$vendorProduct || !$vendorProduct->has_variations) {
+            return collect();
+        }
+        
+        return $vendorProduct->variations;
+    }
 
+    public function getVariationPrice($vendorId, $attributes = [])
+    {
+        $vendorProduct = $this->vendors()->where('vendors.id', $vendorId)->first();
+        
+        if (!$vendorProduct || !$vendorProduct->has_variations) {
+            return $vendorProduct->price ?? 0;
+        }
+        
+        // Find specific variation
+        $variation = $vendorProduct->variations()
+            ->where('attributes', json_encode($attributes))
+            ->first();
+        
+        return $variation ? $variation->price : 0;
+    }
 
 }

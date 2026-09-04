@@ -22,20 +22,46 @@ class PointOfSale extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-calculator';
 
+    public static function canAccess(): bool
+    {
+        // Hide from everyone
+        return false;
+        
+        // OR: Hide from specific roles but allow others
+        // $user = Auth::user();
+        // return $user && $user->hasRole('pos-operator'); // Only specific role
+    }
+    
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+    
+    public static function getNavigationGroup(): ?string
+    {
+        return static::canAccess() ? __('filament.groups.sales') : null;
+    }
+    
+    public static function getNavigationLabel(): string
+    {
+        return static::canAccess() ? __('filament.nav.pos') : '';
+    }
+
     public function getHeading(): string
     {
         return __('filament.nav.pos');
     }
 
-    public static function getNavigationGroup(): ?string
+    /* public static function getNavigationGroup(): ?string
     {
         return __('filament.groups.sales');
-    }
+    } */
 
-    public static function getNavigationLabel(): string
+    /* public static function getNavigationLabel(): string
     {
-        return __('filament.nav.pos');
-    }
+        //return __('filament.nav.pos');
+        return '';
+    } */
     
     protected static ?string $navigationTarget = '_blank';
     protected static string $view = 'filament.pages.point-of-sale';

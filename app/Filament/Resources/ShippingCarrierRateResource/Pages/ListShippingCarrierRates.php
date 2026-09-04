@@ -16,4 +16,13 @@ class ListShippingCarrierRates extends ListRecords
             Actions\CreateAction::make(),
         ];
     }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            \App\Filament\Widgets\CarrierRatesOverview::class,
+            \App\Filament\Widgets\DefaultCarriersByVendor::class,
+        ];
+    }
+
 }

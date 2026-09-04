@@ -16,6 +16,12 @@ class SupplierResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-truck';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        // Hide from admin navigation
+        return false;
+    }
+
     public static function getNavigationGroup(): ?string
     {
         return __('filament.groups.catalog');

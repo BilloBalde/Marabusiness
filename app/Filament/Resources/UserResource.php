@@ -15,6 +15,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
@@ -84,7 +85,15 @@ class UserResource extends Resource
                     ->label('Password')
                     ->password()
                     ->dehydrated(fn($state) => filled($state))
-                    ->required(fn(string $context): bool => $context === 'create'),
+                    ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
+                    ->required(fn(string $context): bool => $context === 'create')
+                    ->confirmed(),
+                Forms\Components\TextInput::make('password_confirmation')
+                    ->label('Confirm Password')
+                    ->password()
+                    ->dehydrated(false)
+                    ->required(fn (string $context): bool => $context === 'create'),
+
                 
                 Select::make('role')
                     ->label('Role')

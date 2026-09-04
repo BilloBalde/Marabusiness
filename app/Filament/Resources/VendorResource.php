@@ -70,9 +70,15 @@ class VendorResource extends Resource
                         ->disk('public_uploads')
                         ->directory('vendors')
                         ->visibility('public')
-                        ->image()
-                        ->imageEditor()
                         ->nullable(),
+                    Forms\Components\Toggle::make('is_active')
+                        ->label('Active')
+                        ->default(false)
+                        ->inline(false)
+                        ->helperText('Toggle to activate or deactivate this vendor.'),
+                    Forms\Components\DateTimePicker::make('approved_at')
+                        ->label('Approval Date')
+                        ->helperText('Set the date and time when this vendor was approved. Leave empty if not approved yet.')
                 ])
                 ->columns(2),
 
@@ -110,6 +116,7 @@ class VendorResource extends Resource
                         ]),
                 ])
                 ->columns(2),
+                
         ]);
     }
 

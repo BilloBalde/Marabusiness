@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\VendorProduct;
+use App\Support\ProductPricing;
 use App\Models\Category;
 use App\Models\Brand;
 use App\Models\Currency;
@@ -26,12 +27,6 @@ class ApiProductsPageController extends Controller
             $page = $request->get('page', 1);
             $perPage = $request->get('per_page', 12);
 
-            \Log::info('Products Page API called', [
-                'categories' => $selectedCategories,
-                'brands' => $selectedBrands,
-                'vendor_id' => $vendorId
-            ]);
-
             // Build query
             $query = VendorProduct::with(['product', 'vendor.currency', 'variations'])
                 ->whereHas('product', function($q) {
@@ -51,6 +46,10 @@ class ApiProductsPageController extends Controller
             // VENDOR FILTER
             if (!empty($vendorId)) {
                 $query->where('vendor_id', $vendorId);
+            } else {
+                // One row per catalogue product, at its best price. Skipped when browsing
+                // a single shop, which must list its own offers whatever a rival charges.
+                $query->cheapestPerProduct();
             }
 
             // CATEGORY FILTER
@@ -105,15 +104,8 @@ class ApiProductsPageController extends Controller
                     $query->latest();
             }
 
-            \Log::info('SQL Query', [
-                'sql' => $query->toSql(),
-                'bindings' => $query->getBindings()
-            ]);
-
             // Paginate
             $vendorProducts = $query->paginate($perPage, ['*'], 'page', $page);
-
-            \Log::info('Found ' . $vendorProducts->total() . ' products');
 
             // Transform products
             $transformedProducts = [];
@@ -203,41 +195,18 @@ class ApiProductsPageController extends Controller
         // Safely get vendor currency
         $vendorCurrency = $vendor->currency->code ?? 'USD';
         
-        // Check if product has variations
-        $hasVariations = $vp->has_variations && $vp->variations && $vp->variations->count() > 0;
-        
-        // Calculate price display
-        $displayPrice = 0;
-        $priceRange = false;
-        $minPrice = 0;
-        $maxPrice = 0;
-        $totalStock = 0;
-        $inStock = false;
-        $salePrice = null;
-        $variationsCount = 0;
-        
-        if ($hasVariations && $vp->variations) {
-            $variationsCount = $vp->variations->count();
-            $prices = $vp->variations->pluck('price')->filter()->toArray();
-            
-            if (!empty($prices)) {
-                $minPrice = min($prices);
-                $maxPrice = max($prices);
-                $displayPrice = $minPrice;
-                $priceRange = $minPrice != $maxPrice;
-            }
-            
-            $totalStock = $vp->variations->sum('stock');
-            $inStock = $totalStock > 0;
-        } else {
-            $displayPrice = $vp->sale_price ?? $vp->price ?? 0;
-            $totalStock = $vp->stock ?? 0;
-            $inStock = $totalStock > 0;
-            
-            if ($vp->sale_price) {
-                $salePrice = $vp->sale_price;
-            }
-        }
+        // Shared with the home feed so both cannot drift apart again.
+        $pricing = ProductPricing::for($vp, $vendorCurrency);
+
+        $hasVariations   = $pricing['has_variations'];
+        $variationsCount = $pricing['variations_count'];
+        $displayPrice    = $pricing['display_price'];
+        $minPrice        = $pricing['min_price'];
+        $maxPrice        = $pricing['max_price'];
+        $priceRange      = $pricing['has_price_range'];
+        $salePrice       = $pricing['sale_price'];
+        $totalStock      = $pricing['total_stock'];
+        $inStock         = $pricing['in_stock'];
 
         // Get image safely
         $image = null;
@@ -268,11 +237,11 @@ class ApiProductsPageController extends Controller
             'max_price' => (float) $maxPrice,
             'has_price_range' => $priceRange,
             'sale_price' => $salePrice ? (float) $salePrice : null,
-            'original_price' => $hasVariations ? null : (float) ($vp->price ?? 0),
+            'original_price' => $pricing['original_price'],
             'has_variations' => $hasVariations,
             'variations_count' => $variationsCount,
-            'display_text' => $this->formatDisplayText($hasVariations, $priceRange, $minPrice, $maxPrice, $displayPrice, $salePrice, $vendorCurrency),
-            'original_text' => $this->formatOriginalText($hasVariations, $variationsCount, $salePrice, $vp->price ?? 0, $vendorCurrency),
+            'display_text' => $pricing['display_text'],
+            'original_text' => $pricing['original_text'],
             'stock_text' => $hasVariations ? ($totalStock . ' pcs total') : ($totalStock . ' pcs'),
             'vendor_stock_text' => '🏬 ' . $vendor->store_name . ' – ' . ($inStock 
                 ? ($hasVariations ? $totalStock . ' pcs total' : $totalStock . ' pcs')
@@ -280,32 +249,4 @@ class ApiProductsPageController extends Controller
         ];
     }
 
-    private function formatDisplayText($hasVariations, $priceRange, $minPrice, $maxPrice, $displayPrice, $salePrice, $currency)
-    {
-        if ($hasVariations) {
-            if ($priceRange) {
-                return number_format($minPrice, 2) . ' - ' . number_format($maxPrice, 2) . ' ' . $currency;
-            }
-            return number_format($minPrice, 2) . ' ' . $currency;
-        }
-        
-        if ($salePrice && $salePrice < $displayPrice) {
-            return number_format($salePrice, 2) . ' ' . $currency;
-        }
-        
-        return number_format($displayPrice, 2) . ' ' . $currency;
-    }
-
-    private function formatOriginalText($hasVariations, $variationsCount, $salePrice, $originalPrice, $currency)
-    {
-        if ($hasVariations) {
-            return $variationsCount . ' variante(s)';
-        }
-        
-        if ($salePrice && $salePrice < $originalPrice) {
-            return number_format($originalPrice, 2) . ' ' . $currency;
-        }
-        
-        return null;
-    }
 }

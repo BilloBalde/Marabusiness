@@ -37,6 +37,35 @@ class VendorProduct extends Model
         'has_variations' => 'boolean',
     ];
 
+    /**
+     * Keeps a single offer per catalogue product: the cheapest among active vendors,
+     * ties broken by the lowest id so paging stays stable.
+     *
+     * Listings query vendor_product directly, so a product carried by three shops
+     * showed up three times. Written as a correlated NOT EXISTS rather than a GROUP BY
+     * so it composes with pagination and survives MySQL's ONLY_FULL_GROUP_BY.
+     *
+     * Effective price is the sale price when there is a real one, else the list price.
+     */
+    public function scopeCheapestPerProduct($query)
+    {
+        $effective = fn (string $alias) => "COALESCE(NULLIF({$alias}.sale_price, 0), {$alias}.price)";
+
+        return $query->whereNotExists(function ($sub) use ($effective) {
+            $sub->selectRaw('1')
+                ->from('vendor_product as vp_rival')
+                ->join('vendors as v_rival', 'v_rival.id', '=', 'vp_rival.vendor_id')
+                ->whereColumn('vp_rival.product_id', 'vendor_product.product_id')
+                ->where('vp_rival.is_active', true)
+                ->where('v_rival.is_active', true)
+                ->whereRaw(
+                    $effective('vp_rival') . ' < ' . $effective('vendor_product')
+                    . ' OR (' . $effective('vp_rival') . ' = ' . $effective('vendor_product')
+                    . ' AND vp_rival.id < vendor_product.id)'
+                );
+        });
+    }
+
     // Relationships
     public function variations()
     {

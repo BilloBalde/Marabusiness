@@ -94,8 +94,11 @@ class ProductsPage extends Component
     public function render()
     {
         // 🔥🔥 THE REAL SOURCE OF TRUTH
+        // One row per catalogue product, at its best price: this page has no vendor
+        // filter, so a product carried by three shops used to appear three times.
         $query = VendorProduct::with(['product', 'vendor.currency'])
-            ->whereHas('product', fn($q) => $q->where('is_active', 1));
+            ->whereHas('product', fn($q) => $q->where('is_active', 1))
+            ->cheapestPerProduct();
 
         /** SEARCH */
         if ($this->search) {

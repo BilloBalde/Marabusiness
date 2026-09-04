@@ -45,7 +45,7 @@ import 'screens/vendor_detail/vendor_detail_screen.dart';
 import 'screens/services/all_services_screen.dart';
 import 'screens/search/search_screen.dart';
 import 'screens/addresses/addresses_screen.dart';
-import 'screens/vendors/shops_screen.dart';
+// shops_screen.dart is no longer routed: the Shops tab renders AllVendorsScreen.
 import 'screens/vendors/vendor_apply_screen.dart';
 import 'screens/addresses/add_edit_address_screen.dart';
 import 'screens/profile/edit_profile_screen.dart';
@@ -73,15 +73,11 @@ final GoRouter _router = GoRouter(
         int currentIndex = 0;
         final String location = state.uri.path;
         
-        if (location == '/categories' || location.startsWith('/categories')) {
+        if (location.startsWith('/categories')) {
           currentIndex = 1;
-        } else if (location == '/shops' || location.startsWith('/shops')) {
+        } else if (location.startsWith('/shops') || location.startsWith('/vendor')) {
           currentIndex = 2;
-        } else if (location.startsWith('/vendor') || 
-                   location.startsWith('/checkout') ||
-                   location.startsWith('/product')) {
-          currentIndex = 2;
-        } else if (location == '/cart' || location.startsWith('/cart')) {
+        } else if (location.startsWith('/products') || location.startsWith('/product/')) {
           currentIndex = 3;
         } else if (location == '/profile' || 
                    location == '/addresses' || 
@@ -191,8 +187,12 @@ final GoRouter _router = GoRouter(
         GoRoute(
           path: '/shops',
           name: 'shops',
+          // Shops now lists shops only. AllVendorsScreen already carries the card the
+          // brief asks for -- logo, name, rating, description, "Voir Boutique" -- plus a
+          // search bar filtering on shop name and description. ShopsScreen mixed a vendor
+          // carousel with a product grid, which is what had to go.
           pageBuilder: (context, state) => const NoTransitionPage(
-            child: ShopsScreen(),
+            child: AllVendorsScreen(),
           ),
         ),
         GoRoute(
@@ -533,7 +533,7 @@ class _MainScaffoldState extends State<MainScaffold> {
               context.go('/shops');
               break;
             case 3:
-              context.go('/cart');
+              context.go('/products');
               break;
             case 4:
               final authProvider = context.read<AuthProvider>();

@@ -316,7 +316,7 @@
                     
                     <div>
                         <label class="fi-label">ZIP Code</label>
-                        <input type="text" wire:model="zip_code" class="mt-1 w-full" required />
+                        <input type="text" wire:model="zip_code" class="mt-1 w-full" />
                     </div>
                     
                     <div>

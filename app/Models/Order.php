@@ -22,6 +22,8 @@ class Order extends Model
         'total_paid',
         'total_remaining',
         'stripe_session_id',
+        'lengopay_pay_id',
+        'lengopay_payment_url',
         'grand_total_usd',
         'shipping_amount_usd',
         'rate_to_usd',

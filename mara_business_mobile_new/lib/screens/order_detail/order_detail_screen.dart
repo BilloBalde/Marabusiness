@@ -948,7 +948,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           },
                           icon: const Icon(Icons.payment),
                           label: Text(
-                            order.paymentMethod == 'stripe' 
+                            const ['lengopay', 'stripe'].contains(order.paymentMethod)
                                 ? 'Payer par Carte' 
                                 : 'Payer maintenant',
                           ),

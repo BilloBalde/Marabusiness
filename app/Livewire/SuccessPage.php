@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Models\Order;
-use App\Models\User;
 use App\Models\Paiement;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -25,7 +24,7 @@ class SuccessPage extends Component
         $this->session_id = request()->query('session_id');
         $this->order_id = request()->query('order_id');
         
-        $userId = Auth::check() ? Auth::id() : User::first()->id;
+        $userId = Auth::id();
 
         // If we have a Stripe session_id, verify the payment
         if ($this->session_id) {

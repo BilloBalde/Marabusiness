@@ -90,7 +90,11 @@ Route::middleware('guest')->group(function () {
     Route::get('/reset-password/{token}', ResetPasswordPage::class)->name('password.reset');
 });
 Route::get('/checkout', CheckoutPage::class);
-Route::get('/success', SuccessPage::class)->name('success');
+Route::get('/success', SuccessPage::class)->middleware('auth')->name('success');
+
+// Absolute return URL handed to payment gateways (see config/app.php frontend_url).
+// On Android the same URL is an App Link caught by the Flutter deep-link listener.
+Route::get('/payment/success', SuccessPage::class)->middleware('auth')->name('payment.success');
 Route::get('/success-stripe', \App\Livewire\SuccessPageStripe::class)->name('success.stripe');
 Route::get('/cancel', CancelPage::class)->name('cancel');
 Route::get('/my-orders/{order_id}', OrderDetailPage::class)->name('my-orders.show');

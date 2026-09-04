@@ -11,6 +11,14 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 class Vendor extends Model
 {
     use Concerns\HasTranslations;
+
+    public const SHIPPING_MODE_CARRIER  = 'carrier';
+    public const SHIPPING_MODE_LOCALITY = 'locality';
+
+    public const SHIPPING_MODES = [
+        self::SHIPPING_MODE_CARRIER  => 'Zones et transporteurs',
+        self::SHIPPING_MODE_LOCALITY => 'Prix par localité',
+    ];
     protected $fillable = [
         'user_id',
         'currency_id',
@@ -29,6 +37,8 @@ class Vendor extends Model
         'longitude',
         'shipping_zones',
         'carrier_rates',
+        'shipping_mode',
+        'default_shipping_amount',
     ];
 
     protected $casts = [
@@ -38,6 +48,7 @@ class Vendor extends Model
         'longitude' => 'float',
         'shipping_zones' => 'array',
         'carrier_rates' => 'array',
+        'default_shipping_amount' => 'decimal:2',
     ];
 
     public function translations(): HasMany
@@ -128,6 +139,23 @@ class Vendor extends Model
     public function purchases(): HasMany
     {
         return $this->hasMany(Purchase::class);
+    }
+
+    /**
+     * Per-locality delivery prices, in this vendor's own currency.
+     */
+    public function shippingRates(): HasMany
+    {
+        return $this->hasMany(VendorShippingRate::class);
+    }
+
+    /**
+     * Vendors default to the historic zone + carrier pricing. Only a vendor moved
+     * to locality mode is quoted by LocalityShippingCalculator.
+     */
+    public function usesLocalityShipping(): bool
+    {
+        return $this->shipping_mode === self::SHIPPING_MODE_LOCALITY;
     }
 
     /**

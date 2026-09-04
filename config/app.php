@@ -56,6 +56,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | Absolute base URL customers are sent back to by external payment gateways
+    | (LengoPay return_url). It must carry a scheme and host: a relative path
+    | makes the gateway fall back to the default URL registered on its portal.
+    | Defaults to APP_URL so a single-domain install needs no extra config.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

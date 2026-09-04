@@ -10,7 +10,7 @@ use App\Models\Vendor;
 use App\Models\VendorProduct;
 use App\Models\VendorProductWholesale;
 use App\Models\Address;
-use App\Services\ShippingCalculator;
+use App\Services\Shipping\CartShippingResolver;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\DB;
@@ -105,7 +105,7 @@ class PointOfSale extends Page
     public bool $calculatingShipping = false;
     public bool $hasShippingCalculated = false;
     public float $shippingCost = 0;
-    private ?ShippingCalculator $shippingCalculator = null;
+    private ?CartShippingResolver $shippingCalculator = null;
 
     public function mount(): void
     {
@@ -263,7 +263,7 @@ class PointOfSale extends Page
             'phone' => ['required', 'string', 'max:255'],
             'street_address' => ['required', 'string', 'max:255'],
             'state' => ['required', 'string', 'max:255'],
-            'zip_code' => ['required', 'string', 'max:255'],
+            'zip_code' => ['nullable', 'string', 'max:255'],
             'country' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'paymentMethod' => ['required', 'string'],
@@ -574,7 +574,7 @@ class PointOfSale extends Page
             'phone' => 'required|string|max:255',
             'street_address' => 'required|string|max:255',
             'state' => 'required|string|max:255',
-            'zip_code' => 'required|string|max:255',
+            'zip_code' => 'nullable|string|max:255',
             'country' => 'required|string|max:255',
         ]);
         
@@ -582,7 +582,7 @@ class PointOfSale extends Page
         
         // Initialize shipping calculator if not already initialized
         if (!$this->shippingCalculator) {
-            $this->shippingCalculator = new ShippingCalculator();
+            $this->shippingCalculator = new CartShippingResolver();
         }
         
         // Prepare cart items for shipping calculation

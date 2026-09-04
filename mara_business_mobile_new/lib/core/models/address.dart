@@ -83,7 +83,12 @@ class Address {
 
   String get fullName => '$firstName $lastName';
   
-  String get fullAddress => '$streetAddress, $city, $state $zipCode, $country';
+  String get fullAddress {
+    final region = zipCode.isEmpty ? state : '$state $zipCode';
+    return [streetAddress, city, region, country]
+        .where((part) => part.trim().isNotEmpty)
+        .join(', ');
+  }
   
   Address copyWith({
     int? id,

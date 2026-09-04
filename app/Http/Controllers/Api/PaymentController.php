@@ -353,8 +353,10 @@ class PaymentController extends Controller
         try {
             $lengo = app(LengoPayService::class);
 
-            $baseUrl = $platform === 'mobile' ? 'mara://' : config('app.url');
-            $returnUrl = 'https://afrobridgeinnov.com/payment/success?order_id=' . $order->id;
+            // Web and mobile share one absolute https return URL. On Android it is
+            // registered as an App Link and main.dart matches the deep link on host +
+            // path, so a mara:// scheme would give an empty host and never be caught.
+            $returnUrl = rtrim(config('app.frontend_url'), '/') . '/payment/success?order_id=' . $order->id;
             $callbackUrl = route('lengopay.callback');
 
             $result = $lengo->createPayment(

@@ -9,7 +9,7 @@ use App\Models\OrderItem;
 use App\Models\Paiement;
 use App\Models\Vendor;
 use App\Models\FinancialTransaction; // Add this
-use App\Services\ShippingCalculator;
+use App\Services\Shipping\CartShippingResolver;
 use App\Services\FinanceCalculator; // Add this
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -35,6 +35,8 @@ class CheckoutPage extends Component
     public $street_address;
     public $state;
     public $zip_code;
+    // Replaces the postal code for vendors priced by locality.
+    public $locality_id = null;
     public $country = 'Guinea';
     public $selectedCurrency = '';
 
@@ -76,7 +78,7 @@ class CheckoutPage extends Component
         }
         
         // Initialize shipping calculator
-        $this->shippingCalculator = new ShippingCalculator();
+        $this->shippingCalculator = new CartShippingResolver();
         //$this->financeCalculator = new FinanceCalculator();
         
         // Pre-fill user address if logged in
@@ -84,13 +86,17 @@ class CheckoutPage extends Component
         if ($user) {
 
             $this->savedAddresses = Address::where('user_id', $user->id)
+            ->whereNull('order_id')
             ->orderByDesc('is_default')
             ->latest()
             ->get()
             ->toArray();
 
             // auto-select default / first address
-            $default = Address::where('user_id', $user->id)->orderByDesc('is_default')->first();
+            $default = Address::where('user_id', $user->id)
+                ->whereNull('order_id')
+                ->orderByDesc('is_default')
+                ->first();
             if ($default) {
                 $this->applyAddress($default->id);
             } else {
@@ -113,7 +119,9 @@ class CheckoutPage extends Component
 
     public function applyAddress(int $addressId): void
     {
-        $address = Address::where('user_id', Auth::id())->findOrFail($addressId);
+        $address = Address::where('user_id', Auth::id())
+            ->whereNull('order_id')
+            ->findOrFail($addressId);
 
         $this->selected_address_id = $address->id;
 
@@ -124,6 +132,7 @@ class CheckoutPage extends Component
         $this->city            = $address->city;
         $this->state           = $address->state;
         $this->zip_code        = $address->zip_code;
+        $this->locality_id     = $address->locality_id;
         $this->country         = $address->country ?? 'Guinea';
         $this->latitude        = $address->latitude;
         $this->longitude       = $address->longitude;
@@ -148,14 +157,14 @@ class CheckoutPage extends Component
     // OR use a boot method to initialize
     public function boot()
     {
-        $this->shippingCalculator = new ShippingCalculator();
+        $this->shippingCalculator = new CartShippingResolver();
     }
 
     // OR use a getter method
     public function getShippingCalculator()
     {
         if (!$this->shippingCalculator) {
-            $this->shippingCalculator = new ShippingCalculator();
+            $this->shippingCalculator = new CartShippingResolver();
         }
         return $this->shippingCalculator;
     }
@@ -205,7 +214,7 @@ class CheckoutPage extends Component
             'phone' => 'required|string|max:255',
             'street_address' => 'required|string|max:255',
             'state' => 'required|string|max:255',
-            'zip_code' => 'required|string|max:255',
+            'zip_code' => 'nullable|string|max:255',
             'country' => 'required|string|max:255',
         ]);
         
@@ -217,6 +226,7 @@ class CheckoutPage extends Component
             'city' => $this->city,
             'state' => $this->state,
             'zip_code' => $this->zip_code,
+            'locality_id' => $this->locality_id,
             'country' => $this->country,
             'country_code' => $this->getCountryCode($this->country),
             'street_address' => $this->street_address,
@@ -359,7 +369,7 @@ class CheckoutPage extends Component
             'phone'      => 'required|string|max:255',
             'street_address' => 'required|string|max:255',
             'state'      => 'required|string|max:255',
-            'zip_code'   => 'required|string|max:255',
+            'zip_code'   => 'nullable|string|max:255',
             'country'    => 'required|string|max:255',
             'payment_method' => 'required|string|in:cash,stripe,cod,om',
             'shipping_carrier' => 'required|string|max:50',
@@ -389,7 +399,31 @@ class CheckoutPage extends Component
             $sourceAddress = null;
 
             if ($this->selected_address_id) {
-                $sourceAddress = Address::where('user_id', $user->id)->find($this->selected_address_id);
+                $sourceAddress = Address::where('user_id', $user->id)
+                    ->whereNull('order_id')
+                    ->find($this->selected_address_id);
+            } elseif ($this->save_address) {
+                // Copy the typed address into the profile, once per checkout. The per-order
+                // shipping addresses created below carry an order_id and stay out of the book.
+                $isFirstSavedAddress = ! Address::where('user_id', $user->id)
+                    ->whereNull('order_id')
+                    ->exists();
+
+                Address::create([
+                    'user_id'        => $user->id,
+                    'first_name'     => $this->first_name,
+                    'last_name'      => $this->last_name,
+                    'phone'          => $this->phone,
+                    'street_address' => $this->street_address,
+                    'city'           => $this->city,
+                    'state'          => $this->state,
+                    'zip_code'       => $this->zip_code,
+                    'locality_id'    => $this->locality_id,
+                    'country'        => $this->country,
+                    'latitude'       => $this->latitude,
+                    'longitude'      => $this->longitude,
+                    'is_default'     => $isFirstSavedAddress,
+                ]);
             }
             
             /** Create orders for each vendor */
@@ -441,6 +475,7 @@ class CheckoutPage extends Component
                     'street_address'  => $sourceAddress?->street_address ?? $this->street_address,
                     'state'           => $sourceAddress?->state ?? $this->state,
                     'zip_code'        => $sourceAddress?->zip_code ?? $this->zip_code,
+                    'locality_id'     => $sourceAddress?->locality_id ?? $this->locality_id,
                     'country'         => $sourceAddress?->country ?? $this->country,
                     'latitude'        => $sourceAddress?->latitude ?? $this->latitude,
                     'longitude'       => $sourceAddress?->longitude ?? $this->longitude,
@@ -452,10 +487,7 @@ class CheckoutPage extends Component
                     $addressData['zone'] = $shippingBreakdown[$vendorId]['zone'];
                 }
                 
-                if (!$this->selected_address_id) {
-                    // ✅ Create address for order
-                    $orderAddress = Address::create($addressData);
-                }
+                Address::create($addressData);
                 
                 /** SAVE ORDER ITEMS WITH VARIATIONS */
                 foreach ($group['items'] as $item) {
@@ -947,7 +979,7 @@ class CheckoutPage extends Component
     public function updated($property)
     {
         // Recalculate shipping when address fields are filled
-        if (in_array($property, ['first_name', 'last_name', 'city', 'state', 'zip_code', 'country', 'latitude', 'longitude'])) {
+        if (in_array($property, ['first_name', 'last_name', 'city', 'state', 'zip_code', 'locality_id', 'country', 'latitude', 'longitude'])) {
             if ($this->first_name && $this->last_name && $this->city && $this->country) {
                 $this->calculateShipping();
             }
@@ -957,6 +989,53 @@ class CheckoutPage extends Component
     public function updatedShippingCarrier($value)
     {
         $this->shipping_carrier = $value;
+    }
+
+    /**
+     * Localities the buyer can pick, labelled "Commune (Préfecture)".
+     */
+    public function localityOptions(): array
+    {
+        return \App\Models\Locality::selectable()
+            ->with('parent')
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn ($locality) => [$locality->id => $locality->full_name])
+            ->all();
+    }
+
+    /**
+     * The locality field only matters when at least one vendor of the cart prices
+     * by locality; otherwise the buyer is not asked for it.
+     */
+    protected function needsLocality($groups): bool
+    {
+        foreach ($groups as $group) {
+            if ($group['vendor']?->usesLocalityShipping()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * When every vendor prices by locality there is nothing to choose: the carrier
+     * selector is hidden and the single computed amount applies.
+     */
+    protected function allVendorsUseLocality($groups): bool
+    {
+        if (count($groups) === 0) {
+            return false;
+        }
+
+        foreach ($groups as $group) {
+            if (! $group['vendor']?->usesLocalityShipping()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function render()
@@ -1036,6 +1115,9 @@ class CheckoutPage extends Component
             'placingOrder' => $this->placingOrder,
             'has_multiple_vendors' => $hasMultipleVendors, // Add this
             'selectedCurrency' => $this->selectedCurrency,
+            'localities' => $this->localityOptions(),
+            'needs_locality' => $this->needsLocality($groups),
+            'carrier_choice_applies' => ! $this->allVendorsUseLocality($groups),
         ]);
     }
 }

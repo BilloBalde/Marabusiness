@@ -17,6 +17,7 @@ class AddressController extends Controller
     {
         try {
             $addresses = Address::where('user_id', Auth::id())
+                ->whereNull('order_id')
                 ->orderByDesc('is_default')
                 ->latest()
                 ->get()
@@ -48,7 +49,7 @@ class AddressController extends Controller
             'street_address' => 'required|string|max:255',
             'city' => 'required|string|max:255',
             'state' => 'required|string|max:255',
-            'zip_code' => 'required|string|max:255',
+            'zip_code' => 'nullable|string|max:255',
             'country' => 'nullable|string|max:255',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
@@ -71,7 +72,7 @@ class AddressController extends Controller
 
             // If this is set as default, unset other defaults
             if ($data['is_default']) {
-                Address::where('user_id', Auth::id())->update(['is_default' => false]);
+                Address::where('user_id', Auth::id())->whereNull('order_id')->update(['is_default' => false]);
             }
 
             $address = Address::create($data);
@@ -95,7 +96,7 @@ class AddressController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $address = Address::where('user_id', Auth::id())->findOrFail($id);
+        $address = Address::where('user_id', Auth::id())->whereNull('order_id')->findOrFail($id);
 
         $validator = Validator::make($request->all(), [
             'first_name' => 'sometimes|required|string|max:255',
@@ -104,7 +105,7 @@ class AddressController extends Controller
             'street_address' => 'sometimes|required|string|max:255',
             'city' => 'sometimes|required|string|max:255',
             'state' => 'sometimes|required|string|max:255',
-            'zip_code' => 'sometimes|required|string|max:255',
+            'zip_code' => 'sometimes|nullable|string|max:255',
             'country' => 'nullable|string|max:255',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
@@ -125,6 +126,7 @@ class AddressController extends Controller
             // Handle default status
             if (isset($data['is_default']) && $data['is_default']) {
                 Address::where('user_id', Auth::id())
+                    ->whereNull('order_id')
                     ->where('id', '!=', $id)
                     ->update(['is_default' => false]);
             }
@@ -151,7 +153,7 @@ class AddressController extends Controller
     public function destroy($id)
     {
         try {
-            $address = Address::where('user_id', Auth::id())->findOrFail($id);
+            $address = Address::where('user_id', Auth::id())->whereNull('order_id')->findOrFail($id);
             
             // Check if it's the default address
             $wasDefault = $address->is_default;
@@ -160,7 +162,7 @@ class AddressController extends Controller
 
             // If deleted address was default, set another as default
             if ($wasDefault) {
-                $newDefault = Address::where('user_id', Auth::id())->first();
+                $newDefault = Address::where('user_id', Auth::id())->whereNull('order_id')->first();
                 if ($newDefault) {
                     $newDefault->update(['is_default' => true]);
                 }
@@ -185,10 +187,11 @@ class AddressController extends Controller
     public function setDefault($id)
     {
         try {
-            $address = Address::where('user_id', Auth::id())->findOrFail($id);
+            $address = Address::where('user_id', Auth::id())->whereNull('order_id')->findOrFail($id);
 
             // Unset all other defaults
             Address::where('user_id', Auth::id())
+                ->whereNull('order_id')
                 ->where('id', '!=', $id)
                 ->update(['is_default' => false]);
 
@@ -215,7 +218,7 @@ class AddressController extends Controller
     public function show($id)
     {
         try {
-            $address = Address::where('user_id', Auth::id())->findOrFail($id);
+            $address = Address::where('user_id', Auth::id())->whereNull('order_id')->findOrFail($id);
 
             return response()->json([
                 'success' => true,
@@ -238,11 +241,12 @@ class AddressController extends Controller
     {
         try {
             $address = Address::where('user_id', Auth::id())
+                ->whereNull('order_id')
                 ->where('is_default', true)
                 ->first();
 
             if (!$address) {
-                $address = Address::where('user_id', Auth::id())->first();
+                $address = Address::where('user_id', Auth::id())->whereNull('order_id')->first();
             }
 
             return response()->json([

@@ -118,11 +118,28 @@
                     </div>
                     
                     <div>
-                        <label class="text-gray-600">Zip Code *</label>
+                        <label class="text-gray-600">Zip Code</label>
                         <input wire:model.blur="zip_code" type="text" 
                                class="mt-1 w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
                         @error('zip_code')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
                     </div>
+
+                    @if($needs_locality)
+                        <div class="md:col-span-2">
+                            <label class="text-gray-600">Localité de livraison *</label>
+                            <select wire:model.live="locality_id"
+                                    class="mt-1 w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
+                                <option value="">— Choisissez votre localité —</option>
+                                @foreach($localities as $localityId => $localityName)
+                                    <option value="{{ $localityId }}">{{ $localityName }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-gray-500 text-sm mt-1">
+                                Les frais de livraison sont calculés automatiquement à partir de votre localité.
+                            </p>
+                            @error('locality_id')<p class="text-red-500 text-sm mt-1">{{ $message }}</p>@enderror
+                        </div>
+                    @endif
                 </div>
                 
                 <div class="mt-4">
@@ -194,7 +211,7 @@
             </div>
             
             {{-- SHIPPING OPTIONS --}}
-            @if($has_shipping_calculated && !empty($availableCarriers))
+            @if($has_shipping_calculated && !empty($availableCarriers) && $carrier_choice_applies)
                 <div class="bg-white shadow-md rounded-xl p-6">
                     <h2 class="text-2xl font-bold text-gray-800 mb-4">Shipping Options</h2>
                     

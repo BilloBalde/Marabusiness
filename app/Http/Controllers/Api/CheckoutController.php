@@ -10,7 +10,7 @@ use App\Models\OrderItem;
 use App\Models\Paiement;
 use App\Models\Vendor;
 use App\Models\FinancialTransaction;
-use App\Services\ShippingCalculator;
+use App\Services\Shipping\CartShippingResolver;
 use App\Services\FinanceCalculator;
 use App\Services\LengoPayService;
 use Illuminate\Http\Request;
@@ -28,7 +28,7 @@ class CheckoutController extends Controller
 
     public function __construct()
     {
-        $this->shippingCalculator = new ShippingCalculator();
+        $this->shippingCalculator = new CartShippingResolver();
         $this->financeCalculator = new FinanceCalculator();
     }
 
@@ -44,7 +44,8 @@ class CheckoutController extends Controller
             'address.phone' => 'required|string',
             'address.street_address' => 'required|string',
             'address.state' => 'required|string',
-            'address.zip_code' => 'required|string',
+            'address.zip_code' => 'nullable|string',
+            'address.locality_id' => 'nullable|integer|exists:localities,id',
             'address.country' => 'required|string',
             'address.latitude' => 'nullable|numeric',
             'address.longitude' => 'nullable|numeric',
@@ -85,7 +86,8 @@ class CheckoutController extends Controller
             'last_name' => $request->address['last_name'],
             'city' => $request->address['city'],
             'state' => $request->address['state'],
-            'zip_code' => $request->address['zip_code'],
+            'zip_code' => $request->address['zip_code'] ?? null,
+            'locality_id' => $request->address['locality_id'] ?? null,
             'country' => $request->address['country'],
             'country_code' => $this->getCountryCode($request->address['country']),
             'street_address' => $request->address['street_address'],
@@ -171,16 +173,22 @@ class CheckoutController extends Controller
             'address.phone' => 'required|string',
             'address.street_address' => 'required|string',
             'address.state' => 'required|string',
-            'address.zip_code' => 'required|string',
+            'address.zip_code' => 'nullable|string',
+            'address.locality_id' => 'nullable|integer|exists:localities,id',
             'address.country' => 'required|string',
             'address.latitude' => 'nullable|numeric',
             'address.longitude' => 'nullable|numeric',
-            'payment_method' => 'required|string|in:cash,stripe,cod,om',
+            'payment_method' => 'required|string|in:cash,stripe,lengopay,cod,om',
             'shipping_carrier' => 'required|string',
             'save_address' => 'boolean',
             'amount' => 'required_if:payment_method,om|numeric|min:1',
             'image' => 'required_if:payment_method,om|image|max:4096',
         ]);
+
+        // 'stripe' is the legacy value already-installed app builds send for LengoPay.
+        // This endpoint has never created a Stripe session - the branch below refuses
+        // any currency other than GNF - so normalise it and record the real gateway.
+        $paymentMethod = $request->payment_method === 'stripe' ? 'lengopay' : $request->payment_method;
 
         $user = Auth::user();
         $cart = CartManagement::getCartItemsFromCookie();
@@ -241,7 +249,8 @@ class CheckoutController extends Controller
                     'phone' => $request->address['phone'],
                     'street_address' => $request->address['street_address'],
                     'state' => $request->address['state'],
-                    'zip_code' => $request->address['zip_code'],
+                    'zip_code' => $request->address['zip_code'] ?? null,
+                    'locality_id' => $request->address['locality_id'] ?? null,
                     'country' => $request->address['country'],
                     'latitude' => $request->address['latitude'] ?? null,
                     'longitude' => $request->address['longitude'] ?? null,
@@ -287,7 +296,7 @@ class CheckoutController extends Controller
                     'grand_total_usd' => $totalUSD,
                     'shipping_amount_usd' => $vendorShippingUSD,
                     'rate_to_usd' => $rate,
-                    'payment_method' => $request->payment_method,
+                    'payment_method' => $paymentMethod,
                     'payment_status' => 'pending',
                     'status' => 'new',
                     'shipping_carrier' => $request->shipping_carrier,
@@ -308,7 +317,8 @@ class CheckoutController extends Controller
                     'phone' => $request->address['phone'],
                     'street_address' => $request->address['street_address'],
                     'state' => $request->address['state'],
-                    'zip_code' => $request->address['zip_code'],
+                    'zip_code' => $request->address['zip_code'] ?? null,
+                    'locality_id' => $request->address['locality_id'] ?? null,
                     'country' => $request->address['country'],
                     'latitude' => $request->address['latitude'] ?? null,
                     'longitude' => $request->address['longitude'] ?? null,
@@ -353,7 +363,7 @@ class CheckoutController extends Controller
                 $this->createFinancialTransactionsForOrder($order, $total);
 
                 // Handle payment
-                if ($request->payment_method === 'stripe') {
+                if ($paymentMethod === 'lengopay') {
                     if (strtoupper($currency) !== 'GNF') {
                         throw new \Exception('LengoPay is available only for GNF payments.');
                     }
@@ -362,7 +372,7 @@ class CheckoutController extends Controller
 
                     $result = $lengo->createPayment(
                         amount: (float) $total,
-                        returnUrl: config('app.frontend_url') . '/payment/success?order_id=' . $order->id,
+                        returnUrl: rtrim(config('app.frontend_url'), '/') . '/payment/success?order_id=' . $order->id,
                         callbackUrl: route('lengopay.callback'),
                         currency: 'GNF'
                     );
@@ -382,7 +392,7 @@ class CheckoutController extends Controller
 
                     $redirectUrl = $result['payment_url'];
                     
-                } elseif ($request->payment_method === 'om') {
+                } elseif ($paymentMethod === 'om') {
                     // Validate exact amount for Orange Money
                     if (number_format($request->amount, 2) != number_format($total, 2)) {
                         throw new \Exception("Orange Money payment must be exactly " . number_format($total, 2) . " " . $currency);
@@ -667,7 +677,8 @@ class CheckoutController extends Controller
             'last_name' => $request->address['last_name'],
             'city' => $request->address['city'],
             'state' => $request->address['state'],
-            'zip_code' => $request->address['zip_code'],
+            'zip_code' => $request->address['zip_code'] ?? null,
+            'locality_id' => $request->address['locality_id'] ?? null,
             'country' => $request->address['country'],
             'country_code' => $this->getCountryCode($request->address['country']),
             'street_address' => $request->address['street_address'],
@@ -713,7 +724,8 @@ private function calculateFullShipping($request, $selectedItems)
         'last_name' => $request->address['last_name'],
         'city' => $request->address['city'],
         'state' => $request->address['state'],
-        'zip_code' => $request->address['zip_code'],
+        'zip_code' => $request->address['zip_code'] ?? null,
+        'locality_id' => $request->address['locality_id'] ?? null,
         'country' => $request->address['country'],
         'country_code' => $this->getCountryCode($request->address['country']),
         'street_address' => $request->address['street_address'],

@@ -9,6 +9,7 @@ use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\FileUpload;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 
 class PaiementsRelationManager extends RelationManager
@@ -55,21 +56,69 @@ class PaiementsRelationManager extends RelationManager
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('transaction_id'),
-                Tables\Columns\TextColumn::make('payment_method'),
-                Tables\Columns\TextColumn::make('payment_status'),
-                Tables\Columns\TextColumn::make('amount'),
-                Tables\Columns\TextColumn::make('currency'),
-                Tables\Columns\TextColumn::make('created_at')->dateTime(),
+                Tables\Columns\TextColumn::make('transaction_id')->label('Référence'),
+                Tables\Columns\TextColumn::make('payment_method')->label('Moyen'),
+
+                // What the vendor actually needs to see: has this money arrived, or is
+                // it only something the buyer has told us?
+                Tables\Columns\TextColumn::make('confirmed_at')
+                    ->label('Réception')
+                    ->badge()
+                    ->color(fn ($record) => $record->confirmed_at ? 'success' : 'warning')
+                    ->formatStateUsing(fn ($state) => $state
+                        ? 'Encaissé le ' . $state->format('d/m/Y H:i')
+                        : 'Déclaré — à confirmer'),
+
+                Tables\Columns\ImageColumn::make('image')
+                    ->label('Justificatif')
+                    ->disk('public')
+                    ->height(40)
+                    ->placeholder('—'),
+
+                Tables\Columns\TextColumn::make('amount')->label('Montant'),
+                Tables\Columns\TextColumn::make('currency')->label('Devise'),
+                Tables\Columns\TextColumn::make('created_at')->label('Déclaré le')->dateTime(),
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
+                    // Recorded from the back office by someone who has the money in
+                    // hand, so it counts immediately — unlike a buyer's declaration.
+                    ->mutateFormDataUsing(function (array $data): array {
+                        $data['confirmed_at'] = now();
+                        $data['confirmed_by'] = auth()->id();
+
+                        return $data;
+                    })
                     ->after(function ($record, $livewire) {
                         $this->updateOrderTotals($livewire->ownerRecord);
                         $this->refreshForm($livewire);
                     }),
             ])
             ->actions([
+                // The vendor's side of the distinction the schema now makes: a buyer
+                // declaring a cash-on-delivery payment no longer settles their own
+                // order — someone who handled the money says so here.
+                Tables\Actions\Action::make('confirmerReception')
+                    ->label('Confirmer la réception')
+                    ->icon('heroicon-o-banknotes')
+                    ->color('success')
+                    ->visible(fn ($record) => ! $record->isConfirmed())
+                    ->requiresConfirmation()
+                    ->modalHeading('Confirmer la réception du paiement')
+                    ->modalDescription(fn ($record) => "Confirmez avoir reçu {$record->amount} {$record->currency} "
+                        . "({$record->payment_method}). Le solde de la commande sera mis à jour.")
+                    ->modalSubmitActionLabel('Oui, j\'ai reçu cet argent')
+                    ->action(function ($record, $livewire) {
+                        $record->confirm(auth()->user());
+                        $this->refreshForm($livewire);
+
+                        Notification::make()
+                            ->title('Paiement confirmé')
+                            ->body('Le solde de la commande a été mis à jour.')
+                            ->success()
+                            ->send();
+                    }),
+
                 Tables\Actions\EditAction::make()
                     ->after(function ($record, $livewire) {
                         $this->updateOrderTotals($livewire->ownerRecord);
@@ -84,25 +133,14 @@ class PaiementsRelationManager extends RelationManager
             ]);
     }
 
+    /**
+     * Was its own copy of the balance rules, summing every payment including ones the
+     * shop has not received. Order::syncPaymentTotals() owns that logic now and counts
+     * confirmed money only.
+     */
     private function updateOrderTotals($order)
     {
-        $totalPaid = $order->paiements()->sum('amount');
-        $remaining = max(0, $order->grand_total - $totalPaid);
-
-        // Correct payment status logic
-        if ($remaining <= 0 && $totalPaid > 0) {
-            $paymentStatus = 'paid';
-        } elseif ($totalPaid > 0 && $totalPaid < $order->grand_total) {
-            $paymentStatus = 'partial';
-        } else {
-            $paymentStatus = 'pending';
-        }
-
-        $order->update([
-            'total_paid'      => $totalPaid,
-            'total_remaining' => $remaining,
-            'payment_status'  => $paymentStatus,
-        ]);
+        $order->syncPaymentTotals();
     }
 
     private function refreshForm($livewire)

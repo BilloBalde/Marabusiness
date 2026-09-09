@@ -150,32 +150,22 @@ class PaiementResource extends Resource
         ];
     }
 
+    /**
+     * Delegates to the model so a single implementation stays in charge of payment
+     * references (see Order::generateTransactionNumber()).
+     */
     public static function generateTransactionNumber(): string
     {
-        $currentYearMonth = now()->format('Ym');
-
-        $latestPaiement = DB::table('paiements')
-            ->where('transaction_id', 'like', "TRANS{$currentYearMonth}%")
-            ->orderByDesc('transaction_id')
-            ->first();
-
-        $increment = 1;
-        if ($latestPaiement) {
-            $lastIncrement = (int)substr($latestPaiement->transaction_id, -4);
-            $increment = $lastIncrement + 1;
-        }
-
-        return "TRANS{$currentYearMonth}" . str_pad($increment, 4, '0', STR_PAD_LEFT);
+        return \App\Models\Order::generateTransactionNumber();
     }
 
+    /**
+     * Was its own copy of the balance rules, summing every payment including ones
+     * the shop has not received. Order::syncPaymentTotals() owns that logic now and
+     * counts confirmed money only.
+     */
     public static function updateOrderTotals(Order $order): void
     {
-        $totalPaid = $order->paiements()->sum('amount');
-        $remaining = max(0, $order->grand_total - $totalPaid);
-
-        $order->update([
-            'total_paid' => $totalPaid,
-            'total_remaining' => $remaining,
-        ]);
+        $order->syncPaymentTotals();
     }
 }

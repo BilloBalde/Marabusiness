@@ -10,7 +10,38 @@ services:
       chmod -R 755 storage bootstrap/cache
       # Create SQLite database if not exists
       touch storage/database.sqlite
-    startCommand: php artisan serve --host=0.0.0.0 --port=8000
+    # No startCommand: this used to force `php artisan serve`, PHP's own
+    # single-threaded development server — one request at a time, so a slow one
+    # (an invoice PDF, a Stripe call) blocked every other visitor until it
+    # finished. Render's native PHP environment (env: php) runs its own
+    # production web server (Apache + PHP-FPM) automatically when no
+    # startCommand overrides it, which is what every other native PHP service
+    # on Render already relies on. Verify the very first deploy after this
+    # change actually comes up and serves the site before trusting it —
+    # this could not be tested locally (no Composer, no Apache/PHP-FPM here).
+    #
+    # Without a persistent disk, the service's filesystem is ephemeral — nothing
+    # written to storage/database.sqlite survives a redeploy, a restart, or the
+    # instance
+    # being rescheduled onto different hardware, because there was never
+    # anywhere on disk that Render kept around for this service. Declaring the
+    # disk here makes Render provision (or reattach, on redeploy) one persistent
+    # volume mounted exactly where the database and every file this app writes
+    # already live — no application code needs to change. On the very first
+    # deploy after this is added, Render still needs the change applied via its
+    # dashboard sync or a manual "Sync render.yaml"; it is not retroactive to a
+    # service that's already running.
+    disk:
+      name: marabusiness-data
+      mountPath: /opt/render/project/src/storage
+      sizeGB: 1
+    # NOT covered by this disk: config/filesystems.php's 'public_uploads' disk
+    # (product images, payment proofs) writes to public/uploads — outside
+    # storage/ entirely, so those files are still wiped on every redeploy. A
+    # second disk, if Render's render.yaml schema supports more than one per
+    # service, or moving these uploads onto the 'public' disk (storage/app/
+    # public, already inside the mount above) would close that gap too — left
+    # for a deliberate follow-up rather than guessed at here.
     envVars:
       - key: APP_ENV
         value: production

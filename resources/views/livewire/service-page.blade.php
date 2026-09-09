@@ -80,7 +80,7 @@
                         <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ $service->name }}</h1>
                         
                         <div class="prose max-w-none text-gray-700 mb-6">
-                            <p class="text-lg">{!! $service->description ?? 'Premium service offering from MARA BUSINESS.' !!}</p>
+                            <p class="text-lg">{!! \App\Support\HtmlSanitizer::clean($service->description) ?: 'Premium service offering from MARA BUSINESS.' !!}</p>
                         </div>
                         
                         {{-- Service Features --}}

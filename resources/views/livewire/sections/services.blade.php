@@ -33,7 +33,8 @@
           <div x-show="tab === '{{ $service->slug }}'" class="p-6 space-y-4 rounded-lg bg-gray-50 dark:bg-gray-900">
             <h2 class="text-3xl font-bold text-gray-800 dark:text-white">{{ $service->name }}</h2>
             <div class="prose text-justify dark:prose-invert max-w-none">
-            {!! \Illuminate\Support\Str::markdown($service->description ?? 'Aucune description disponible.') !!}
+            {{-- Markdown passes raw HTML through by default, so the result is sanitized too. --}}
+            {!! \App\Support\HtmlSanitizer::clean(\Illuminate\Support\Str::markdown($service->description ?? 'Aucune description disponible.')) !!}
             </div>
             {{-- Add more dynamic fields here as needed --}}
           </div>

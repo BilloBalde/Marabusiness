@@ -4,6 +4,10 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\CommissionSetting;
+// createFinancialTransactionsForOrder() has always used this class without importing
+// it, so every call threw "Class App\Services\FinancialTransaction not found" —
+// including the one Order::booted() makes when an order is marked delivered.
+use App\Models\FinancialTransaction;
 use App\Models\PaymentGatewayFee;
 use App\Models\WireTransferFee;
 use App\Models\Vendor;
@@ -13,15 +17,20 @@ class FinanceCalculator
     public function calculateOrderBreakdown($order)
     {
         $vendor = $order->vendor;
-        
+
+        // orders.grand_total is nullable, and calculateGatewayFee() below declares a
+        // float parameter — passing the raw column through threw a TypeError on a null
+        // total, in the same method that already crashed on a zero one.
+        $grandTotal = (float) ($order->grand_total ?? 0);
+
         // Calculate commission
-        $commission = $this->calculateCommission($order->grand_total, $vendor->id);
-        
+        $commission = $this->calculateCommission($grandTotal, $vendor->id);
+
         // Calculate gateway fee
-        $gatewayFee = $this->calculateGatewayFee($order->grand_total, $order->payment_method);
-        
+        $gatewayFee = $this->calculateGatewayFee($grandTotal, $order->payment_method);
+
         // Calculate net amount before wire fee
-        $amountBeforeWire = $order->grand_total - $commission - $gatewayFee;
+        $amountBeforeWire = $grandTotal - $commission - $gatewayFee;
         
         // Calculate wire fee
         $wireFee = $this->calculateWireFee($amountBeforeWire, $vendor->id);
@@ -30,18 +39,31 @@ class FinanceCalculator
         $netAmount = $amountBeforeWire - $wireFee;
         
         return [
-            'gross_amount' => $order->grand_total,
+            'gross_amount' => $grandTotal,
             'commission' => $commission,
             'gateway_fee' => $gatewayFee,
             'wire_fee' => $wireFee,
             'net_amount' => $netAmount,
             'breakdown' => [
-                'commission_percentage' => $commission / $order->grand_total * 100,
-                'gateway_fee_percentage' => $gatewayFee / $order->grand_total * 100,
-                'wire_fee_percentage' => $wireFee / $order->grand_total * 100,
-                'net_percentage' => $netAmount / $order->grand_total * 100,
+                'commission_percentage' => $this->asPercentageOf($commission, $grandTotal),
+                'gateway_fee_percentage' => $this->asPercentageOf($gatewayFee, $grandTotal),
+                'wire_fee_percentage' => $this->asPercentageOf($wireFee, $grandTotal),
+                'net_percentage' => $this->asPercentageOf($netAmount, $grandTotal),
             ],
         ];
+    }
+
+    /**
+     * These four percentages used to divide by grand_total directly, which threw a
+     * DivisionByZeroError on any order totalling zero — and orders like that exist. The
+     * method is called from both checkout paths and the payment modal, so the crash
+     * surfaced as a 500 mid-order. Zero total means zero share, not an error.
+     */
+    private function asPercentageOf(float $part, $total): float
+    {
+        $total = (float) $total;
+
+        return $total > 0 ? $part / $total * 100 : 0.0;
     }
 
     public function calculateCommission($amount, $vendorId = null): float

@@ -37,7 +37,17 @@ class User extends Authenticatable implements FilamentUser
         'email',
         'password',
         'email_verified_at',
-        'phone'
+        'phone',
+        // Written by SocialAuthController on every Google login. Missing here,
+        // update()/create() silently dropped them (Eloquent mass-assignment just
+        // skips an unlisted key rather than erroring) — no user in production has
+        // ever actually had provider/provider_id persisted, so the "already linked"
+        // branch of that lookup has been dead code since it shipped; every social
+        // login has been falling through to matching by email alone.
+        'provider',
+        'provider_id',
+        'avatar',
+        'locale',
     ];
 
     /**

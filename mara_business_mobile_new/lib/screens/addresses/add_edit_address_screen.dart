@@ -320,17 +320,11 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                     child: TextFormField(
                       controller: _zipController,
                       decoration: const InputDecoration(
-                        labelText: 'Code postal *',
+                        labelText: 'Code postal',
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Requis';
-                        }
-                        return null;
-                      },
                     ),
                   ),
                   const SizedBox(width: 12),

@@ -49,6 +49,56 @@ class ProductResource extends Resource
         return $user?->vendor->id ?? $user?->vendor_id ?? null;
     }
 
+    /**
+     * A vendor owns a product if they authored the catalog entry (created_by) OR
+     * they actually have a vendor_product listing for it. Used consistently by
+     * getEloquentQuery() above, the Edit action's visibility, and
+     * EditProduct::authorizeAccess() — the same three places that used to check
+     * created_by alone, which is why fixing only the query would have left a
+     * vendor able to see a product in their list without being able to open it.
+     */
+    public static function ownedByVendor(Product $record, ?int $userId, ?int $vendorId): bool
+    {
+        if ($userId !== null && $record->created_by === $userId) {
+            return true;
+        }
+
+        return $vendorId !== null && $record->vendorProducts()->where('vendor_id', $vendorId)->exists();
+    }
+
+    /**
+     * The list, search and record count were never scoped — only the Edit action's
+     * visibility and EditProduct::authorizeAccess() restricted what a vendor could
+     * touch, not what they could see. A vendor opening "Produits" saw every product
+     * from every vendor on the marketplace.
+     *
+     * Scoped by created_by OR an actual vendor_product listing — not created_by
+     * alone. Real ownership in this marketplace is the vendor_product pivot (that's
+     * what the storefront, the price column below, and checkout all read); created_by
+     * only records who typed the catalog entry in, which can be an admin, or nobody
+     * at all if a listing was ever attached to a product created by someone else. A
+     * real product ("tshitNike", created_by NULL) sold by OmarShop was invisible in
+     * OmarShop's own "Produits" tab because of this. created_by still counts too:
+     * a vendor who has just created a product has no vendor_product row yet, so
+     * dropping created_by entirely would make their own new product disappear from
+     * their own list the moment ownership stopped being "who typed it in".
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        if (static::isVendorPanel()) {
+            $vendorId = static::vendorId();
+
+            $query->where(function (Builder $q) use ($vendorId) {
+                $q->where('created_by', Filament::auth()->id())
+                    ->orWhereHas('vendorProducts', fn (Builder $vp) => $vp->where('vendor_id', $vendorId));
+            });
+        }
+
+        return $query;
+    }
+
     public static function getNavigationGroup(): ?string
     {
         return __('filament.groups.catalog');
@@ -680,15 +730,13 @@ class ProductResource extends Resource
                         ->color('gray'),
                     Tables\Actions\EditAction::make()
                         ->visible(function ($record) use ($isVendorPanel) {
-                            $user = Filament::auth()->user();
-                            
                             // Admin can edit everything
                             if (!$isVendorPanel) {
                                 return true;
                             }
-                            
-                            // Vendor can only edit their own products
-                            return $record->created_by === $user->id;
+
+                            // Vendor can only edit products they created or list.
+                            return static::ownedByVendor($record, Filament::auth()->id(), static::vendorId());
                         }),
                         
                     Tables\Actions\DeleteAction::make()

@@ -113,7 +113,7 @@ document.addEventListener('livewire:init', () => {
     
     const sessionLifetime = {{ config('session.lifetime', 120) }} * 60 * 1000;
     const warningTime = sessionLifetime - (5 * 60 * 1000);
-    const loginUrl = '{{ route('customer_login') }}';
+    const loginUrl = '{{ route('login') }}';
     
     function createModal() {
         if (document.getElementById('session-modal')) {
@@ -159,7 +159,7 @@ document.addEventListener('livewire:init', () => {
         fetch('/keep-alive', { 
             method: 'POST',
             headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 'Content-Type': 'application/json'
             }
         })

@@ -1,3 +1,4 @@
+<div>{{-- livewire-root : Livewire n'accepte qu'un seul element racine --}}
 <div class="w-full max-w-[90rem] py-10 px-4 sm:px-6 lg:px-8 mx-auto">
     @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.contact', 'hasSub' => false, 'subContent' => '', 'subLink' => ''])
     
@@ -335,3 +336,4 @@
         box-shadow: 0 10px 30px -10px rgba(212, 175, 55, 0.2);
     }
 </style>
+</div>

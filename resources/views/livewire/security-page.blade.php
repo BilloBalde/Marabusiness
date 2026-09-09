@@ -1,3 +1,4 @@
+<div>{{-- livewire-root : Livewire n'accepte qu'un seul element racine --}}
 <!-- Remove padding from main container, add it to content sections instead -->
 <div class="w-full max-w-[90rem] px-4 sm:px-6 lg:px-8 mx-auto">
     @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.security', 'hasSub' => false, 'subContent' => '', 'subLink' => ''])
@@ -771,3 +772,4 @@
         });
     });
 </script>
+</div>

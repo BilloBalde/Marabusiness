@@ -56,6 +56,33 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | Absolute base URL customers are sent back to by external payment gateways
+    | (LengoPay return_url). It must carry a scheme and host: a relative path
+    | makes the gateway fall back to the default URL registered on its portal.
+    | Defaults to APP_URL so a single-domain install needs no extra config.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Query Logging
+    |--------------------------------------------------------------------------
+    |
+    | Writes every SQL statement and its bindings to the log. Deliberately its own
+    | switch rather than following APP_DEBUG: bindings carry customer ids and e-mail
+    | addresses, and a catalogue page issues dozens of queries per request.
+    |
+    */
+
+    'log_queries' => (bool) env('LOG_QUERIES', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

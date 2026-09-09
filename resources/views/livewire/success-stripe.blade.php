@@ -37,18 +37,27 @@
             </p>
             
             <div class="mt-8 space-y-3">
-                <a href="{{ route('my-orders.show', $orderId) }}"
-                    class="block w-full py-3 bg-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-gray-300 shadow">
-                    ← Back to Order
-                </a>
-                
+                {{-- $orderId is null whenever this screen is reached with no
+                    session_id at all (the most common case: someone opens this
+                    page directly, or refreshes it after the session already
+                    expired) — route('my-orders.show', null) against a required
+                    {order_id} segment throws UrlGenerationException, turning a
+                    "payment didn't go through" message into a 500. Only offer
+                    this link when there is actually an order to point it at. --}}
+                @if($orderId)
+                    <a href="{{ route('my-orders.show', $orderId) }}"
+                        class="block w-full py-3 bg-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-gray-300 shadow">
+                        ← Back to Order
+                    </a>
+                @endif
+
                 <a href="{{ route('my-orders') }}"
                     class="block w-full py-3 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-900 shadow">
                     View All Orders
                 </a>
             </div>
         </div>
-        
+
     @elseif($order && $payment)
         <!-- Success Screen -->
         <div class="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full text-center relative overflow-hidden">

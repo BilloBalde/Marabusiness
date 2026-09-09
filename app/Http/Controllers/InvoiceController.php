@@ -7,8 +7,29 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class InvoiceController extends Controller
 {
+    /**
+     * The route only requires being logged in; this is the actual check that the
+     * signed-in user has a legitimate reason to see THIS order's invoice — its buyer,
+     * the vendor who has to fulfill it, or an admin. Without it, any authenticated
+     * account (or, before the route also gained ->middleware('auth'), literally
+     * anyone) could read another customer's name, address and phone by changing the
+     * order id in the URL.
+     */
+    private function authorizeOrder(Order $order): void
+    {
+        $user = auth()->user();
+
+        $isOwner  = $order->user_id === $user->id;
+        $isVendor = $user->vendor && $order->vendor_id === $user->vendor->id;
+        $isAdmin  = $user->hasAnyRole(['admin', 'manager']);
+
+        abort_unless($isOwner || $isVendor || $isAdmin, 403);
+    }
+
     public function preview(Order $order)
     {
+        $this->authorizeOrder($order);
+
         $qrSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
         ->size(120)
         ->generate($order->order_number);
@@ -23,6 +44,8 @@ class InvoiceController extends Controller
 
     public function download(Order $order)
     {
+        $this->authorizeOrder($order);
+
         // Generate QR SVG
         $qrSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
             ->size(200)

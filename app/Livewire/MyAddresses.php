@@ -32,7 +32,7 @@ class MyAddresses extends Component
             'street_address' => ['required', 'string', 'max:255'],
             'city' => ['required', 'string', 'max:255'],
             'state' => ['required', 'string', 'max:255'],
-            'zip_code' => ['required', 'string', 'max:255'],
+            'zip_code' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -63,7 +63,9 @@ class MyAddresses extends Component
 
     public function edit(int $id)
     {
-        $address = Address::where('user_id', Auth::id())->findOrFail($id);
+        $address = Address::where('user_id', Auth::id())
+            ->whereNull('order_id')
+            ->findOrFail($id);
 
         $this->editingId = $address->id;
         $this->first_name = $address->first_name;
@@ -88,11 +90,14 @@ class MyAddresses extends Component
         $data['user_id'] = Auth::id();
 
         if ($data['is_default']) {
-            Address::where('user_id', Auth::id())->update(['is_default' => false]);
+            Address::where('user_id', Auth::id())
+                ->whereNull('order_id')
+                ->update(['is_default' => false]);
         }
 
         if ($this->editingId) {
             Address::where('user_id', Auth::id())
+                ->whereNull('order_id')
                 ->where('id', $this->editingId)
                 ->update($data);
         } else {
@@ -105,13 +110,17 @@ class MyAddresses extends Component
 
     public function delete(int $id)
     {
-        Address::where('user_id', Auth::id())->where('id', $id)->delete();
+        Address::where('user_id', Auth::id())
+            ->whereNull('order_id')
+            ->where('id', $id)
+            ->delete();
         session()->flash('success', 'Address removed.');
     }
 
     public function render()
     {
         $addresses = Address::where('user_id', Auth::id())
+            ->whereNull('order_id')
             ->orderByDesc('is_default')
             ->latest()
             ->get();

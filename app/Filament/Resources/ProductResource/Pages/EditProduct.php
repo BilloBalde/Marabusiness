@@ -28,8 +28,13 @@ class EditProduct extends EditRecord
             return;
         }
         
-        // Vendor can only access if they created it
-        if ($record->created_by !== $user->id) {
+        // Vendor can access if they created the entry or actually list it — the
+        // same combined check as ProductResource::getEloquentQuery() and the Edit
+        // action's visibility, via ProductResource::ownedByVendor(). Checking
+        // created_by alone here (while the list already allowed either) is what
+        // let a vendor see a product in "Produits" and then get bounced right back
+        // out trying to open it.
+        if (! ProductResource::ownedByVendor($record, $user->id, $this->vendorId())) {
             Notification::make()
                 ->title('Access Denied')
                 ->body('You are not authorized to edit this product. You can only edit products that you created.')

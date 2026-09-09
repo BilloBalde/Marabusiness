@@ -1,3 +1,4 @@
+<div>{{-- livewire-root : Livewire n'accepte qu'un seul element racine --}}
 @push('styles')
 <style>
     .chat-panel {
@@ -186,4 +187,5 @@
             </button>
         </div>
     </div>
+</div>
 </div>

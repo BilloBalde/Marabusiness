@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\WelcomeMail;
@@ -58,6 +59,22 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        // Keyed by email+IP rather than the generic 60/min throttle:api this route
+        // already sits behind: that one is far too loose for a login endpoint
+        // specifically, and IP-only would let a guessing spree against one account
+        // block every other customer sharing that IP. Checked, and hit, before the
+        // password is even validated — a blocked attempt never reaches Auth::attempt().
+        $key = 'api-login:'.strtolower(trim((string) $request->input('email'))).'|'.$request->ip();
+
+        if (RateLimiter::tooManyAttempts($key, 5)) {
+            return response()->json([
+                'message' => 'Trop de tentatives. Réessayez dans '.RateLimiter::availableIn($key).' secondes.',
+                'retry_after' => RateLimiter::availableIn($key),
+            ], 429);
+        }
+
+        RateLimiter::hit($key, 60);
+
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
@@ -68,6 +85,9 @@ class AuthController extends Controller
                 'email' => ['The provided credentials are incorrect.'],
             ]);
         }
+
+        // A correct password means this email+IP pair is no longer suspect.
+        RateLimiter::clear($key);
 
         $user = User::where('email', $request->email)->firstOrFail();
         $token = $user->createToken('auth_token')->plainTextToken;

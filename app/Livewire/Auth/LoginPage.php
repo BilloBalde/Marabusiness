@@ -6,10 +6,16 @@ use Livewire\Component;
 
 use Livewire\Attributes\Title;
 use Illuminate\Support\Facades\Auth;
+use DanHarrin\LivewireRateLimiting\WithRateLimiting;
+use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 
 #[Title('Login Page - MARA BUSINESS')]
 class LoginPage extends Component
 {
+    // Same package Filament's own admin/vendor login already uses for this exact
+    // problem (it's a transitive dependency of filament/filament, already vendored)
+    // — one throttling idiom in the codebase instead of two.
+    use WithRateLimiting;
 
     public $email = '';
     public $password = '';
@@ -30,11 +36,35 @@ class LoginPage extends Component
 
     public function save()
     {
+        // Checked before validation and before Auth::attempt() — same order as
+        // Filament's own Login::authenticate(), and for the same reason: a wrong
+        // guess still counts against the limit even if the form itself is otherwise
+        // valid, and a blocked attempt should never touch the database at all.
+        try {
+            $this->rateLimit(5); // même seuil que le login Filament : 5 tentatives / 60s
+        } catch (TooManyRequestsException $exception) {
+            session()->flash('error',
+                "Trop de tentatives. Réessayez dans {$exception->secondsUntilAvailable} secondes.");
+
+            return;
+        }
+
         $this->validate([
             'email' => ['required', 'string', 'email:rfc'],
             'password' => ['required', 'string', 'min:6', 'max:255'],
         ]);
         if (Auth::attempt(['email' => $this->email, 'password' => $this->password], $this->remember)) {
+            // A correct password means this email+IP pair is no longer suspect —
+            // the same moment the session id gets rotated below.
+            $this->clearRateLimiter();
+
+            // Auth::attempt() does not itself rotate the session id — this is what
+            // stops someone who planted a session on this browser beforehand (a
+            // shared computer, a fixation link) from inheriting it once the real
+            // user signs in. Session data (including url.intended, set in mount())
+            // survives a regenerate(); only the id and CSRF token change.
+            session()->regenerate();
+
             // Get redirect URL from session
             $redirectTo = session()->pull('url.intended', null);
             
@@ -63,6 +93,24 @@ class LoginPage extends Component
         } else {
             session()->flash('error', 'Invalid credentials');
         }
+    }
+
+    /**
+     * WithRateLimiting keys by component+method+IP alone by default — the same key
+     * Filament's own admin/vendor login uses. That is fine for a page with no
+     * concept of "which account", but here it would let one email address on a
+     * shared connection lock out every other customer behind the same IP/NAT. Keying
+     * by email+IP instead means only repeated wrong guesses against the *same*
+     * account trip the limit; a different customer's own attempts, from the same
+     * network, are never affected by someone else's failed logins.
+     */
+    protected function getRateLimitKey($method, $component = null)
+    {
+        $component ??= static::class;
+
+        return 'livewire-rate-limiter:'.sha1(
+            $component.'|'.$method.'|'.strtolower(trim($this->email)).'|'.request()->ip()
+        );
     }
 
     private function isValidRedirect($url)

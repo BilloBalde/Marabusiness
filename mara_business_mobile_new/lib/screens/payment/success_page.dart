@@ -82,8 +82,9 @@ class _SuccessPageState extends State<SuccessPage> {
         return 'Cash à la livraison';
       case 'om':
         return 'Orange Money';
-      case 'stripe':
-        return 'Carte Bancaire (Stripe)';
+      case 'lengopay':
+      case 'stripe': // legacy value for the same gateway
+        return 'Carte Bancaire';
       case 'cash':
         return 'Espèces';
       default:
@@ -467,7 +468,7 @@ class _SuccessPageState extends State<SuccessPage> {
                                       ),
                                     ),
                                   ),
-                                  if (order['payment_method'] == 'stripe')
+                                  if (const ['lengopay', 'stripe'].contains(order['payment_method']))
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
@@ -775,7 +776,7 @@ class _SuccessPageState extends State<SuccessPage> {
                         ),
                         const SizedBox(width: 8),
                         if (order['payment_status'] == 'pending' &&
-                            order['payment_method'] != 'stripe')
+                            !const ['lengopay', 'stripe'].contains(order['payment_method']))
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () {

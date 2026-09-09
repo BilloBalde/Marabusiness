@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Vendor;
+use App\Support\VendorPresenter;
 use App\Models\VendorFollow;
 use App\Models\VendorReview;
 use App\Models\Product;
@@ -25,9 +26,7 @@ class VendorController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Vendor::query()
-                ->withCount(['followers', 'approvedVendorReviews as reviews_count'])
-                ->with(['currency'])
+            $query = VendorPresenter::eagerLoad(Vendor::query())
                 ->where('is_active', true);
 
             // Search by store name
@@ -506,17 +505,7 @@ public function userVendorStatus()
         $perPage = $request->get('per_page', 20);
         $products = $query->paginate($perPage);
 
-        // Add this temporary debug code before the transform
-        $debugData = $query->get();
-        \Log::info('Vendor products raw data:', [
-            'count' => $debugData->count(),
-            'first_product' => $debugData->first() ? [
-                'id' => $debugData->first()->id,
-                'name' => $debugData->first()->name,
-                'pivot_price' => $debugData->first()->pivot->price ?? 'null',
-                'pivot_sale_price' => $debugData->first()->pivot->sale_price ?? 'null',
-            ] : 'no products'
-        ]);
+        // (debug block removed: it re-ran the full query on every request)
         // Transform products
         $products->getCollection()->transform(function ($product) use ($vendor) {
             return [
@@ -673,23 +662,7 @@ public function userVendorStatus()
      */
     private function formatVendor($vendor, $request = null, $detailed = false)
     {
-        $formatted = [
-            'id' => $vendor->id,
-            'store_name' => $vendor->store_name,
-            'slug' => $vendor->slug,
-            'description' => $vendor->description,
-            'logo' => $vendor->logo_path ? url('uploads/' . $vendor->logo_path) : null,
-            'banner' => $vendor->banner_path ? url('uploads/' . $vendor->banner_path) : null,
-            'currency' => $vendor->currency?->code ?? 'USD',
-            'currency_rate' => $vendor->currency?->rate_to_usd ?? 1,
-            'rating' => (float) $vendor->vendor_rating,
-            'reviews_count' => (int) ($vendor->reviews_count ?? $vendor->approvedVendorReviews()->count()),
-            'followers_count' => (int) ($vendor->followers_count ?? $vendor->followers()->count()),
-            'products_count' => $vendor->vendorProducts()->wherePivot('is_active', true)->count(),
-            'is_verified' => (bool) ($vendor->is_verified ?? false),
-            'is_featured' => (bool) ($vendor->is_featured ?? false),
-            'created_at' => $vendor->created_at?->toDateTimeString(),
-        ];
+        $formatted = VendorPresenter::present($vendor);
 
         if ($detailed) {
             $formatted['address'] = $vendor->address;

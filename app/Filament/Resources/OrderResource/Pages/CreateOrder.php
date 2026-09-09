@@ -40,20 +40,18 @@ class CreateOrder extends CreateRecord
                 'currency'       => $currencyCode,
                 'payment_status' => $amount >= $order->grand_total ? 'paid' : 'partial',
                 'transaction_id' => OrderResource::generateTransactionNumber(),
+                // Entered from the back office by staff who have the money.
+                'confirmed_at'   => now(),
+                'confirmed_by'   => auth()->id(),
             ]);
         }
 
-        // Update totals on order
-        $totalPaid = $order->paiements()->sum('amount');
-        $remaining = max(0, $order->grand_total - $totalPaid);
-
-        $order->update([
-            'total_paid'      => $totalPaid,
-            'total_remaining' => $remaining,
-            'payment_status'  => $remaining <= 0
-                ? 'paid'
-                : ($totalPaid > 0 ? 'partial' : 'pending'),
-        ]);
+        // Update totals on order — from confirmed payments only. The one created
+        // above is confirmed at creation (staff entered it, money in hand), but this
+        // must still go through the same accounting as every other path: a manual
+        // edit here that summed every payment regardless of confirmation is exactly
+        // what let a buyer's unconfirmed declaration get banked as real money.
+        $order->syncPaymentTotals();
 
         $pdf = Pdf::loadView('invoices.order', [
             'order' => $order,

@@ -115,13 +115,22 @@
                         <h2 class="text-2xl font-bold text-gray-800">
                             🏪 {{ $vendor?->store_name ?? 'Vendeur inconnu' }}
                         </h2>
+                        @php
+                            // Money the buyer says they have sent, which the vendor has
+                            // not confirmed receiving yet. Without showing this, a buyer
+                            // who has just declared a payment sees "En attente de
+                            // paiement" and thinks nothing was recorded.
+                            $declare = $order->declaredAwaitingConfirmation();
+                        @endphp
                         <div class="flex items-center gap-3 mt-2">
-                            <span class="px-3 py-1 rounded-full text-sm font-semibold 
+                            <span class="px-3 py-1 rounded-full text-sm font-semibold
                                 @if($order->payment_status === 'paid') bg-green-100 text-green-800
                                 @elseif($order->payment_status === 'partial') bg-yellow-100 text-yellow-800
+                                @elseif($declare > 0) bg-blue-100 text-blue-800
                                 @else bg-gray-100 text-gray-800 @endif">
                                 @if($order->payment_status === 'paid') ✅ Payé
                                 @elseif($order->payment_status === 'partial') ⏳ Paiement partiel
+                                @elseif($declare > 0) 🕓 Paiement déclaré — en attente de validation du vendeur
                                 @else ⏳ En attente de paiement
                                 @endif
                             </span>
@@ -136,7 +145,12 @@
                         <div class="text-[#D4AF37] font-bold text-2xl">
                             {{ Number::currency($order->grand_total, $vendor->currency->code ?? 'USD') }}
                         </div>
-                        @if($order->payment_status === 'partial' || $order->payment_status === 'pending')
+                        @if($declare > 0)
+                            <div class="text-sm text-blue-700 mt-1">
+                                {{ Number::currency($declare, $vendor->currency->code ?? 'USD') }} déclarés,
+                                en attente de confirmation
+                            </div>
+                        @elseif($order->payment_status === 'partial' || $order->payment_status === 'pending')
                             <div class="text-sm text-gray-600 mt-1">
                                 Reste à payer: {{ Number::currency($order->total_remaining, $vendor->currency->code ?? 'USD') }}
                             </div>
@@ -302,7 +316,13 @@
                             <i class="fas fa-eye mr-2"></i> Voir les détails complets
                         </a>
                         
-                        @if($order->payment_status === 'pending' && $order->payment_method !== 'stripe')
+                        @if($declare > 0)
+                            {{-- Declaring again while the first one is still being checked
+                                 would only produce a second claim for the same money. --}}
+                            <span class="inline-flex items-center px-4 py-2 text-xs font-medium text-blue-800 bg-blue-50 border border-blue-200 rounded-full">
+                                🕓 Paiement déclaré — le vendeur doit le confirmer
+                            </span>
+                        @elseif($order->payment_status === 'pending' && $order->payment_method !== 'stripe')
                             <button
                                 wire:click="$dispatch('open-paiement-modal', { orderId: {{ $order->id }} })"
                                 class="inline-flex items-center px-4 py-2 text-xs font-semibold tracking-wide text-white rounded-full bg-emerald-600 hover:bg-emerald-700 shadow-sm"
@@ -351,7 +371,7 @@
                     <p class="text-lg font-semibold text-gray-800">
                         Total des commandes aujourd'hui: 
                         <span class="text-[#D4AF37]">
-                            {{ Number::currency($orders->sum('grand_total'), 'USD') }}
+                            {{ Number::currency($todayTotal, $todayTotalCurrency) }}
                         </span>
                     </p>
                     <p class="text-sm text-gray-600 mt-1">

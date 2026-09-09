@@ -268,7 +268,7 @@ Widget _buildVendorCard(Vendor vendor) {
                   ? CachedNetworkImage(
                       imageUrl: vendor.logo!.startsWith('http')
                           ? vendor.logo!
-                          : '${AppConstants.baseUrl.replaceAll('/api/v1', '')}/uploads/${vendor.logo}',
+                          : '${AppConstants.baseUrl}/uploads/${vendor.logo}',
                       fit: BoxFit.cover,
                       errorWidget: (context, error, stack) => Center(
                         child: Container(

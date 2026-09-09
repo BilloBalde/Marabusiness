@@ -3,9 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BulkRfqOffer extends Model
 {
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_ACCEPTED = 'accepted_by_buyer';
+    public const STATUS_REJECTED = 'rejected_by_buyer';
+
     protected $fillable = [
         'bulk_rfq_id',
         'vendor_id',
@@ -38,6 +43,19 @@ class BulkRfqOffer extends Model
 
     public function isAccepted(): bool
     {
-        return $this->status === 'accepted_by_buyer';
+        return $this->status === self::STATUS_ACCEPTED;
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+    /**
+     * Total of the quote, expressed in the offer's own currency.
+     */
+    public function total(): float
+    {
+        return ((float) $this->unit_price * (int) $this->moq) + (float) $this->shipping_cost;
     }
 }

@@ -58,7 +58,7 @@ class RfqButton extends Component
         if (!Auth::check()) {
             // Redirect to login with return URL
             session()->put('redirect_after_login', url()->current());
-            return redirect()->route('customer_login')->with('success', 'Connectez-vous');
+            return redirect()->route('login')->with('success', 'Connectez-vous');
         }
         
         $this->showModal = true;

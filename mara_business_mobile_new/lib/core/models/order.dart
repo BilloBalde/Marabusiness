@@ -355,7 +355,8 @@ class Payment {
 
   String get methodLabel {
     switch (method) {
-      case 'stripe':
+      case 'lengopay':
+      case 'stripe': // legacy value for the same gateway
         return 'Carte Bancaire';
       case 'om':
         return 'Orange Money';

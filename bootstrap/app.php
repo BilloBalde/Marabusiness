@@ -15,6 +15,17 @@ return Application::configure(basePath: dirname(__DIR__))
         App\Providers\RateLimiterServiceProvider::class,
     ])
     ->withMiddleware(function (Middleware $middleware) {
+        // Render (and every PaaS like it) puts the app behind its own reverse
+        // proxy — the app is never reached directly from the public internet.
+        // Without this, Laravel reads $request->ip() as the proxy's own address
+        // for every visitor (defeating the per-IP rate limiter, see
+        // RateLimiterServiceProvider and LoginPage's own throttle — every guest
+        // would share one bucket) and never sees the request as secure, so a
+        // cookie can never be marked "secure" and $request->isSecure() is always
+        // false. Trusting '*' is the standard, safe setting for this topology:
+        // the platform's edge is the actual trust boundary, not this list.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'session.expiry' => \App\Http\Middleware\CheckSessionExpiry::class,
             'panel.timeout' => \App\Http\Middleware\MultiPanelSessionTimeout::class,

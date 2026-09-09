@@ -9,7 +9,8 @@ use App\Models\Product;
 use App\Models\Service;
 use App\Models\SiteSetting;
 use App\Models\Vendor;
-use App\Models\VendorProduct;
+use App\Support\VendorPresenter;
+use App\Support\ProductPricing;
 use Illuminate\Http\Request;
 
 class HomeController extends Controller
@@ -21,7 +22,7 @@ class HomeController extends Controller
         $currencyRate = $currency ? $currency->rate_to_usd : 1;
 
         // Featured products
-        $featuredProducts = Product::with(['vendors.currency'])
+        $featuredProducts = Product::with($this->offerRelations())
             ->where('is_featured', 1)
             ->where('is_active', 1)
             ->get()
@@ -29,7 +30,7 @@ class HomeController extends Controller
             ->filter(fn($p) => $p['has_vendor']);
 
         // Sale products
-        $saleProducts = Product::with(['vendors.currency'])
+        $saleProducts = Product::with($this->offerRelations())
             ->where('on_sale', 1)
             ->where('is_active', 1)
             ->get()
@@ -41,40 +42,15 @@ class HomeController extends Controller
             ->get(['id', 'name', 'slug', 'image']);
 
         // Vendors
-        $vendors = Vendor::where('is_active', 1)
-            ->with(['currency'])
+        // Selecting logo / banner / rating / is_verified / is_featured as columns was
+        // silently wrong: none of them exist on `vendors`. SQLite returned them as string
+        // literals, so every logo came back null and every rating fell to a hardcoded 4.5,
+        // and the same query raises "Unknown column" on MySQL. VendorPresenter reads the
+        // real logo_path and the computed rating, and serves /vendors identically.
+        $vendors = VendorPresenter::eagerLoad(Vendor::where('is_active', 1))
             ->orderBy('created_at', 'desc')
-            ->get([
-                'id', 
-                'store_name', 
-                'slug', 
-                'logo', 
-                'banner',
-                'description', 
-                'currency', 
-                'rating', 
-                'is_verified',
-                'is_featured', 
-                'created_at'
-            ])
-            ->map(function($vendor) {
-                return [
-                    'id' => $vendor->id,
-                    'store_name' => $vendor->store_name,
-                    'slug' => $vendor->slug,
-                    'logo' => $vendor->logo,
-                    'banner' => $vendor->banner,
-                    'description' => $vendor->description,
-                    'currency' => $vendor->currency,
-                    'rating' => $vendor->rating ?? 4.5,
-                    'reviews_count' => $vendor->reviews_count ?? 0,
-                    'followers_count' => $vendor->followers_count ?? 0,
-                    'products_count' => $vendor->products_count ?? 0,
-                    'is_verified' => $vendor->is_verified ?? false,
-                    'is_featured' => $vendor->is_featured ?? false,
-                    'created_at' => $vendor->created_at,
-                ];
-            });
+            ->get()
+            ->map(fn (Vendor $vendor) => VendorPresenter::present($vendor));
 
         // Services
         $services = Service::all()->map(fn($s) => [
@@ -118,25 +94,14 @@ class HomeController extends Controller
             ];
         }
 
-        // Add this debug code
-        if ($product->images && count($product->images) > 0) {
-            $imagePath = public_path('uploads/' . $product->images[0]);
-            if (file_exists($imagePath)) {
-                $fileSize = filesize($imagePath);
-                $mimeType = mime_content_type($imagePath);
-                \Log::info("Product image: {$product->id} - Size: $fileSize, MIME: $mimeType");
-            } else {
-                \Log::info("Product image not found: {$product->images[0]}");
-            }
-        }
-
-        $uniqueVendor = $product->vendors
-            ->groupBy('id')
-            ->map(fn($g) => $g->first())
-            ->sortBy(fn($v) => $v->pivot->price)
+        // Cheapest active offer wins: one product is shown once, at its best price,
+        // instead of once per shop that stocks it.
+        $offer = $product->vendorProducts
+            ->filter(fn ($vp) => $vp->is_active && $vp->vendor && $vp->vendor->is_active)
+            ->sortBy(fn ($vp) => ProductPricing::for($vp, '')['display_price'])
             ->first();
 
-        if (!$uniqueVendor) {
+        if (! $offer) {
             return [
                 'id' => $product->id,
                 'name' => $product->name,
@@ -146,27 +111,29 @@ class HomeController extends Controller
             ];
         }
 
-        $vendorRate = $uniqueVendor->currency->rate_to_usd ?? 1;
-        
-        // Get vendor_product_id
-        $vp = VendorProduct::where('product_id', $product->id)
-            ->where('vendor_id', $uniqueVendor->id)
-            ->first();
+        $vendor         = $offer->vendor;
+        $vendorCurrency = $vendor->currency->code ?? 'USD';
+        $vendorRate     = $vendor->currency->rate_to_usd ?? 1;
 
-        // Convert prices
-        $basePriceUSD = $uniqueVendor->pivot->price * $vendorRate;
-        $displayPrice = $basePriceUSD * $currencyRate;
-        
-        $salePrice = null;
+        $pricing = ProductPricing::for($offer, $vendorCurrency);
+
+        // Vendor currency -> USD -> the currency the client asked for. The old code
+        // computed this and then returned the raw pivot price anyway, which is why
+        // display_price, original_price and sale_price were all the same number and no
+        // discount ever appeared on the home feed.
+        // rate_to_usd converts *into* USD, so the target currency divides rather than
+        // multiplies: 1416 USD / 0.00012 = 11.8M GNF, not 0.17.
+        $toRequested = fn (?float $amount) => $amount === null
+            ? null
+            : round($amount * $vendorRate / ($currencyRate > 0 ? $currencyRate : 1), 2);
+
+        $displayPrice  = $toRequested($pricing['display_price']);
+        $originalPrice = $toRequested($pricing['original_price']);
+        $salePrice     = $toRequested($pricing['sale_price']);
+
         $discount = null;
-        
-        if ($uniqueVendor->pivot->sale_price) {
-            $salePriceUSD = $uniqueVendor->pivot->sale_price * $vendorRate;
-            $salePrice = $salePriceUSD * $currencyRate;
-            
-            if ($basePriceUSD > 0) {
-                $discount = round(100 - ($salePriceUSD / $basePriceUSD * 100));
-            }
+        if ($salePrice !== null && $originalPrice > 0 && $salePrice < $originalPrice) {
+            $discount = (int) round(100 - ($salePrice / $originalPrice * 100));
         }
 
         return [
@@ -174,18 +141,42 @@ class HomeController extends Controller
             'name' => $product->name,
             'slug' => $product->slug,
             'images' => $product->images ?? [],
-            'vendor_id' => $uniqueVendor->id,
-            'vendor_product_id' => $vp ? $vp->id : null,
-            'vendor_name' => $uniqueVendor->store_name,
-            'vendor_slug' => $uniqueVendor->slug,
-            'stock' => $uniqueVendor->pivot->stock ?? 0,
-            'currency' => $uniqueVendor->currency->code ?? 'USD',
-            'display_price' => (float) $uniqueVendor->pivot->price,
-            'original_price' => (float) $uniqueVendor->pivot->price,
-            'sale_price' => (float) $uniqueVendor->pivot->price,
-            'sale_end' => $uniqueVendor->pivot->sale_end,
+            'vendor_id' => $vendor->id,
+            'vendor_product_id' => $offer->id,
+            'vendor_name' => $vendor->store_name,
+            'vendor_slug' => $vendor->slug,
+            'stock' => $pricing['total_stock'],
+            'currency' => $currencyCode,
+            'display_price' => $displayPrice,
+            'original_price' => $originalPrice,
+            'sale_price' => $salePrice,
+            'sale_end' => $offer->sale_end,
             'discount' => $discount,
+            'has_variations' => $pricing['has_variations'],
+            'variations_count' => $pricing['variations_count'],
+            'min_price' => $toRequested($pricing['min_price']),
+            'max_price' => $toRequested($pricing['max_price']),
+            'has_price_range' => $pricing['has_price_range'],
+            // Rebuilt from the converted amounts: ProductPricing formats in the vendor's
+            // currency, and this feed answers in the currency the client asked for.
+            'display_text' => ProductPricing::displayText(
+                $pricing['has_variations'], $pricing['has_price_range'],
+                (float) $toRequested($pricing['min_price']), (float) $toRequested($pricing['max_price']),
+                (float) $displayPrice, $salePrice, $currencyCode
+            ),
+            'original_text' => ProductPricing::originalText(
+                $pricing['has_variations'], $pricing['variations_count'],
+                $salePrice, (float) $originalPrice, $currencyCode
+            ),
             'has_vendor' => true,
         ];
+    }
+
+    /**
+     * Everything mapProductForApi() reads, so the feed costs a fixed number of queries.
+     */
+    private function offerRelations(): array
+    {
+        return ['vendorProducts.vendor.currency', 'vendorProducts.variations'];
     }
 }

@@ -347,7 +347,7 @@ class ProductDetailPage extends Component
     {
         if (!Auth::check()) {
             $this->dispatch('show-toast', message: 'Please login to add items to cart.', type: 'warning');
-            return $this->redirectRoute('customer_login');
+            return $this->redirectRoute('login');
         }
 
         $qty = (int) $this->quantity;

@@ -47,11 +47,30 @@ return [
         'express_url' => env('DHL_EXPRESS_URL', 'https://api-eu.dhl.com/dhlexpress'),
     ],
 
+    /*
+    | Optional HTTP proxy for the Socialite providers. Leave the env keys unset and
+    | Socialite talks to Google and Facebook directly; set both and every sign-in
+    | request is routed through it.
+    */
+    'proxy' => [
+        'host' => env('PROXY_HOST'),
+        'port' => env('PROXY_PORT'),
+    ],
+
     'lengopay' => [
         'base_url'    => env('LENGOPAY_BASE_URL', 'https://portal.lengopay.com'),
         'license_key' => env('LENGOPAY_LICENSE_KEY'),
         'website_id'  => env('LENGOPAY_WEBSITE_ID'),
         'currency'    => env('LENGOPAY_CURRENCY', 'GNF'),
+    ],
+
+    /*
+    | Read through config(), never env(), from application code: the production build runs
+    | `php artisan optimize`, which caches the config and stops Laravel from reading .env
+    | at all — every env() call outside this directory returns null from that point on.
+    */
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET'),
     ],
 
     'google' => [

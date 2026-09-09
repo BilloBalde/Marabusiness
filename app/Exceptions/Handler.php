@@ -5,6 +5,7 @@ namespace App\Exceptions;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Throwable;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Filament\Facades\Filament;
 use ErrorException;
 use Illuminate\Session\TokenMismatchException;
@@ -47,44 +48,16 @@ class Handler extends ExceptionHandler
             }
         });
 
-        // Log additional context for specific errors
-        $this->reportable(function (Throwable $e) {
-            // Log CSRF token mismatch with context
-            if ($e instanceof TokenMismatchException) {
-                Log::warning('CSRF Token Mismatch', [
-                    'url' => request()->fullUrl(),
-                    'user_id' => auth()->id(),
-                    'ip' => request()->ip(),
-                    'user_agent' => request()->userAgent(),
-                    'method' => request()->method(),
-                    'session_last_activity' => session('last_activity'),
-                ]);
-            }
-
-            // Log 403 forbidden attempts
-            if ($e instanceof HttpException && $e->getStatusCode() === 403) {
-                Log::warning('403 Forbidden Access Attempt', [
-                    'url' => request()->fullUrl(),
-                    'user_id' => auth()->id(),
-                    'ip' => request()->ip(),
-                    'user_agent' => request()->userAgent(),
-                    'role' => auth()->check() ? auth()->user()->roles->first()->name ?? 'none' : 'guest',
-                ]);
-            }
-
-            // Log 500 server errors with more context
-            if ($e instanceof HttpException && $e->getStatusCode() === 500) {
-                Log::error('500 Server Error', [
-                    'url' => request()->fullUrl(),
-                    'user_id' => auth()->id(),
-                    'ip' => request()->ip(),
-                    'user_agent' => request()->userAgent(),
-                    'exception' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                ]);
-            }
-        });
+        // This used to register CSRF/403/500 logging here via reportable(). It never
+        // ran: Laravel's base Handler checks shouldReport() BEFORE ever consulting a
+        // reportable() callback, and TokenMismatchException and every HttpException
+        // (which is how abort(403)/abort(500) actually throw) are unconditionally in
+        // the framework's own $internalDontReport list — routine HTTP-status flow,
+        // not something report() considers reportable at all. No condition inside
+        // this closure could ever make it execute. The logging itself was sound; it
+        // just needed to live where it can actually run — inside each render*()
+        // method below, the same way 500's has always logged directly rather than
+        // through this dead path.
     }
 
     public function render($request, Throwable $exception)
@@ -117,7 +90,7 @@ class Handler extends ExceptionHandler
 
         // Handle other HTTP exceptions
         if ($exception instanceof HttpException) {
-            return $this->renderHttpException($request, $exception);
+            return $this->renderHttpException($exception);
         }
 
         // Handle authentication exceptions
@@ -133,9 +106,20 @@ class Handler extends ExceptionHandler
      */
     protected function renderTokenMismatchException($request, TokenMismatchException $exception)
     {
+        // Read before the session is cleared below — user_id and
+        // session_last_activity would otherwise always log as empty.
+        Log::warning('CSRF Token Mismatch', [
+            'url' => $request->fullUrl(),
+            'user_id' => auth()->id(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'method' => $request->method(),
+            'session_last_activity' => session('last_activity'),
+        ]);
+
         // Determine the appropriate login route based on current panel
         $loginRoute = $this->getLoginRoute($request);
-        
+
         // Generate reference ID
         $referenceId = substr(md5(uniqid()), 0, 8);
 
@@ -181,6 +165,15 @@ class Handler extends ExceptionHandler
         $referenceId = substr(md5(uniqid()), 0, 8);
         $isPanel = $this->isPanelRequest($request);
         $panelName = $this->getPanelName($request);
+
+        Log::warning('403 Forbidden Access Attempt', [
+            'reference_id' => $referenceId,
+            'url' => $request->fullUrl(),
+            'user_id' => auth()->id(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'role' => auth()->check() ? (auth()->user()->roles->first()->name ?? 'none') : 'guest',
+        ]);
 
         // AJAX/JSON requests
         if ($request->expectsJson()) {
@@ -266,12 +259,20 @@ class Handler extends ExceptionHandler
     }
 
     /**
-     * Render generic HTTP exceptions
+     * Render generic HTTP exceptions.
+     *
+     * Signature must match the parent exactly — renderHttpException(HttpExceptionInterface
+     * $e), one argument, no $request. This method used to declare ($request, HttpException
+     * $exception): two parameters, and a narrower type than the interface the parent
+     * accepts. PHP enforces Liskov substitution on overridden method signatures, so that
+     * mismatch was a fatal "Declaration ... must be compatible with ..." error at class-
+     * load time — this whole class has never once been loadable, independent of whether
+     * anything ever bound it as the active exception handler.
      */
-    protected function renderHttpException($request, HttpException $exception)
+    protected function renderHttpException(HttpExceptionInterface $exception)
     {
         $status = $exception->getStatusCode();
-        
+
         // Check if a custom view exists for this status code
         if (view()->exists("errors.{$status}")) {
             return response()->view("errors.{$status}", [
@@ -281,7 +282,7 @@ class Handler extends ExceptionHandler
             ], $status);
         }
 
-        return parent::renderHttpException($request, $exception);
+        return parent::renderHttpException($exception);
     }
 
     /**

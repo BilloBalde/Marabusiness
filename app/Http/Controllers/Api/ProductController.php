@@ -43,6 +43,10 @@ class ProductController extends Controller
         // Vendor filter
         if ($request->has('vendor_id') && !empty($request->vendor_id)) {
             $query->where('vendor_id', $request->vendor_id);
+        } else {
+            // One row per catalogue product, at its best price. Skipped when browsing a
+            // single shop, which must list its own offers whatever a rival charges.
+            $query->cheapestPerProduct();
         }
 
         // Price range filters
@@ -99,14 +103,15 @@ class ProductController extends Controller
             
             // Convert prices
             $basePriceUSD = $vendorProduct->price * $vendorRate;
-            $displayPrice = $basePriceUSD * $currencyRate;
+            // rate_to_usd converts into USD, so the requested currency divides.
+            $displayPrice = $basePriceUSD / ($currencyRate > 0 ? $currencyRate : 1);
             
             $salePrice = null;
             $discount = null;
             
             if ($vendorProduct->sale_price) {
                 $salePriceUSD = $vendorProduct->sale_price * $vendorRate;
-                $salePrice = $salePriceUSD * $currencyRate;
+                $salePrice = $salePriceUSD / ($currencyRate > 0 ? $currencyRate : 1);
                 
                 if ($basePriceUSD > 0) {
                     $discount = round(100 - ($salePriceUSD / $basePriceUSD * 100));

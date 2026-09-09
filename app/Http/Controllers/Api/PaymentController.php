@@ -107,13 +107,9 @@ class PaymentController extends Controller
                     'transaction_id' => Order::generateTransactionNumber(),
                 ]);
 
-                // Update order totals
-                $totalPaid = $order->paiements()->sum('amount') + $order->total_remaining;
-                $order->update([
-                    'total_paid' => $totalPaid,
-                    'total_remaining' => max(0, $order->grand_total - $totalPaid),
-                    'payment_status' => $totalPaid >= $order->grand_total ? 'paid' : 'partial',
-                ]);
+                // Cash on delivery declared from the mobile app: recorded, but the order
+                // is only settled once the vendor confirms the courier collected it.
+                $order->syncPaymentTotals();
 
                 // Update financial transactions
                 $this->updateFinancialTransactions($order, 'cod', $order->total_remaining, 'paid cash');
@@ -189,13 +185,9 @@ class PaymentController extends Controller
                 'transaction_id' => Order::generateTransactionNumber(),
             ]);
 
-            // Update order totals
-            $totalPaid = $order->paiements()->sum('amount') + $request->amount;
-            $order->update([
-                'total_paid' => $totalPaid,
-                'total_remaining' => max(0, $order->grand_total - $totalPaid),
-                'payment_status' => $totalPaid >= $order->grand_total ? 'paid' : 'partial',
-            ]);
+            // Offline payment declared from the mobile app; awaits the vendor's
+            // confirmation before it counts towards the balance.
+            $order->syncPaymentTotals();
 
             // Update financial transactions
             $this->updateFinancialTransactions($order, 'cod', $request->amount, 'paid cash');
@@ -260,7 +252,7 @@ class PaymentController extends Controller
             ], 400);
         }
 
-        Stripe::setApiKey(env('STRIPE_SECRET'));
+        Stripe::setApiKey(config('services.stripe.secret'));
 
         try {
             $baseUrl = $platform === 'mobile' ? 'mara://' : config('app.url');
@@ -353,8 +345,10 @@ class PaymentController extends Controller
         try {
             $lengo = app(LengoPayService::class);
 
-            $baseUrl = $platform === 'mobile' ? 'mara://' : config('app.url');
-            $returnUrl = 'https://afrobridgeinnov.com/payment/success?order_id=' . $order->id;
+            // Web and mobile share one absolute https return URL. On Android it is
+            // registered as an App Link and main.dart matches the deep link on host +
+            // path, so a mara:// scheme would give an empty host and never be caught.
+            $returnUrl = rtrim(config('app.frontend_url'), '/') . '/payment/success?order_id=' . $order->id;
             $callbackUrl = route('lengopay.callback');
 
             $result = $lengo->createPayment(

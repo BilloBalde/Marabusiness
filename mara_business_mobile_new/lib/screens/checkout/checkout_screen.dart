@@ -380,15 +380,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           child: TextFormField(
                             controller: _zipController,
                             decoration: const InputDecoration(
-                              labelText: 'Zip Code *',
+                              labelText: 'Zip Code',
                               border: OutlineInputBorder(),
                             ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Required';
-                              }
-                              return null;
-                            },
                             onChanged: (_) => _updateShippingAddressFromForm(),
                           ),
                         ),
@@ -753,12 +747,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: _buildPaymentOption(
-                            value: 'stripe',
+                            value: 'lengopay',
                             label: '💳 Card',
                             subtitle: 'LengoPay',
                             enabled: !checkoutProvider.hasMultipleVendors,
-                            isSelected: checkoutProvider.paymentMethod == 'stripe',
-                            onTap: () => checkoutProvider.setPaymentMethod('stripe'),
+                            isSelected: checkoutProvider.paymentMethod == 'lengopay',
+                            onTap: () => checkoutProvider.setPaymentMethod('lengopay'),
                           ),
                         ),
                       ],

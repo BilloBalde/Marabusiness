@@ -41,16 +41,9 @@ use App\Livewire\MyAddresses;
 
 Route::middleware('auth')->get('/my-addresses', MyAddresses::class)->name('my.addresses');
 
-Route::get('/locale/{locale}', function (string $locale) {
-    $available = ['en', 'fr', 'zh'];
-
-    abort_unless(in_array($locale, $available, true), 404);
-
-    session(['locale' => $locale]);
-    app()->setLocale($locale);
-
-    return back();
-})->name('locale.switch');
+// Was a second, near-identical copy of lang.switch below (only difference: 404
+// on an invalid locale instead of falling back to 'en') — the public navbar now
+// points at lang.switch too, same as both Filament panels always did.
 
 Route::get('/', HomePage::class)->name('home');
 Route::get('/categories', CategoriesPage::class);
@@ -84,17 +77,24 @@ Route::get('/service/{slug}', \App\Livewire\ServicePage::class)->name('service.s
 
 
 Route::middleware('guest')->group(function () {
-    Route::get('/login', AuthLoginPage::class)->name('customer_login');
+    Route::get('/login', AuthLoginPage::class)->name('login');
     Route::get('/register', AuthRegisterPage::class);
     Route::get('/forgot-password', ForgotPage::class)->name('password.request');
     Route::get('/reset-password/{token}', ResetPasswordPage::class)->name('password.reset');
 });
 Route::get('/checkout', CheckoutPage::class);
-Route::get('/success', SuccessPage::class)->name('success');
+Route::get('/success', SuccessPage::class)->middleware('auth')->name('success');
+
+// Absolute return URL handed to payment gateways (see config/app.php frontend_url).
+// On Android the same URL is an App Link caught by the Flutter deep-link listener.
+Route::get('/payment/success', SuccessPage::class)->middleware('auth')->name('payment.success');
 Route::get('/success-stripe', \App\Livewire\SuccessPageStripe::class)->name('success.stripe');
 Route::get('/cancel', CancelPage::class)->name('cancel');
-Route::get('/my-orders/{order_id}', OrderDetailPage::class)->name('my-orders.show');
 Route::middleware('auth')->group(function (){
+    // Was outside the auth group: reachable while logged out, and OrderDetailPage's
+    // mount() had no ownership check either — any order id in the URL was viewable
+    // by anyone. Both are fixed now (this middleware + the check in mount()).
+    Route::get('/my-orders/{order_id}', OrderDetailPage::class)->name('my-orders.show');
     Route::get('/orders', MyOrdersPage::class)->name('my-orders');
     Route::get('/chats/{chatWithId}', CustomerChat::class)->name('chats');
     Route::get('/my-rfqs', \App\Livewire\UserRfqsPage::class)->name('user.rfqs');
@@ -127,16 +127,23 @@ Route::middleware('auth')->group(function (){
     })->name('logout.get');
 });
 Route::get('/cookies', \App\Livewire\CookieSettings::class)->name('cookies');
-Route::get('/orders/{order}/invoice/preview', [InvoiceController::class, 'preview'])
-    ->name('orders.invoice.preview');
+// Auth here only proves someone is logged in; InvoiceController itself checks that
+// this specific order belongs to them (buyer, its vendor, or an admin) — without it,
+// anyone could read or download any customer's name, address, phone and full order
+// total just by changing the id in the URL.
+Route::middleware('auth')->group(function () {
+    Route::get('/orders/{order}/invoice/preview', [InvoiceController::class, 'preview'])
+        ->name('orders.invoice.preview');
 
-Route::get('/orders/{order}/invoice/pdf', [InvoiceController::class, 'download'])
-    ->name('orders.invoice.pdf');
+    Route::get('/orders/{order}/invoice/pdf', [InvoiceController::class, 'download'])
+        ->name('orders.invoice.pdf');
+});
 
-Route::get('/filament/language', function () {
-    return view('filament.language-menu');
-})->name('filament.language.menu');
-
+// Removed: /filament/language and its view. It returned a 500 (a Filament 2 page
+// component rendered outside any page context) and its links used a ?lang= parameter
+// that SetLocale never reads. Both panels already switch language through the
+// lang.switch route below; the only thing still pointing here was a commented-out
+// menu item in AdminPanelProvider.
 Route::get('/lang/{locale}', function ($locale) {
     $allowed = ['en', 'fr', 'zh'];
     if (! in_array($locale, $allowed)) {
@@ -156,38 +163,6 @@ Route::get('/auth/google/callback', [SocialAuthController::class, 'callbackGoogl
 // FACEBOOK
 Route::get('/auth/facebook', [SocialAuthController::class, 'redirectFacebook'])->name('facebook.redirect');
 Route::get('/auth/facebook/callback', [SocialAuthController::class, 'callbackFacebook']);
-// routes/web.php (temporary)
-Route::get('/debug-routes', function() {
-    $routes = collect(\Illuminate\Support\Facades\Route::getRoutes()->getRoutes())
-        ->filter(function($route) {
-            return str_contains($route->uri, 'bulk-rfq') || 
-                   str_contains($route->getName() ?? '', 'bulk-rfq');
-        })
-        ->map(function($route) {
-            return [
-                'name' => $route->getName(),
-                'uri' => $route->uri,
-                'methods' => $route->methods,
-                'action' => $route->action['controller'] ?? $route->action['uses'] ?? 'Closure',
-            ];
-        });
-    
-    return response()->json($routes->values());
-});
-// Debug route
-Route::get('/debug-bulk-rfq-route', function() {
-    $record = \App\Models\BulkRfq::first();
-    if (!$record) {
-        return "No BulkRfq records found";
-    }
-    
-    return [
-        'route_exists' => route_exists('filament.vendor.resources.bulk-rfqs.quote'),
-        'route_url' => \App\Filament\Vendor\Resources\BulkRfqResource::getUrl('quote', ['record' => $record->id]),
-        'panel_path' => config('filament-vendor.path'),
-        'record_id' => $record->id,
-    ];
-});
 // CSRF Token Refresh Route
 Route::get('/refresh-csrf', function (Request $request) {
     // Regenerate token if needed
@@ -234,148 +209,13 @@ Route::post('/keep-alive', function (Request $request) {
     ], 401);
 })->middleware('web')->name('keep-alive');
 
-Route::get('/debug-cookie', function() {
-    $cart_items = session('cart_items', []);
-    $cart_items = is_array($cart_items) ? $cart_items : [];
-
-    return response()->json([
-        'session_count' => count($cart_items),
-        'items' => array_map(function($item) {
-            return [
-                'cart_key' => $item['cart_key'] ?? 'no_key',
-                'vendor_product_id' => $item['vendor_product_id'] ?? null,
-                'product_name' => $item['product_name'] ?? 'no_name'
-            ];
-        }, $cart_items)
-    ]);
-});
-Route::get('/test-add-direct/{vendor_product_id}/{variation_id?}', function($vendor_product_id, $variation_id = null) {
-    $cart_items = \App\Helpers\CartManagement::getCartItemsFromCookie();
-    
-    $new_item = [
-        'vendor_product_id' => (int)$vendor_product_id,
-        'product_id' => 999,
-        'vendor_id' => 2,
-        'product_name' => 'Test Direct Add',
-        'image' => 'test.jpg',
-        'quantity' => 1,
-        'base_price' => 100,
-        'currency' => 'USD',
-        'rate_to_usd' => 1,
-        'variation_id' => $variation_id ? (int)$variation_id : null,
-        'selected_variations' => $variation_id ? ['Color' => 'Test'] : [],
-        'variation_note' => $variation_id ? 'Color: Test' : '',
-        'wholesale_applied' => false,
-        'cart_key' => $variation_id ? "cart_{$vendor_product_id}_var_{$variation_id}" : "cart_{$vendor_product_id}_simple",
-        'wholesale_tiers' => [],
-        'total_amount' => 100,
-        'unit_amount' => 100
-    ];
-    
-    $cart_items[] = $new_item;
-    
-    \App\Helpers\CartManagement::addCartItemsToCookie($cart_items);
-    
-    // Verify
-    $saved = \App\Helpers\CartManagement::getCartItemsFromCookie();
-    
-    return response()->json([
-        'added_item' => $new_item['cart_key'],
-        'saved_count' => count($saved),
-        'saved_items' => array_map(function($item) {
-            return $item['cart_key'] ?? 'no_key';
-        }, $saved)
-    ]);
-});
-Route::get('/test-cookie-limit', function() {
-    // Clear current cart
-    session()->forget('cart_items');
-    
-    // Create 5 simple test items
-    $test_items = [];
-    for ($i = 1; $i <= 5; $i++) {
-        $test_items[] = [
-            'vendor_product_id' => $i,
-            'product_id' => $i,
-            'vendor_id' => 1,
-            'product_name' => 'Test Product ' . $i,
-            'image' => 'test' . $i . '.jpg',
-            'quantity' => 1,
-            'base_price' => 100,
-            'currency' => 'USD',
-            'rate_to_usd' => 1,
-            'variation_id' => null,
-            'selected_variations' => [],
-            'variation_note' => '',
-            'wholesale_applied' => false,
-            'cart_key' => 'cart_test_' . $i,
-            'wholesale_tiers' => [],
-            'total_amount' => 100,
-            'unit_amount' => 100
-        ];
-    }
-    
-    // Save using CartManagement
-    \App\Helpers\CartManagement::addCartItemsToCookie($test_items);
-    
-    // Check what was saved
-    $saved = \App\Helpers\CartManagement::getCartItemsFromCookie();
-    
-    return response()->json([
-        'tried_to_save' => count($test_items),
-        'actually_saved' => count($saved),
-        'saved_keys' => array_map(function($item) {
-            return $item['cart_key'];
-        }, $saved),
-        'session_count' => count(session('cart_items', []))
-    ]);
-});
-Route::get('/test-419', function () {
-    throw new \Illuminate\Session\TokenMismatchException;
-});
-
-Route::get('/test-403', function () {
-    abort(403);
-});
-
-Route::get('/test-500', function () {
-    abort(500);
-});
-
-Route::get('/test-add-simple', function() {
-    $cart_items = \App\Helpers\CartManagement::getCartItemsFromCookie();
-    
-    // Add a simple item
-    $cart_items[] = [
-        'vendor_product_id' => 999,
-        'product_id' => 999,
-        'vendor_id' => 1,
-        'product_name' => 'Simple Test',
-        'image' => 'test.jpg',
-        'quantity' => 1,
-        'base_price' => 100,
-        'currency' => 'USD',
-        'rate_to_usd' => 1,
-        'variation_id' => null,
-        'selected_variations' => [],
-        'variation_note' => '',
-        'wholesale_applied' => false,
-        'cart_key' => 'simple_test_' . time(),
-        'wholesale_tiers' => [],
-        'total_amount' => 100,
-        'unit_amount' => 100
-    ];
-    
-    \App\Helpers\CartManagement::addCartItemsToCookie($cart_items, true);
-    
-    // Read back
-    $saved = \App\Helpers\CartManagement::getCartItemsFromCookie();
-    
-    return response()->json([
-        'added_count' => count($cart_items),
-        'saved_count' => count($saved),
-        'saved_keys' => array_map(function($item) {
-            return $item['cart_key'] ?? 'no_key';
-        }, $saved)
-    ]);
-});
+// Removed: /debug-cookie, /test-add-direct, /test-cookie-limit, /test-419,
+// /test-403, /test-500, /test-add-simple — leftover debugging routes with no
+// environment gate, reachable in production exactly like any real route.
+// /test-add-direct and /test-add-simple were the most serious: they wrote a
+// cart line with an attacker-chosen base_price/unit_amount/total_amount straight
+// into the session, and CheckoutController trusts those cart amounts when it
+// builds the order total and the Stripe charge — so anyone hitting either route
+// could check out at whatever price they picked. Removed rather than gated,
+// since none of these had any legitimate use once the features they debugged
+// (bulk RFQ routing, the cart cookie) were working.

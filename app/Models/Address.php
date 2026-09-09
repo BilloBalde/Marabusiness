@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Address extends Model
 {
@@ -21,6 +22,11 @@ class Address extends Model
         'longitude',    // 新增
         'zone',     
         'is_default',
+        'locality_id',
+    ];
+
+    protected $casts = [
+        'is_default' => 'boolean',
     ];
 
     protected $appends = ['full_name', 'coordinates'];
@@ -33,6 +39,15 @@ class Address extends Model
     public function order()
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /**
+     * Delivery locality, used instead of the postal code to price shipping for
+     * vendors on the locality pricing mode.
+     */
+    public function locality(): BelongsTo
+    {
+        return $this->belongsTo(Locality::class);
     }
 
     public function getFullNameAttribute()

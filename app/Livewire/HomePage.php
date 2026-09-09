@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Models\Product;
-use App\Models\VendorProduct;
 use App\Models\Currency;
 use App\Models\Category;
 use App\Models\Vendor;
@@ -84,22 +83,6 @@ class HomePage extends Component
     }
 
     /**
-     * Get vendor_product_id for a product and vendor
-     */
-    private function getVendorProductId($product_id, $vendor_id)
-    {
-        if (!$vendor_id) {
-            return null;
-        }
-        
-        $vp = VendorProduct::where('product_id', $product_id)
-            ->where('vendor_id', $vendor_id)
-            ->first();
-            
-        return $vp ? $vp->id : null;
-    }
-
-    /**
      * Map products for homepage layout
      */
     private function mapProductForHomepage(Product $product)
@@ -152,8 +135,10 @@ class HomePage extends Component
             ];
         }
 
-        // Get vendor_product_id
-        $vendor_product_id = $this->getVendorProductId($product->id, $uniqueVendor->id);
+        // $uniqueVendor is one of $product->vendors, eager-loaded with the
+        // product — the pivot already carries this exact vendor_product row's id
+        // (see Product::vendors()'s withPivot()); no need to re-query it.
+        $vendor_product_id = $uniqueVendor->pivot->id ?? null;
 
         // Vendor currency → USD rate
         $vendorRate = $uniqueVendor->currency->rate_to_usd ?? 1;
@@ -213,7 +198,7 @@ class HomePage extends Component
     public function render()
     {
         // Get featured products
-        $featuredProducts = Product::with(['vendors.currency'])
+        $featuredProducts = Product::with(['vendors.currency', 'vendors.translations'])
             ->where('is_featured', 1)
             ->where('is_active', 1)
             ->get()
@@ -221,7 +206,7 @@ class HomePage extends Component
             ->filter(fn($p) => $p->has_vendor);
 
         // Get sale products
-        $saleProducts = Product::with(['vendors.currency'])
+        $saleProducts = Product::with(['vendors.currency', 'vendors.translations'])
             ->where('on_sale', 1)
             ->where('is_active', 1)
             ->get()
@@ -229,19 +214,38 @@ class HomePage extends Component
             ->filter(fn($p) => $p->has_vendor);
 
         // Get categories with their first product (if any)
+        //
+        // 'translations' eager-loaded for $category->name below — otherwise
+        // HasTranslations::getTranslation() re-queries category_translations
+        // itself, once per field access, since it only checks whether the
+        // relation is already loaded and re-fetches fresh every time it isn't.
         $categories = Category::with(['products' => function($query) {
             $query->where('is_active', 1)
                   ->orderBy('created_at', 'desc')
                   ->limit(1);
-        }])->where('is_active', 1)->get();
+        }, 'translations'])->where('is_active', 1)->get();
 
-        // Get active vendors
-        $vendors = Vendor::where('is_active', 1)
+        // Get active vendors.
+        //
+        // This page used to run 106 queries (~2.3s) for 7 products and 8 vendors:
+        // 28 for vendor_translations, 10 each for the rating average and the
+        // follower count, all repeated per vendor per field access because none
+        // of it was eager-loaded. 'translations' fixes store_name/description the
+        // same way as $categories above; withAvg/withCount compute the rating and
+        // follower count in this one query instead of two more per vendor.
+        $vendors = Vendor::with('translations')
+            ->withAvg('approvedVendorReviews as vendor_rating', 'rating')
+            ->withCount([
+                'approvedVendorReviews as vendor_reviews_count',
+                'followers as followers_count',
+            ])
+            ->where('is_active', 1)
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Get services
-        $services = Service::all();
+        // Get services — 'translations' eager-loaded for the same reason as
+        // categories and vendors above (name/description via HasTranslations).
+        $services = Service::with('translations')->get();
         // Get banners
         $banners = SiteSetting::whereIn('key', [
             'home-page-banner-1',

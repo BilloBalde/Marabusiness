@@ -71,8 +71,17 @@ class StorageService {
     await setSecureString(AppConstants.prefAuthToken, token);
   }
 
+  /// AuthProvider persists the token with SharedPreferences while this class was
+  /// written against secure storage, so the cold-start read in main.dart always came
+  /// back null and the very first API call of a session went out unauthenticated.
+  /// Both stores are consulted rather than switching outright, which would sign out
+  /// every user whose token already sits in SharedPreferences.
   Future<String?> getAuthToken() async {
-    return await getSecureString(AppConstants.prefAuthToken);
+    final secure = await getSecureString(AppConstants.prefAuthToken);
+    if (secure != null && secure.isNotEmpty) return secure;
+
+    final stored = _prefs.getString(AppConstants.prefAuthToken);
+    return (stored != null && stored.isNotEmpty) ? stored : null;
   }
 
   Future<void> saveUser(Map<String, dynamic> user) async {

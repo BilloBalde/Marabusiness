@@ -49,31 +49,36 @@ Route::prefix('v1')->group(function () {
     // In routes/api.php - Add these routes
 
     Route::prefix('products')->group(function () {
-        // Existing routes
         Route::get('/', [ProductController::class, 'index']);
-        Route::get('{slug}/{vendor_product_id}', [ProductController::class, 'show']);
-        
-        // NEW ROUTES FOR REVIEWS
+
+        // Reviews first: 'reviews' and 'review' are literal path segments, but
+        // {slug}/{vendor_product_id} below matches ANY two segments — registered
+        // first, it would swallow GET products/reviews/{id} as
+        // ProductController::show(slug: "reviews", ...) before this route ever
+        // got a chance to match. Laravel matches whichever route is registered
+        // first, not whichever is more specific.
         Route::prefix('reviews')->group(function () {
             Route::get('{vendor_product_id}', [ProductReviewController::class, 'index']);
             Route::post('{vendor_product_id}', [ProductReviewController::class, 'store'])->middleware('auth:sanctum');
         });
-        
+
         Route::prefix('review')->group(function () {
             Route::put('{review_id}', [ProductReviewController::class, 'update'])->middleware('auth:sanctum');
             Route::delete('{review_id}', [ProductReviewController::class, 'destroy'])->middleware('auth:sanctum');
         });
+
+        Route::get('{slug}/{vendor_product_id}', [ProductController::class, 'show']);
     });
     Route::get('/products-page', [ApiProductsPageController::class, 'index']);
-    // Brands
+    // Brands — /featured must come before /{id}, or "featured" is read as an id.
     Route::get('/brands', [App\Http\Controllers\Api\BrandController::class, 'index']);
-    Route::get('/brands/{id}', [App\Http\Controllers\Api\BrandController::class, 'show']);
     Route::get('/brands/featured', [App\Http\Controllers\Api\BrandController::class, 'featured']);
-    // Categories
+    Route::get('/brands/{id}', [App\Http\Controllers\Api\BrandController::class, 'show']);
+    // Categories — same reasoning: the literal segments before the parameterized one.
     Route::get('/categories', [CategoryController::class, 'index']);
-    Route::get('/categories/{id}', [CategoryController::class, 'show']);
     Route::get('/categories/tree', [CategoryController::class, 'tree']);
     Route::get('/categories/featured', [CategoryController::class, 'featured']);
+    Route::get('/categories/{id}', [CategoryController::class, 'show']);
     // Vendors
     Route::get('/vendors', [VendorController::class, 'index']);
     Route::get('/vendors/featured', [VendorController::class, 'featured']);

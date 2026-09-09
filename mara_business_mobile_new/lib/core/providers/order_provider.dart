@@ -1,5 +1,7 @@
 // lib/core/providers/order_provider.dart
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/order.dart';
@@ -10,8 +12,14 @@ class OrderProvider extends ChangeNotifier {
   
   List<Order> _orders = [];
   Order? _currentOrder;
-  bool _isLoading = false;
+  // Starts true: nothing has been loaded yet, so screens must show a loader rather
+  // than the empty state on their very first frame.
+  bool _isLoading = true;
   bool _isLoadingOrders = false;
+
+  /// The request currently in flight, so a concurrent caller can await it instead of
+  /// being dropped.
+  Completer<void>? _ordersRequest;
   String? _error;
   int _currentPage = 1;
   bool _hasMorePages = true;
@@ -269,8 +277,14 @@ Future<void> loadOrders({
   String? status,
   bool refresh = false,
 }) async {
-  if (_isLoadingOrders) return;
-  
+  final inFlight = _ordersRequest;
+  if (inFlight != null) {
+    await inFlight.future;
+
+    // Nothing new was asked for, so the request that just finished answers this call.
+    if (!refresh && search == null && status == null) return;
+  }
+
   // Handle refresh or new search
   if (refresh) {
     _currentPage = 1;
@@ -299,6 +313,8 @@ Future<void> loadOrders({
 
   if (!_hasMorePages && !refresh && search == null && status == null) return;
 
+  final request = Completer<void>();
+  _ordersRequest = request;
   _isLoadingOrders = true;
   _isLoading = true;
   notifyListeners();
@@ -359,11 +375,13 @@ Future<void> loadOrders({
   } catch (e) {
     _error = e.toString();
     print('❌ Exception loading orders: $e');
+  } finally {
+    _ordersRequest = null;
+    if (!request.isCompleted) request.complete();
+    _isLoadingOrders = false;
+    _isLoading = false;
+    notifyListeners();
   }
-
-  _isLoadingOrders = false;
-  _isLoading = false;
-  notifyListeners();
 }
 
   // Filter by status

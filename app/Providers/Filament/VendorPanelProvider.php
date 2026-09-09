@@ -85,6 +85,7 @@ class VendorPanelProvider extends PanelProvider
                 ProductResource::class,
                 CategoryResource::class,
                 \App\Filament\Resources\BrandResource::class,
+                \App\Filament\Resources\DeliveryZoneResource::class,
                 \App\Filament\Vendor\Resources\VendorReviewResource::class,
             ]);
     }

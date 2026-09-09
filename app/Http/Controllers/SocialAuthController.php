@@ -31,11 +31,33 @@ class SocialAuthController extends Controller
 
             $socialUser = Socialite::driver($provider)->stateless()->user();
 
-            // Find or create user
-            $user = User::where('provider', $provider)
-                    ->where('provider_id', $socialUser->getId())
-                    ->orWhere('email', $socialUser->getEmail())
-                    ->first();
+            // Matched by (provider, provider_id) first — an account already linked
+            // to this exact social identity. Failing that, by email: Google verifies
+            // email ownership before handing out a token, so completing this flow
+            // means genuinely controlling that mailbox — the same trust "forgot
+            // password" already relies on. Grouped explicitly (rather than a bare
+            // ->orWhere('email', ...) after two ->where() calls) so this stays
+            // (provider AND provider_id) OR email regardless of what a future edit
+            // adds above it — a silent regrouping there would let an unrelated
+            // ->where() upstream turn this into "match everyone with this email".
+            //
+            // Restricted to customer accounts: the Google button only ever appears
+            // on the public login page, never an admin or vendor login screen, so
+            // this lookup should not be able to reach a staff account even if it
+            // happens to share the exact verified mailbox. This same restriction
+            // will matter more the day Facebook login is actually wired up (its
+            // routes exist, its controller methods don't yet) — Facebook does not
+            // guarantee a verified email the way Google does, so email-matching
+            // needs its own look before it is trusted for that provider.
+            $user = User::where(function ($query) use ($provider, $socialUser) {
+                    $query->where('provider', $provider)
+                        ->where('provider_id', $socialUser->getId());
+                })
+                ->orWhere(function ($query) use ($socialUser) {
+                    $query->where('email', $socialUser->getEmail())
+                        ->role('customer');
+                })
+                ->first();
 
             if ($user) {
                 $user->update([
@@ -68,8 +90,13 @@ class SocialAuthController extends Controller
                 $encoded = base64_encode(json_encode($userData));
                 return redirect()->away("mara://login/callback?data=$encoded");
             } else {
-                // Web: normal login and redirect
+                // Web: normal login and redirect. Auth::login() does not itself
+                // rotate the session id — regenerate() here is what stops someone
+                // who planted a session on this browser beforehand (a shared
+                // computer, a fixation link) from inheriting it once the real user
+                // signs in.
                 Auth::login($user, true);
+                session()->regenerate();
                 return redirect('/'); // or redirect()->intended('/')
             }
 

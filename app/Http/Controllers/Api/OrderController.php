@@ -318,6 +318,14 @@ class OrderController extends Controller
             'rate_to_usd' => $order->vendor->currency->rate_to_usd ?? 1,
             'total_paid' => (float) $order->total_paid,
             'total_remaining' => (float) $order->total_remaining,
+            // Money the buyer says they have paid and the vendor has not confirmed
+            // yet. Without this the app cannot tell "not paid" from "paid, waiting
+            // on the vendor" — both read as payment_status 'pending' — so it offers
+            // the payment button again to someone who has already handed over cash,
+            // and they can pay twice. The web has this guard
+            // (Order::declaredAwaitingConfirmation, used by PaiementModal); this is
+            // the same signal, exposed so the app can use it too.
+            'declared_awaiting_confirmation' => (float) $order->declaredAwaitingConfirmation(),
             'shipping_amount' => (float) $order->shipping_amount,
             'currency' => $order->currency?->code ?? $order->vendor?->currency?->code ?? 'USD',
             'vendor_id' => $order->vendor_id,
@@ -363,14 +371,29 @@ class OrderController extends Controller
             }
 
             // Payments
+            //
+            // 'status' used to be paiements.payment_status, which says 'paid' on a
+            // declaration the vendor has not confirmed and that does not count
+            // towards the balance — so the API reported a payment as paid while
+            // reporting the order it belongs to as pending, on the same response.
+            // Only confirmed_at decides whether money actually arrived, so that is
+            // what these fields are derived from now.
+            //
+            // 'paid_at' was created_at: the moment the buyer *said* they paid,
+            // presented as the moment it was paid. It now carries confirmed_at
+            // (null until the vendor confirms), and the declaration time moved to
+            // its own honestly-named field. The Dart model already parses paid_at
+            // as a nullable DateTime, so a null is handled there.
             $formatted['paiements'] = $order->paiements?->map(function ($payment) {
                 return [
                     'id' => $payment->id,
                     'amount' => (float) $payment->amount,
                     'method' => $payment->payment_method,
-                    'status' => $payment->payment_status,
+                    'status' => $payment->isConfirmed() ? 'confirmed' : 'awaiting_confirmation',
+                    'confirmed' => $payment->isConfirmed(),
                     'transaction_id' => $payment->transaction_id,
-                    'paid_at' => $payment->created_at->toDateTimeString()
+                    'declared_at' => $payment->created_at->toDateTimeString(),
+                    'paid_at' => $payment->confirmed_at?->toDateTimeString(),
                 ];
             })->toArray();
 

@@ -1,5 +1,6 @@
 // lib/screens/profile/profile_screen.dart
 
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -556,18 +557,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   // In profile_screen.dart, update the _navigateToEditProfile method:
 
   void _navigateToEditProfile(dynamic user) {
-    print('🔵 Navigating to edit profile with user: ${user?.name}');
-    print('🔵 User ID: ${user?.id}');
-    print('🔵 User roles: ${user?.roles}');
+    logDebug('🔵 Navigating to edit profile with user: ${user?.name}');
+    logDebug('🔵 User ID: ${user?.id}');
+    logDebug('🔵 User roles: ${user?.roles}');
     
     if (user == null) {
-      print('❌ User is null, cannot navigate to edit profile');
+      logDebug('❌ User is null, cannot navigate to edit profile');
       return;
     }
     
     // Pass the user object as extra
     context.push('/edit-profile', extra: user).then((_) {
-      print('🔵 Returning from edit profile screen');
+      logDebug('🔵 Returning from edit profile screen');
       // Refresh user data when returning from edit screen
       context.read<AuthProvider>().refreshUser();
     });

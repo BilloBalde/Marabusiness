@@ -33,7 +33,16 @@ class _SuccessPageState extends State<SuccessPage> {
   double _totalAmount = 0;
   int _orderCount = 0;
   String? _sessionId;
-  final bool _stripePaymentCompleted = false;
+
+  /// Was `final bool _stripePaymentCompleted = false;` — a final field, so it
+  /// could never become true and the "payment confirmed" half of this screen
+  /// (green panel, check icon, confirmation wording) was unreachable code: every
+  /// buyer saw the blue "awaiting" variant, including after a payment that went
+  /// through. Derived from the orders this screen has just loaded instead, so it
+  /// reflects what the server actually says.
+  bool get _paymentCompleted =>
+      _orders.isNotEmpty &&
+      _orders.every((order) => order['payment_status'] == 'paid');
 
   @override
   void initState() {
@@ -294,17 +303,17 @@ class _SuccessPageState extends State<SuccessPage> {
                 margin: const EdgeInsets.all(16),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _stripePaymentCompleted ? Colors.green[50] : Colors.blue[50],
+                  color: _paymentCompleted ? Colors.green[50] : Colors.blue[50],
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _stripePaymentCompleted ? Colors.green[200]! : Colors.blue[200]!,
+                    color: _paymentCompleted ? Colors.green[200]! : Colors.blue[200]!,
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      _stripePaymentCompleted ? Icons.check_circle : Icons.info,
-                      color: _stripePaymentCompleted ? Colors.green : Colors.blue,
+                      _paymentCompleted ? Icons.check_circle : Icons.info,
+                      color: _paymentCompleted ? Colors.green : Colors.blue,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -312,22 +321,22 @@ class _SuccessPageState extends State<SuccessPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _stripePaymentCompleted
+                            _paymentCompleted
                                 ? '✅ Paiement Stripe confirmé !'
                                 : '⏳ Vérification du paiement...',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: _stripePaymentCompleted ? Colors.green[800] : Colors.blue[800],
+                              color: _paymentCompleted ? Colors.green[800] : Colors.blue[800],
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _stripePaymentCompleted
+                            _paymentCompleted
                                 ? 'Votre paiement a été traité avec succès.'
                                 : 'Nous vérifions votre paiement Stripe.',
                             style: TextStyle(
                               fontSize: 12,
-                              color: _stripePaymentCompleted ? Colors.green[600] : Colors.blue[600],
+                              color: _paymentCompleted ? Colors.green[600] : Colors.blue[600],
                             ),
                           ),
                         ],

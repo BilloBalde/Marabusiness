@@ -1,5 +1,6 @@
 // lib/screens/product/product_detail_screen.dart - WISHLIST REMOVED
 
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -1295,7 +1296,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void _initializeVideoPlayer(String videoUrl) {
   // Ensure the URL is properly formatted
   String fullUrl = _getFullImageUrl(videoUrl);
-  print('🎥 Initializing video from: $fullUrl');
+  logDebug('🎥 Initializing video from: $fullUrl');
   
   _videoController = VideoPlayerController.networkUrl(
     Uri.parse(fullUrl),
@@ -1306,9 +1307,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (_isPlayingVideo) {
         _videoController!.play();
       }
-      print('✅ Video initialized successfully');
+      logDebug('✅ Video initialized successfully');
     }).catchError((error) {
-      print('❌ Error initializing video: $error');
+      logDebug('❌ Error initializing video: $error');
       setState(() {
         _isVideoInitialized = true; // Still set to true to show error state
       });
@@ -2008,10 +2009,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final isLoggedIn = authProvider.isAuthenticated;
   final hasReviewed = product.userReview != null;
   // In _buildReviewForm, add this at the beginning:
-  print('🔍 Building review form - isLoggedIn: $isLoggedIn');
-  print('🔍 userReview: ${product.userReview}');
-  print('🔍 hasReviewed: $hasReviewed');
-  print('🔍 isEditingReview: $_isEditingReview');
+  logDebug('🔍 Building review form - isLoggedIn: $isLoggedIn');
+  logDebug('🔍 userReview: ${product.userReview}');
+  logDebug('🔍 hasReviewed: $hasReviewed');
+  logDebug('🔍 isEditingReview: $_isEditingReview');
 
   if (!isLoggedIn) {
     return Container(

@@ -1,5 +1,6 @@
 // lib/core/providers/products_page_provider.dart
 
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/products_page_models.dart';
@@ -110,14 +111,14 @@ class ProductsPageProvider extends ChangeNotifier {
           _currentPage++;
         }
         
-        print('✅ Loaded ${productsResponse.data.products.length} products, page $_currentPage of $_lastPage');
-        print('✅ Total products: ${_products.length}');
+        logDebug('✅ Loaded ${productsResponse.data.products.length} products, page $_currentPage of $_lastPage');
+        logDebug('✅ Total products: ${_products.length}');
       } else {
         _error = response.message ?? 'Failed to load products';
       }
     } catch (e) {
       _error = e.toString();
-      print('🔴 Error loading products: $e');
+      logDebug('🔴 Error loading products: $e');
     }
 
     _isLoading = false;
@@ -127,7 +128,7 @@ class ProductsPageProvider extends ChangeNotifier {
   // Load more products (pagination)
   Future<void> loadMoreProducts() async {
     if (!_hasMorePages || _isLoadingMore || _isLoading) {
-      print('🔵 Cannot load more: hasMorePages=$_hasMorePages, isLoadingMore=$_isLoadingMore, isLoading=$_isLoading');
+      logDebug('🔵 Cannot load more: hasMorePages=$_hasMorePages, isLoadingMore=$_isLoadingMore, isLoading=$_isLoading');
       return;
     }
     
@@ -217,7 +218,7 @@ class ProductsPageProvider extends ChangeNotifier {
   }
 
   void forceReset() {
-    print('🔄 Force resetting ProductsPageProvider');
+    logDebug('🔄 Force resetting ProductsPageProvider');
     _products = [];
     _selectedCategories = [];
     _selectedBrands = [];
@@ -236,7 +237,7 @@ class ProductsPageProvider extends ChangeNotifier {
   }
 /* 
   void resetForHome() {
-  print('🔄 Resetting ProductsPageProvider for home navigation');
+  logDebug('🔄 Resetting ProductsPageProvider for home navigation');
   _selectedCategories = [];
   _selectedBrands = [];
   _featured = false;

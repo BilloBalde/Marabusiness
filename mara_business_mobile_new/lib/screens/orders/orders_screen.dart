@@ -351,6 +351,52 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       return const LoadingWidget(message: 'Chargement des commandes...');
     }
 
+    // OrderProvider sets an error when the request fails, and this screen never
+    // read it — so a 401, a dropped connection or a server fault fell straight
+    // through to the empty state below and told the customer "vous n'avez aucune
+    // commande". Saying someone's order history is empty is a far worse answer
+    // than saying the load failed, especially where those orders are paid in cash
+    // on delivery. "No orders yet" and "we could not load your orders" are two
+    // different things and now look different.
+    if (provider.error != null && orders.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              Text(
+                'Impossible de charger vos commandes',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                provider.error!,
+                style: TextStyle(color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => provider.loadOrders(refresh: true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Réessayer'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (orders.isEmpty) {
       return Center(
         child: Column(

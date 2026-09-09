@@ -1,3 +1,4 @@
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/home_models.dart';
@@ -56,7 +57,7 @@ class SearchProvider extends ChangeNotifier {
       }
     } catch (e) {
       _error = e.toString();
-      print('Search error: $e');
+      logDebug('Search error: $e');
     }
 
     _isLoading = false;

@@ -1,3 +1,4 @@
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/home_models.dart';
@@ -114,7 +115,7 @@ class UnifiedSearchProvider extends ChangeNotifier {
       _error = null;
     } catch (e) {
       _error = e.toString();
-      print('Unified search error: $e');
+      logDebug('Unified search error: $e');
     }
 
     _isLoading = false;

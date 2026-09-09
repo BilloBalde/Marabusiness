@@ -1,3 +1,4 @@
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/brand_models.dart';
@@ -25,27 +26,27 @@ class BrandProvider extends ChangeNotifier {
     try {
       final response = await _apiService.getBrands();
       
-      //print('Brands API Response: ${response.data}'); // Add this line
+      //logDebug('Brands API Response: ${response.data}'); // Add this line
       
       if (response.success && response.data != null) {
         final List<dynamic> data = response.data['data'] ?? response.data;
-        //print('Brands data type: ${data.runtimeType}'); // Add this
-        //print('First brand: ${data.isNotEmpty ? data.first : 'empty'}'); // Add this
+        //logDebug('Brands data type: ${data.runtimeType}'); // Add this
+        //logDebug('First brand: ${data.isNotEmpty ? data.first : 'empty'}'); // Add this
         
         _brands = data.map((e) {
-          //print('Processing brand: $e'); // Add this
+          //logDebug('Processing brand: $e'); // Add this
           return Brand.fromJson(e);
         }).toList();
         
         _filteredBrands = _brands;
-        //print('Brands loaded: ${_brands.length}');
+        //logDebug('Brands loaded: ${_brands.length}');
       } else {
         _error = response.message ?? 'Failed to load brands';
       }
     } catch (e) {
       _error = e.toString();
-      //print('Error loading brands: $e');
-      //print('Stack trace: ${StackTrace.current}'); // Add this
+      //logDebug('Error loading brands: $e');
+      //logDebug('Stack trace: ${StackTrace.current}'); // Add this
     }
 
     _isLoading = false;

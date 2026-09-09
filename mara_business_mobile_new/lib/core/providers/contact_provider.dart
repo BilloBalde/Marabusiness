@@ -1,5 +1,6 @@
 // lib/core/providers/contact_provider.dart
 
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../constants/api_endpoints.dart';
@@ -35,16 +36,16 @@ class ContactProvider extends ChangeNotifier {
         'message': message,
       };
 
-      print('🔵 Submitting contact form to: ${ApiEndpoints.contact}');
-      print('🔵 Data: $data');
+      logDebug('🔵 Submitting contact form to: ${ApiEndpoints.contact}');
+      logDebug('🔵 Data: $data');
       
       final response = await _apiService.post(
         ApiEndpoints.contact, 
         data: data,
       );
 
-      print('🔵 Response success: ${response.success}');
-      print('🔵 Response message: ${response.message}');
+      logDebug('🔵 Response success: ${response.success}');
+      logDebug('🔵 Response message: ${response.message}');
 
       if (response.success) {
         _isLoading = false;
@@ -57,7 +58,7 @@ class ContactProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      print('🔴 Error submitting contact: $e');
+      logDebug('🔴 Error submitting contact: $e');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();

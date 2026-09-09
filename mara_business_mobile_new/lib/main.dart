@@ -63,9 +63,41 @@ import 'widgets/bottom_nav_bar.dart';
 // final AppLinks _appLinks = AppLinks();
 
 // Router configuration
+/// Routes that show or change something belonging to one account. Everything
+/// else stays open to a browsing guest.
+const List<String> _authenticatedOnlyPrefixes = [
+  '/orders',
+  '/addresses',
+  '/checkout',
+  '/edit-profile',
+];
+
 final GoRouter _router = GoRouter(
   initialLocation: '/',
   // Deep links are handled by app_links, not by router redirect.
+  //
+  // There was no guard here at all, and the screens did not compensate:
+  // orders_screen and the addresses screens never check whether anyone is signed
+  // in. A guest reaching /orders — through a deep link, or after a token expired
+  // — got an API 401, which nothing handled, rendered as the empty state:
+  // "you have no orders". Telling a customer their order history is empty is a
+  // worse failure than asking them to sign in.
+  //
+  // /profile is deliberately not listed: that screen already handles a signed-out
+  // visitor properly, showing a sign-in button rather than pretending to be empty.
+  redirect: (context, state) {
+    final location = state.matchedLocation;
+
+    final needsAuth = _authenticatedOnlyPrefixes.any(
+      (prefix) => location == prefix || location.startsWith('$prefix/'),
+    );
+
+    if (!needsAuth || context.read<AuthProvider>().isAuthenticated) {
+      return null;
+    }
+
+    return '/login?redirect=${Uri.encodeComponent(location)}';
+  },
   routes: [
     // ShellRoute for screens with bottom navigation
     ShellRoute(
@@ -374,6 +406,15 @@ void main() async {
     apiService.setToken(token);
   }
   apiService.setCurrency(storageService.getCurrency());
+
+  // A rejected token now ends the session instead of leaving the app in a state
+  // where every request fails silently. Tokens expire after 90 days server-side
+  // (config/sanctum.php), so this path is reachable in normal use, not only when
+  // a token is revoked.
+  apiService.onUnauthorized = () {
+    storageService.clearAuth();
+    _router.go('/login');
+  };
 
   // Set up deep link listeners before runApp
   _setupDeepLinkListeners();

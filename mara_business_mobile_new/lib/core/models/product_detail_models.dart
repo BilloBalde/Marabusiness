@@ -1,4 +1,5 @@
 // lib/core/models/product_detail_models.dart
+import '../../utils/app_logger.dart';
 class SimilarProduct {
   final int id;
   final String name;
@@ -154,10 +155,10 @@ class ProductDetail {
   // In product_detail_models.dart, update the fromJson factory - FOCUS ON LINE 131
 
 factory ProductDetail.fromJson(Map<String, dynamic> json) {
-  print('🔵 Building ProductDetail from JSON');
-  print('🔵 JSON keys: ${json.keys}');
-  print('🔵 has_variations: ${json['has_variations']}');
-  print('🔵 variation_attributes type: ${json['variation_attributes'].runtimeType}');
+  logDebug('🔵 Building ProductDetail from JSON');
+  logDebug('🔵 JSON keys: ${json.keys}');
+  logDebug('🔵 has_variations: ${json['has_variations']}');
+  logDebug('🔵 variation_attributes type: ${json['variation_attributes'].runtimeType}');
   
   // Helper to parse double safely
   double parseDouble(dynamic value) {
@@ -182,7 +183,7 @@ factory ProductDetail.fromJson(Map<String, dynamic> json) {
   Map<String, List<String>> variationAttributes = {};
   if (json['variation_attributes'] != null) {
     final varAttr = json['variation_attributes'];
-    print('🔵 variation_attributes value: $varAttr');
+    logDebug('🔵 variation_attributes value: $varAttr');
     
     if (varAttr is Map) {
       // It's a Map - good!
@@ -193,7 +194,7 @@ factory ProductDetail.fromJson(Map<String, dynamic> json) {
       });
     } else if (varAttr is List) {
       // It's a List (empty probably) - just use empty map
-      print('🔵 variation_attributes is a List (empty product with no variations)');
+      logDebug('🔵 variation_attributes is a List (empty product with no variations)');
       // Keep empty map
     }
   }

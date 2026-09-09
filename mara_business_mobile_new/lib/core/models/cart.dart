@@ -1,5 +1,6 @@
 // lib/core/models/cart.dart - UPDATED with CBM calculation
 
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 
 class CartItem {
@@ -98,7 +99,7 @@ class CartItem {
   }
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
-    print('📦 CartItem.fromJson received keys: ${json.keys}');
+    logDebug('📦 CartItem.fromJson received keys: ${json.keys}');
     
     // Safe extraction of values with proper type checking
     String safeString(dynamic value, String defaultValue) {
@@ -234,7 +235,7 @@ class VendorCart {
   String get formattedTotalCbm => '${totalCbm.toStringAsFixed(4)} m³';
 
   factory VendorCart.fromJson(Map<String, dynamic> json) {
-    print('📦 VendorCart.fromJson received with keys: ${json.keys}');
+    logDebug('📦 VendorCart.fromJson received with keys: ${json.keys}');
     
     // Parse items - they come as a List
     List<CartItem> items = [];
@@ -243,11 +244,11 @@ class VendorCart {
     
     if (json['items'] != null && json['items'] is List) {
       final itemsList = json['items'] as List;
-      print('📦 Parsing ${itemsList.length} items for vendor ${json['vendor_id']}');
+      logDebug('📦 Parsing ${itemsList.length} items for vendor ${json['vendor_id']}');
       
       for (var i = 0; i < itemsList.length; i++) {
         final itemJson = itemsList[i];
-        print('📦 Item $i type: ${itemJson.runtimeType}');
+        logDebug('📦 Item $i type: ${itemJson.runtimeType}');
         
         if (itemJson is Map<String, dynamic>) {
           try {
@@ -257,20 +258,20 @@ class VendorCart {
             if (i == 0) {
               vendorCurrency = cartItem.currency;
             }
-            print('📦 Successfully parsed item ${i+1}: ${cartItem.productName}');
+            logDebug('📦 Successfully parsed item ${i+1}: ${cartItem.productName}');
           } catch (e) {
-            print('❌ Error parsing item $i: $e');
-            print('❌ Item data: $itemJson');
+            logDebug('❌ Error parsing item $i: $e');
+            logDebug('❌ Item data: $itemJson');
           }
         } else {
-          print('❌ Item $i is not a Map: ${itemJson.runtimeType}');
+          logDebug('❌ Item $i is not a Map: ${itemJson.runtimeType}');
         }
       }
     }
 
     // If we have items but none were parsed successfully
     if (json['items'] != null && (json['items'] as List).isNotEmpty && items.isEmpty) {
-      print('⚠️ No items parsed successfully for vendor ${json['vendor_id']}');
+      logDebug('⚠️ No items parsed successfully for vendor ${json['vendor_id']}');
     }
 
     final vendor = VendorCart(
@@ -283,7 +284,7 @@ class VendorCart {
       currency: vendorCurrency,
     );
     
-    print('📦 Created vendor: ${vendor.vendorName} with ${vendor.items.length} items');
+    logDebug('📦 Created vendor: ${vendor.vendorName} with ${vendor.items.length} items');
     return vendor;
   }
 

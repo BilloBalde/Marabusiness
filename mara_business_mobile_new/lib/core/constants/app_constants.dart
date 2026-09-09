@@ -1,21 +1,28 @@
 class AppConstants {
   static const String appName = 'MARA BUSINESS';
   
-  // IMPORTANT: Change this to your local IP address
-  // If using Android emulator: use 10.0.2.2
-  // If using iOS simulator: use localhost or 127.0.0.1
-  // If using real device: use your computer's IP address (e.g., 192.168.1.100)
-  //static const String baseUrl = 'http://localhost:8000'; // For Local emulator
-  static const String baseUrl = 'https://afrobridgeinnov.com';
-  //static const String baseUrl = 'http://10.0.2.2:8000'; // Android emulator
-  //static const String baseUrl = 'http://192.168.0.148:8000'; // Android emulator
-  
-  // For iOS simulator, use:
-  //static const String baseUrl = 'http://127.0.0.1:8000';
-  
-  // For real device on same network, use your computer's IP:
-  //static const String baseUrl = 'http://192.168.10.87:8000';
-  
+  /// Set at build time, production by default.
+  ///
+  /// This used to be six `baseUrl` lines stacked on top of each other with five
+  /// commented out, so switching environments meant editing source and
+  /// remembering to put it back. A build shipped with the wrong line uncommented
+  /// points the whole app at a localhost that no phone can reach — and nothing
+  /// in the code or the review would show it.
+  ///
+  /// Override per build instead of editing this file:
+  ///
+  ///   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000   # Android emulator
+  ///   flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000  # iOS simulator
+  ///   flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8000  # real device
+  ///
+  /// With no --dart-define, this is production, which is what a release build
+  /// should be without anyone having to remember anything.
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://afrobridgeinnov.com',
+  );
+
+
   // API Version
   static const String apiVersion = '/api/v1';
   

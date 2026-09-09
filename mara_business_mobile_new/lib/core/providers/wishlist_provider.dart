@@ -1,3 +1,4 @@
+import '../../utils/app_logger.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
@@ -31,7 +32,7 @@ class WishlistProvider extends ChangeNotifier {
         _items = List<Map<String, dynamic>>.from(json.decode(wishlistJson));
         _totalCount = _items.length;
       } catch (e) {
-        print('Error loading wishlist from storage: $e');
+        logDebug('Error loading wishlist from storage: $e');
       }
     }
     notifyListeners();
@@ -100,11 +101,11 @@ Future<bool> addToWishlist(
     );
     
     // DEBUG: Print the actual response from your API
-    //print('🔵 ADD TO WISHLIST RESPONSE:');
-    //print('🔵 Success: ${response.success}');
-    //print('🔵 Message: ${response.message}');
-    //print('🔵 Data: ${response.data}');
-    //print('🔵 Data type: ${response.data.runtimeType}');
+    //logDebug('🔵 ADD TO WISHLIST RESPONSE:');
+    //logDebug('🔵 Success: ${response.success}');
+    //logDebug('🔵 Message: ${response.message}');
+    //logDebug('🔵 Data: ${response.data}');
+    //logDebug('🔵 Data type: ${response.data.runtimeType}');
     
     if (response.success) {
       // Don't rely on response data, just refresh the whole wishlist
@@ -120,7 +121,7 @@ Future<bool> addToWishlist(
       return false;
     }
   } catch (e) {
-    print('🔴 Error adding to wishlist: $e');
+    logDebug('🔴 Error adding to wishlist: $e');
     _error = e.toString();
     _isLoading = false;
     notifyListeners();
@@ -206,7 +207,7 @@ Future<bool> addToWishlist(
   try {
     final response = await _apiService.getWishlist();
     
-    //print('🔵 WISHLIST RESPONSE: ${response.data}');
+    //logDebug('🔵 WISHLIST RESPONSE: ${response.data}');
     
     if (response.success && response.data != null) {
       final responseData = response.data;
@@ -222,7 +223,7 @@ Future<bool> addToWishlist(
         }
       }
       
-      //print('🔵 Items count: ${items.length}');
+      //logDebug('🔵 Items count: ${items.length}');
       
       _items = items.map((item) {
         if (item is! Map<String, dynamic>) {
@@ -250,7 +251,7 @@ Future<bool> addToWishlist(
       await _saveWishlistToStorage();
     }
   } catch (e) {
-    print('🔴 Error refreshing wishlist: $e');
+    logDebug('🔴 Error refreshing wishlist: $e');
     _error = e.toString();
   }
 

@@ -1,4 +1,5 @@
 // lib/core/models/products_page_models.dart
+import '../../utils/app_logger.dart';
 
 class ProductsPageResponse {
   final bool success;
@@ -100,11 +101,11 @@ class ProductsPageProduct {
   });
 
   factory ProductsPageProduct.fromJson(Map<String, dynamic> json) {
-    print('🔵 PRODUCTS PAGE PRODUCT: ${json['name']}');
-    print('🔵 PRODUCTS PAGE KEYS: ${json.keys}');
-    print('🔵 PRODUCTS PAGE - display_price: ${json['display_price']}');
-    print('🔵 PRODUCTS PAGE - min_price: ${json['min_price']}');
-    print('🔵 PRODUCTS PAGE - max_price: ${json['max_price']}');
+    logDebug('🔵 PRODUCTS PAGE PRODUCT: ${json['name']}');
+    logDebug('🔵 PRODUCTS PAGE KEYS: ${json.keys}');
+    logDebug('🔵 PRODUCTS PAGE - display_price: ${json['display_price']}');
+    logDebug('🔵 PRODUCTS PAGE - min_price: ${json['min_price']}');
+    logDebug('🔵 PRODUCTS PAGE - max_price: ${json['max_price']}');
     // Helper function to convert dynamic to double safely
     double toDouble(dynamic value) {
       if (value == null) return 0.0;

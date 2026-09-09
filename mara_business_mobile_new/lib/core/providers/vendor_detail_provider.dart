@@ -1,3 +1,4 @@
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/vendor_models.dart';
@@ -77,7 +78,7 @@ class VendorDetailProvider extends ChangeNotifier {
       _minPrice = minPrice;
       _maxPrice = maxPrice;
 
-      print('🔵 Loading vendor data for slug: $slug');
+      logDebug('🔵 Loading vendor data for slug: $slug');
       
       final response = await _apiService.getVendorDetail(slug, {
         'sort_by': sortBy,
@@ -86,75 +87,75 @@ class VendorDetailProvider extends ChangeNotifier {
         if (maxPrice < 1000000) 'max_price': maxPrice,
       });
 
-      print('🔵 Response status: ${response.success}');
-      print('🔵 Response data: ${response.data}');
+      logDebug('🔵 Response status: ${response.success}');
+      logDebug('🔵 Response data: ${response.data}');
 
       if (response.success && response.data != null) {
         final data = response.data['data'] ?? response.data;
-        print('🔵 Data after extraction: $data');
+        logDebug('🔵 Data after extraction: $data');
         
         _vendor = ExtendedVendor.fromJson(data['vendor'] ?? data);
         
         // Handle products
         if (data['products'] != null) {
-          print('🔵 Products structure: ${data['products']}');
+          logDebug('🔵 Products structure: ${data['products']}');
           
           if (data['products'] is Map && data['products']['data'] != null) {
             final productsData = data['products']['data'];
             if (productsData is List) {
               _products = productsData.map((e) {
-                print('🔵 Product JSON: $e');
+                logDebug('🔵 Product JSON: $e');
                 return VendorProduct.fromJson(e);
               }).toList();
             }
           } else if (data['products'] is List) {
             _products = (data['products'] as List).map((e) {
-              print('🔵 Product JSON: $e');
+              logDebug('🔵 Product JSON: $e');
               return VendorProduct.fromJson(e);
             }).toList();
           }
           
-          print('🔵 Products loaded: ${_products.length}');
+          logDebug('🔵 Products loaded: ${_products.length}');
         }
 
         // Handle reviews
         if (data['reviews'] != null) {
-          print('🔵 REVIEWS DATA FOUND: ${data['reviews']}');
+          logDebug('🔵 REVIEWS DATA FOUND: ${data['reviews']}');
           
           if (data['reviews'] is Map && data['reviews']['data'] != null) {
-            print('🔵 REVIEWS IS PAGINATED WITH ${(data['reviews']['data'] as List).length} items');
+            logDebug('🔵 REVIEWS IS PAGINATED WITH ${(data['reviews']['data'] as List).length} items');
             final reviewsData = data['reviews']['data'];
             if (reviewsData is List) {
               _reviews = reviewsData.map((e) {
-                print('🔵 PARSING REVIEW: $e');
+                logDebug('🔵 PARSING REVIEW: $e');
                 return VendorReview.fromJson(e);
               }).toList();
             }
           } else if (data['reviews'] is List) {
-            print('🔵 REVIEWS IS LIST WITH ${(data['reviews'] as List).length} items');
+            logDebug('🔵 REVIEWS IS LIST WITH ${(data['reviews'] as List).length} items');
             _reviews = (data['reviews'] as List).map((e) {
-              print('🔵 PARSING REVIEW: $e');
+              logDebug('🔵 PARSING REVIEW: $e');
               return VendorReview.fromJson(e);
             }).toList();
           }
-          print('✅ FINAL REVIEWS COUNT: ${_reviews.length}');
+          logDebug('✅ FINAL REVIEWS COUNT: ${_reviews.length}');
         }
         
         // CRITICAL: Save follow status
         _isFollowing = data['is_following'] ?? false;
-        print('🔵 FOLLOW STATUS FROM API: $_isFollowing');
+        logDebug('🔵 FOLLOW STATUS FROM API: $_isFollowing');
         
         // Handle user review
         if (data['user_review'] != null) {
           try {
             _userReview = VendorReview.fromJson(data['user_review']);
-            print('✅ User review parsed: ${_userReview?.id}');
+            logDebug('✅ User review parsed: ${_userReview?.id}');
           } catch (e) {
-            print('❌ Error parsing user review: $e');
+            logDebug('❌ Error parsing user review: $e');
             _userReview = null;
           }
         } else {
-          print('🔵 No user review in response');
+          logDebug('🔵 No user review in response');
           _userReview = null;
         }
         
@@ -169,15 +170,15 @@ class VendorDetailProvider extends ChangeNotifier {
           _reviewsLastPage = data['reviews']['last_page'] ?? 1;
         }
 
-        print('✅ Vendor data loaded successfully');
+        logDebug('✅ Vendor data loaded successfully');
       } else {
         _error = response.message ?? 'Failed to load vendor data';
-        print('❌ Error: $_error');
+        logDebug('❌ Error: $_error');
       }
     } catch (e, stackTrace) {
       _error = e.toString();
-      print('❌ Error loading vendor data: $e');
-      print('❌ Stack trace: $stackTrace');
+      logDebug('❌ Error loading vendor data: $e');
+      logDebug('❌ Stack trace: $stackTrace');
     }
 
     _isLoading = false;
@@ -219,7 +220,7 @@ class VendorDetailProvider extends ChangeNotifier {
         _productsLastPage = data['data']?['last_page'] ?? _productsLastPage;
       }
     } catch (e) {
-      print('Error loading more products: $e');
+      logDebug('Error loading more products: $e');
     }
 
     _isLoadingMoreProducts = false;
@@ -250,7 +251,7 @@ class VendorDetailProvider extends ChangeNotifier {
         _reviewsLastPage = data['data']?['last_page'] ?? _reviewsLastPage;
       }
     } catch (e) {
-      print('Error loading more reviews: $e');
+      logDebug('Error loading more reviews: $e');
     }
 
     _isLoadingMoreReviews = false;
@@ -262,17 +263,17 @@ class VendorDetailProvider extends ChangeNotifier {
   Future<void> toggleFollow() async {
   if (_vendor == null) return;
 
-  print('🔐 TOGGLE FOLLOW DEBUG');
-  print('🔐 Vendor ID: ${_vendor!.id}');
-  print('🔐 Current follow status: $_isFollowing');
+  logDebug('🔐 TOGGLE FOLLOW DEBUG');
+  logDebug('🔐 Vendor ID: ${_vendor!.id}');
+  logDebug('🔐 Current follow status: $_isFollowing');
 
   try {
-    print('🔐 Making API call to toggle follow...');
+    logDebug('🔐 Making API call to toggle follow...');
     final response = await _apiService.toggleFollowVendor(_vendor!.id);
     
-    print('🔐 Response success: ${response.success}');
-    print('🔐 Response message: ${response.message}');
-    print('🔐 Response data: ${response.data}');
+    logDebug('🔐 Response success: ${response.success}');
+    logDebug('🔐 Response message: ${response.message}');
+    logDebug('🔐 Response data: ${response.data}');
     
     if (response.success) {
       // Toggle the follow status
@@ -324,15 +325,15 @@ class VendorDetailProvider extends ChangeNotifier {
         );
       }
       
-      print('🔐 New follow status: $_isFollowing');
-      print('🔐 New followers count: ${_vendor?.followersCount}');
+      logDebug('🔐 New follow status: $_isFollowing');
+      logDebug('🔐 New followers count: ${_vendor?.followersCount}');
       
       notifyListeners();
     } else if (response.message?.contains('Unauthenticated') ?? false) {
-      print('🔐 Server says unauthenticated - token might be invalid/expired');
+      logDebug('🔐 Server says unauthenticated - token might be invalid/expired');
     }
   } catch (e) {
-    print('🔐 Error toggling follow: $e');
+    logDebug('🔐 Error toggling follow: $e');
   }
 }
   // Submit review
@@ -351,12 +352,12 @@ class VendorDetailProvider extends ChangeNotifier {
         await loadVendorData(_vendor!.slug);
         return true;
       } else if (response.message?.contains('Unauthenticated') ?? false) {
-        print('User not authenticated for review submission');
+        logDebug('User not authenticated for review submission');
         return false;
       }
       return false;
     } catch (e) {
-      print('Error submitting review: $e');
+      logDebug('Error submitting review: $e');
       return false;
     }
   }
@@ -374,12 +375,12 @@ class VendorDetailProvider extends ChangeNotifier {
         await loadVendorData(_vendor!.slug);
         return true;
       } else if (response.message?.contains('Unauthenticated') ?? false) {
-        print('User not authenticated for review deletion');
+        logDebug('User not authenticated for review deletion');
         return false;
       }
       return false;
     } catch (e) {
-      print('Error deleting review: $e');
+      logDebug('Error deleting review: $e');
       return false;
     }
   }

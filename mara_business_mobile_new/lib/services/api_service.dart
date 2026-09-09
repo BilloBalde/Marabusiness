@@ -1,4 +1,6 @@
+import '../utils/app_logger.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../core/models/api_response.dart';
 import '../core/constants/api_endpoints.dart';
 import 'dart:io';
@@ -8,6 +10,13 @@ class ApiService {
   final String baseUrl;
   String? _token;
   String _currency = 'USD';
+
+  /// Called when the server rejects the token (401). Nothing used to happen on a
+  /// 401 at all: the error was printed and passed along, so an expired or revoked
+  /// token left the app showing generic failures forever with no way back to the
+  /// sign-in screen — and, because most screens ignore provider errors, those
+  /// failures surfaced as empty lists ("you have no orders"). Wired in main.dart.
+  void Function()? onUnauthorized;
 
   ApiService({required this.baseUrl}) {
   _dio = Dio(BaseOptions(
@@ -33,24 +42,34 @@ class ApiService {
       }
       options.headers['Currency'] = _currency;
       
-      //print('🌐 REQUEST: ${options.method} ${options.path}');
-      //print('📤 HEADERS: ${options.headers}');
-      //print('📦 DATA: ${options.data}');
-      //print('📦 EXTRA: ${options.extra}'); // Add this to debug
+      //logDebug('🌐 REQUEST: ${options.method} ${options.path}');
+      //logDebug('📤 HEADERS: ${options.headers}');
+      //logDebug('📦 DATA: ${options.data}');
+      //logDebug('📦 EXTRA: ${options.extra}'); // Add this to debug
       
       return handler.next(options);
     },
     onResponse: (response, handler) {
-      //print('📥 RESPONSE: ${response.statusCode}');
-      //print('📥 RESPONSE HEADERS: ${response.headers}'); // Add this to see cookies
-      //print('📥 RESPONSE DATA: ${response.data}');
+      //logDebug('📥 RESPONSE: ${response.statusCode}');
+      //logDebug('📥 RESPONSE HEADERS: ${response.headers}'); // Add this to see cookies
+      //logDebug('📥 RESPONSE DATA: ${response.data}');
       return handler.next(response);
     },
     onError: (error, handler) {
-      print('❌ ERROR: ${error.message}');
+      // These were print(), which reaches the device log in release builds too,
+      // and the body of a failed response can carry account data — the mobile
+      // counterpart of the DHL credentials that were being logged server-side.
+      // logDebug() compiles away entirely outside debug builds.
+      logDebug('❌ ERROR: ${error.message}');
       if (error.response != null) {
-        print('❌ RESPONSE DATA: ${error.response?.data}');
+        logDebug('❌ RESPONSE DATA: ${error.response?.data}');
       }
+
+      if (error.response?.statusCode == 401) {
+        _token = null;
+        onUnauthorized?.call();
+      }
+
       return handler.next(error);
     },
   ));
@@ -198,21 +217,21 @@ Future<ApiResponse> getBrandDetail(int id) async {
 
 Future<ApiResponse> post(String endpoint, {Map<String, dynamic>? data}) async {
   try {
-    print('🔵 POST request to: $endpoint');
-    print('🔵 Data: $data');
+    logDebug('🔵 POST request to: $endpoint');
+    logDebug('🔵 Data: $data');
     
     final response = await _dio.post(
       endpoint,
       data: data,
     );
     
-    print('🔵 Response status: ${response.statusCode}');
-    print('🔵 Response data: ${response.data}');
+    logDebug('🔵 Response status: ${response.statusCode}');
+    logDebug('🔵 Response data: ${response.data}');
     
     return _handleResponse(response);
   } on DioException catch (e) {
-    print('🔴 POST error: ${e.message}');
-    print('🔴 Response: ${e.response?.data}');
+    logDebug('🔴 POST error: ${e.message}');
+    logDebug('🔴 Response: ${e.response?.data}');
     return _handleError(e);
   }
 }
@@ -281,7 +300,7 @@ Future<ApiResponse> post(String endpoint, {Map<String, dynamic>? data}) async {
   /* Future<ApiResponse> getHomeData() async {
     try {
       final url = ApiEndpoints.home;
-      //print('Requesting URL: $url');
+      //logDebug('Requesting URL: $url');
       final response = await _dio.get(
         url,
         options: Options(
@@ -289,8 +308,8 @@ Future<ApiResponse> post(String endpoint, {Map<String, dynamic>? data}) async {
         )
       );
 
-      //print('Raw API Response from Service: ${response.data}');
-      //print('Response Status Code: ${response.statusCode}');
+      //logDebug('Raw API Response from Service: ${response.data}');
+      //logDebug('Response Status Code: ${response.statusCode}');
       
       // Since the API returns data directly, we wrap it in our ApiResponse
       return ApiResponse(
@@ -299,11 +318,11 @@ Future<ApiResponse> post(String endpoint, {Map<String, dynamic>? data}) async {
         data: response.data,
       );
     } on DioException catch (e) {
-      //print('Error in request: ${e.message}');
-      //print('Error details: ${e.response?.data}');
-      print('❌ FULL ERROR: ${e.message}');
-      print('❌ ERROR TYPE: ${e.type}');
-      print('❌ RESPONSE: ${e.response?.data}');
+      //logDebug('Error in request: ${e.message}');
+      //logDebug('Error details: ${e.response?.data}');
+      logDebug('❌ FULL ERROR: ${e.message}');
+      logDebug('❌ ERROR TYPE: ${e.type}');
+      logDebug('❌ RESPONSE: ${e.response?.data}');
       return _handleError(e);
     }
   }
@@ -312,8 +331,8 @@ Future<ApiResponse> post(String endpoint, {Map<String, dynamic>? data}) async {
   try {
     final response = await _dio.get(ApiEndpoints.home);
     // Log the type and a preview (useful for debugging)
-    print('📦 Home response type: ${response.data.runtimeType}');
-    print('📦 Home response preview: ${response.data.toString().substring(0, 200)}');
+    logDebug('📦 Home response type: ${response.data.runtimeType}');
+    logDebug('📦 Home response preview: ${response.data.toString().substring(0, 200)}');
     return _handleResponse(response);
   } on DioException catch (e) {
     return _handleError(e);
@@ -490,15 +509,15 @@ Future<ApiResponse> getVendorReviews(int vendorId, [Map<String, dynamic>? params
 
 Future<ApiResponse> toggleFollowVendor(int vendorId) async {
   try {
-    print('🔐 TOGGLE FOLLOW API CALL');
-    print('🔐 URL: ${ApiEndpoints.toggleFollowVendor(vendorId)}');
-    print('🔐 Token present: ${_token != null}');
-    print('🔐 Headers: ${_dio.options.headers}');
+    logDebug('🔐 TOGGLE FOLLOW API CALL');
+    logDebug('🔐 URL: ${ApiEndpoints.toggleFollowVendor(vendorId)}');
+    logDebug('🔐 Token present: ${_token != null}');
+    logDebug('🔐 Headers: ${_dio.options.headers}');
     
     final response = await _dio.post(ApiEndpoints.toggleFollowVendor(vendorId));
     
-    print('🔐 Response status: ${response.statusCode}');
-    print('🔐 Response data: ${response.data}');
+    logDebug('🔐 Response status: ${response.statusCode}');
+    logDebug('🔐 Response data: ${response.data}');
     
     return ApiResponse(
       success: true,
@@ -506,9 +525,9 @@ Future<ApiResponse> toggleFollowVendor(int vendorId) async {
       data: response.data,
     );
   } on DioException catch (e) {
-    print('🔐 DioError: ${e.message}');
-    print('🔐 Response: ${e.response?.data}');
-    print('🔐 Status code: ${e.response?.statusCode}');
+    logDebug('🔐 DioError: ${e.message}');
+    logDebug('🔐 Response: ${e.response?.data}');
+    logDebug('🔐 Status code: ${e.response?.statusCode}');
     return _handleError(e);
   }
 }
@@ -612,8 +631,8 @@ Future<ApiResponse> deleteVendorReview(int vendorId) async {
 
 Future<ApiResponse> createPaymentSession(int orderId, String paymentMethod) async {
   try {
-    print('🔵 Creating payment session - Order: $orderId, Method: $paymentMethod');
-    print('🔵 Token present: ${_token != null}');
+    logDebug('🔵 Creating payment session - Order: $orderId, Method: $paymentMethod');
+    logDebug('🔵 Token present: ${_token != null}');
     
     final response = await _dio.post(
       '${ApiEndpoints.baseUrl}/orders/$orderId/payment/session',
@@ -623,14 +642,14 @@ Future<ApiResponse> createPaymentSession(int orderId, String paymentMethod) asyn
       },
     );
     
-    print('🔵 Response status: ${response.statusCode}');
-    print('🔵 Response data: ${response.data}');
+    logDebug('🔵 Response status: ${response.statusCode}');
+    logDebug('🔵 Response data: ${response.data}');
     
     return _handleResponse(response);
   } on DioException catch (e) {
-    print('🔴 Error creating payment session: ${e.message}');
-    print('🔴 Response data: ${e.response?.data}');
-    print('🔴 Status code: ${e.response?.statusCode}');
+    logDebug('🔴 Error creating payment session: ${e.message}');
+    logDebug('🔴 Response data: ${e.response?.data}');
+    logDebug('🔴 Status code: ${e.response?.statusCode}');
     return _handleError(e);
   }
 }
@@ -665,18 +684,18 @@ Future<ApiResponse> submitOfflinePayment({
   Future<ApiResponse> getProduct(String slug, int vendorProductId) async {
     try {
       final url = ApiEndpoints.productDetail(slug, vendorProductId);
-      print('🔵🔵🔵 FULL API URL: $url');
-      print('🔵🔵🔵 Token being sent: ${_token != null ? 'Yes (length: ${_token!.length})' : 'No'}');
+      logDebug('🔵🔵🔵 FULL API URL: $url');
+      logDebug('🔵🔵🔵 Token being sent: ${_token != null ? 'Yes (length: ${_token!.length})' : 'No'}');
       
       final response = await _dio.get(url);
       
-      print('🔵 Response status: ${response.statusCode}');
-      print('🔵 Response data type: ${response.data.runtimeType}');
-      print('🔵 Response data: ${response.data}');
+      logDebug('🔵 Response status: ${response.statusCode}');
+      logDebug('🔵 Response data type: ${response.data.runtimeType}');
+      logDebug('🔵 Response data: ${response.data}');
       
       // If the response is a List, wrap it in a Map structure
       if (response.data is List) {
-        print('🔵 Response is a list, wrapping in data object');
+        logDebug('🔵 Response is a list, wrapping in data object');
         return ApiResponse(
           success: true,
           message: 'Success',
@@ -693,9 +712,9 @@ Future<ApiResponse> submitOfflinePayment({
         data: response.data,
       );
     } on DioException catch (e) {
-      print('🔴 DioError: ${e.message}');
-      print('🔴 Response status: ${e.response?.statusCode}');
-      print('🔴 Response data: ${e.response?.data}');
+      logDebug('🔴 DioError: ${e.message}');
+      logDebug('🔴 Response status: ${e.response?.statusCode}');
+      logDebug('🔴 Response data: ${e.response?.data}');
       return _handleError(e);
     }
   }
@@ -703,20 +722,20 @@ Future<ApiResponse> submitOfflinePayment({
 
 Future<ApiResponse> getSuccessPageOrders() async {
   try {
-    print('🔵 Fetching success page orders');
-    print('🔵 Token present: ${_token != null}');
+    logDebug('🔵 Fetching success page orders');
+    logDebug('🔵 Token present: ${_token != null}');
     
     final response = await _dio.get(
       '${ApiEndpoints.baseUrl}/success/orders',
     );
     
-    print('🔵 Response status: ${response.statusCode}');
-    print('🔵 Response data: ${response.data}');
+    logDebug('🔵 Response status: ${response.statusCode}');
+    logDebug('🔵 Response data: ${response.data}');
     
     return _handleResponse(response);
   } on DioException catch (e) {
-    print('🔴 Error fetching success page orders: ${e.message}');
-    print('🔴 Response data: ${e.response?.data}');
+    logDebug('🔴 Error fetching success page orders: ${e.message}');
+    logDebug('🔴 Response data: ${e.response?.data}');
     return _handleError(e);
   }
 }
@@ -729,28 +748,28 @@ Future<ApiResponse> getSuccessPageOrders() async {
 
   Future<ApiResponse> getUserProfile() async {
   try {
-    print('🔵 Getting user profile - Token: ${_token != null ? 'Present' : 'Missing'}');
+    logDebug('🔵 Getting user profile - Token: ${_token != null ? 'Present' : 'Missing'}');
     
     // Use the endpoint from ApiEndpoints
     final url = ApiEndpoints.editProfile;
-    print('🔵 Full URL: $url'); // This will show the correct URL
+    logDebug('🔵 Full URL: $url'); // This will show the correct URL
     
     final response = await _dio.get(url);
-    print('🔵 Response status: ${response.statusCode}');
-    print('🔵 Response data: ${response.data}');
+    logDebug('🔵 Response status: ${response.statusCode}');
+    logDebug('🔵 Response data: ${response.data}');
     
     return _handleResponse(response);
   } on DioException catch (e) {
-    print('🔴 Error: ${e.message}');
-    print('🔴 Response: ${e.response?.data}');
+    logDebug('🔴 Error: ${e.message}');
+    logDebug('🔴 Response: ${e.response?.data}');
     return _handleError(e);
   }
 }
 
 Future<ApiResponse> updateProfile(Map<String, dynamic> data) async {
   try {
-    print('🔵 Updating profile - URL: ${ApiEndpoints.updateProfile}');
-    print('🔵 Data: $data');
+    logDebug('🔵 Updating profile - URL: ${ApiEndpoints.updateProfile}');
+    logDebug('🔵 Data: $data');
     
     final response = await _dio.put(ApiEndpoints.updateProfile, data: data);
     return _handleResponse(response);
@@ -760,14 +779,14 @@ Future<ApiResponse> updateProfile(Map<String, dynamic> data) async {
 }
   Future<ApiResponse> getCart() async {
   try {
-    print('🔵 Fetching cart from: ${ApiEndpoints.cart}');
-    print('🔵 Auth token present: ${_token != null}');
+    logDebug('🔵 Fetching cart from: ${ApiEndpoints.cart}');
+    logDebug('🔵 Auth token present: ${_token != null}');
     
     final response = await _dio.get(ApiEndpoints.cart);
     
-    print('🔵 Cart response status: ${response.statusCode}');
-    print('🔵 Cart response type: ${response.data.runtimeType}');
-    print('🔵 Cart response data: ${response.data}');
+    logDebug('🔵 Cart response status: ${response.statusCode}');
+    logDebug('🔵 Cart response type: ${response.data.runtimeType}');
+    logDebug('🔵 Cart response data: ${response.data}');
     
     if (response.data is Map) {
       final data = response.data as Map<String, dynamic>;
@@ -794,8 +813,8 @@ Future<ApiResponse> updateProfile(Map<String, dynamic> data) async {
       data: response.data,
     );
   } on DioException catch (e) {
-    print('🔴 Cart error: ${e.message}');
-    print('🔴 Response: ${e.response?.data}');
+    logDebug('🔴 Cart error: ${e.message}');
+    logDebug('🔴 Response: ${e.response?.data}');
     return _handleError(e);
   }
 }
@@ -945,17 +964,17 @@ Future<ApiResponse> updateProfile(Map<String, dynamic> data) async {
         data['selected_attributes'] = selectedAttributes;
       }
       
-      //print('🔵 Making request to: ${ApiEndpoints.wishlistAdd(vendorProductId)}');
-      //print('🔵 Request data: $data');
-      //print('🔵 Headers: ${_dio.options.headers}');
+      //logDebug('🔵 Making request to: ${ApiEndpoints.wishlistAdd(vendorProductId)}');
+      //logDebug('🔵 Request data: $data');
+      //logDebug('🔵 Headers: ${_dio.options.headers}');
       
       final response = await _dio.post(
         ApiEndpoints.wishlistAdd(vendorProductId),
         data: data,
       );
       
-      //print('🔵 Response status: ${response.statusCode}');
-      //print('🔵 Response data: ${response.data}');
+      //logDebug('🔵 Response status: ${response.statusCode}');
+      //logDebug('🔵 Response data: ${response.data}');
       
       return ApiResponse(
         success: true,
@@ -963,10 +982,10 @@ Future<ApiResponse> updateProfile(Map<String, dynamic> data) async {
         data: response.data,
       );
     } on DioException catch (e) {
-      print('🔴 DioError: ${e.message}');
-      print('🔴 Response status: ${e.response?.statusCode}');
-      print('🔴 Response data: ${e.response?.data}');
-      print('🔴 Error type: ${e.type}');
+      logDebug('🔴 DioError: ${e.message}');
+      logDebug('🔴 Response status: ${e.response?.statusCode}');
+      logDebug('🔴 Response data: ${e.response?.data}');
+      logDebug('🔴 Error type: ${e.type}');
       return _handleError(e);
     }
   }
@@ -1070,14 +1089,14 @@ Future<ApiResponse> moveWishlistToCart(List<String> wishlistKeys) async {
       };
       if (search != null && search.isNotEmpty) {
         queryParams['search'] = search;
-        print('🔍 API - Adding search parameter: $search');
+        logDebug('🔍 API - Adding search parameter: $search');
       }
       if (status != null && status.isNotEmpty && status != 'all') {
         queryParams['status'] = status;
-        print('🔍 API - Adding status parameter: $status');
+        logDebug('🔍 API - Adding status parameter: $status');
       }
       
-      print('🔍 API - Full query params: $queryParams');
+      logDebug('🔍 API - Full query params: $queryParams');
       final response = await _dio.get(
         ApiEndpoints.orders,
         queryParameters: queryParams,
@@ -1259,7 +1278,7 @@ Future<ApiResponse> getProductsPage({
       queryParams['search'] = search;
     }
     
-    print('🔵 Fetching products page with params: $queryParams');
+    logDebug('🔵 Fetching products page with params: $queryParams');
     
     final response = await _dio.get(
       ApiEndpoints.productsPage,
@@ -1272,7 +1291,7 @@ Future<ApiResponse> getProductsPage({
       data: response.data,
     );
   } on DioException catch (e) {
-    print('🔴 Error fetching products page: $e');
+    logDebug('🔴 Error fetching products page: $e');
     return _handleError(e);
   }
 }

@@ -1,3 +1,4 @@
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/home_models.dart';
@@ -60,7 +61,7 @@ Future<void> loadHomeData() async {
       _error = 'API returned unexpected format: $dataType.\n'
                'Expected Map<String, dynamic> but got $dataType.\n'
                'Preview: $preview';
-      print('❌ Invalid data type: $rawData');
+      logDebug('❌ Invalid data type: $rawData');
       _isLoading = false;
       notifyListeners();
       return;
@@ -78,12 +79,12 @@ Future<void> loadHomeData() async {
 
     // Parse home data
     _homeData = HomeData.fromJson(data);
-    print('✅ Home data loaded: featured=${_homeData?.featuredProducts.length}, '
+    logDebug('✅ Home data loaded: featured=${_homeData?.featuredProducts.length}, '
           'categories=${_homeData?.categories.length}');
 
   } catch (e) {
     _error = e.toString();
-    print('❌ Exception: $e');
+    logDebug('❌ Exception: $e');
   }
 
   _isLoading = false;

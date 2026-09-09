@@ -1,5 +1,6 @@
 // lib/core/providers/cart_provider.dart - UPDATED
 
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/cart.dart';
@@ -37,15 +38,15 @@ Future<void> loadCart() async {
   notifyListeners();
 
   try {
-    print('🔄 Loading cart from database...');
+    logDebug('🔄 Loading cart from database...');
     final response = await _apiService.getCart();
     
-    print('📦 Cart response success: ${response.success}');
+    logDebug('📦 Cart response success: ${response.success}');
     
     if (response.success && response.data != null) {
       final data = response.data;
-      print('📦 Cart data type: ${data.runtimeType}');
-      print('📦 Cart data keys: ${data.keys}');
+      logDebug('📦 Cart data type: ${data.runtimeType}');
+      logDebug('📦 Cart data keys: ${data.keys}');
       
       // Clear previous data
       _items = [];
@@ -57,16 +58,16 @@ Future<void> loadCart() async {
         
         if (cartData.containsKey('vendors') && cartData['vendors'] is List) {
           final vendorsData = cartData['vendors'] as List;
-          print('📦 Found ${vendorsData.length} vendors in cart');
+          logDebug('📦 Found ${vendorsData.length} vendors in cart');
           
           for (var vendorJson in vendorsData) {
             try {
               final vendor = VendorCart.fromJson(vendorJson as Map<String, dynamic>);
               _vendors.add(vendor);
               _items.addAll(vendor.items);
-              print('📦 Added vendor: ${vendor.vendorName} with ${vendor.items.length} items');
+              logDebug('📦 Added vendor: ${vendor.vendorName} with ${vendor.items.length} items');
             } catch (e) {
-              print('❌ Error parsing vendor: $e');
+              logDebug('❌ Error parsing vendor: $e');
             }
           }
         }
@@ -76,15 +77,15 @@ Future<void> loadCart() async {
       _totalItems = _items.fold(0, (sum, item) => sum + item.quantity);
       _subtotalUSD = _vendors.fold(0, (sum, vendor) => sum + vendor.subtotalUsd);
       
-      print('✅ Cart loaded: ${_items.length} items, ${_vendors.length} vendors');
+      logDebug('✅ Cart loaded: ${_items.length} items, ${_vendors.length} vendors');
     } else {
       _error = response.message ?? 'Failed to load cart';
-      print('❌ Error loading cart: $_error');
+      logDebug('❌ Error loading cart: $_error');
     }
   } catch (e, stackTrace) {
     _error = e.toString();
-    print('❌ Exception loading cart: $e');
-    print('❌ Stack trace: $stackTrace');
+    logDebug('❌ Exception loading cart: $e');
+    logDebug('❌ Stack trace: $stackTrace');
   }
 
   _isLoading = false;
@@ -104,7 +105,7 @@ Future<void> loadCart() async {
     notifyListeners();
 
     try {
-      print('🔄 Adding to cart: vendorProductId=$vendorProductId, quantity=$quantity');
+      logDebug('🔄 Adding to cart: vendorProductId=$vendorProductId, quantity=$quantity');
       
       final response = await _apiService.addToCart(
         vendorProductId,
@@ -114,7 +115,7 @@ Future<void> loadCart() async {
         customNote: customNote,
       );
       
-      print('📦 Add to cart response: ${response.data}');
+      logDebug('📦 Add to cart response: ${response.data}');
       
       if (response.success) {
         // Reload cart to get updated data
@@ -126,7 +127,7 @@ Future<void> loadCart() async {
       }
     } catch (e) {
       _error = e.toString();
-      print('❌ Error adding to cart: $e');
+      logDebug('❌ Error adding to cart: $e');
       return false;
     } finally {
       _isAddingToCart = false;
@@ -139,7 +140,7 @@ Future<void> loadCart() async {
     _error = null;
     
     try {
-      print('🔄 Removing item: $cartKey');
+      logDebug('🔄 Removing item: $cartKey');
       final response = await _apiService.removeFromCart(cartKey);
       
       if (response.success) {
@@ -160,7 +161,7 @@ Future<void> loadCart() async {
     _error = null;
     
     try {
-      print('🔄 Updating quantity: $cartKey -> $quantity');
+      logDebug('🔄 Updating quantity: $cartKey -> $quantity');
       final response = await _apiService.updateCartItem(cartKey, quantity);
       
       if (response.success) {
@@ -181,7 +182,7 @@ Future<void> loadCart() async {
     _error = null;
     
     try {
-      print('🔄 Clearing cart');
+      logDebug('🔄 Clearing cart');
       final response = await _apiService.clearCart();
       
       if (response.success) {

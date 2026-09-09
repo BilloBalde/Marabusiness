@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\VendorProduct;
 use App\Models\Currency;
 use App\Models\VendorProductReview;
+use App\Support\HtmlSanitizer;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
@@ -398,7 +399,16 @@ class ProductController extends Controller
         return [
             'id' => $product->id,
             'name' => $product->name,
-            'description' => $product->description ?? '',
+            // Vendor-authored rich text (RichEditor in ProductResource), rendered
+            // by the mobile app with flutter_html — which runs no JavaScript, so a
+            // <script> is inert there, but an <img src="http://tracker/..."> still
+            // reports every viewer's IP to a third party, and wiring onLinkTap to
+            // launchUrl later (the app already uses launchUrl elsewhere) would turn
+            // a crafted <a href> into a phishing link. Sanitised here, at the
+            // source, so the API and the web page agree on what a description may
+            // contain — the web already cleans it at render
+            // (product-detail-page.blade.php).
+            'description' => HtmlSanitizer::clean($product->description ?? ''),
             'short_description' => $product->short_description,
             'slug' => $product->slug,
             'images' => $product->images ?? [],

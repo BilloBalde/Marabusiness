@@ -1,5 +1,6 @@
 // lib/core/providers/product_provider.dart
 
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/home_models.dart'; // For Product model (list view)
@@ -126,7 +127,7 @@ class ProductProvider extends ChangeNotifier {
       }
     } catch (e) {
       _listError = e.toString();
-      print('🔴 Error loading products: $e');
+      logDebug('🔴 Error loading products: $e');
     }
 
     _isLoadingList = false;
@@ -241,13 +242,13 @@ Future<void> loadProductsByCategory({
       final response = await _apiService.getProduct(slug, vendorProductId);
       
       // DEBUG: Print the raw response
-      print('🔵 RAW API RESPONSE TYPE: ${response.data.runtimeType}');
-      print('🔵 RAW API RESPONSE: ${response.data}');
+      logDebug('🔵 RAW API RESPONSE TYPE: ${response.data.runtimeType}');
+      logDebug('🔵 RAW API RESPONSE: ${response.data}');
       
       if (response.success && response.data != null) {
         // Check if response.data is a List or Map
         if (response.data is List) {
-          print('🔵 Response is a LIST with ${response.data.length} items');
+          logDebug('🔵 Response is a LIST with ${response.data.length} items');
           // Handle list response - maybe take first item?
           if ((response.data as List).isNotEmpty) {
             final data = (response.data as List).first as Map<String, dynamic>;
@@ -256,7 +257,7 @@ Future<void> loadProductsByCategory({
             _detailError = 'Empty product list returned';
           }
         } else if (response.data is Map) {
-          print('🔵 Response is a MAP');
+          logDebug('🔵 Response is a MAP');
           final data = response.data as Map<String, dynamic>;
           _productDetail = ProductDetail.fromJson(data);
         } else {
@@ -264,17 +265,17 @@ Future<void> loadProductsByCategory({
         }
         
         if (_productDetail != null) {
-          print('✅ Product detail loaded: ${_productDetail?.name}');
-          print('✅ Currency: ${_productDetail?.currency}');
-          print('✅ Price: ${_productDetail?.displayPrice}');
+          logDebug('✅ Product detail loaded: ${_productDetail?.name}');
+          logDebug('✅ Currency: ${_productDetail?.currency}');
+          logDebug('✅ Price: ${_productDetail?.displayPrice}');
         }
       } else {
         _detailError = response.message ?? 'Failed to load product';
       }
     } catch (e, stackTrace) {
       _detailError = e.toString();
-      print('🔴 Error loading product detail: $e');
-      print('🔴 Stack trace: $stackTrace');
+      logDebug('🔴 Error loading product detail: $e');
+      logDebug('🔴 Stack trace: $stackTrace');
     }
 
     _isLoadingDetail = false;
@@ -304,7 +305,7 @@ Future<void> loadProductsByCategory({
         if (_hasMoreReviews) _currentReviewPage++;
       }
     } catch (e) {
-      print('🔴 Error loading more reviews: $e');
+      logDebug('🔴 Error loading more reviews: $e');
     }
 
     _isLoadingReviews = false;

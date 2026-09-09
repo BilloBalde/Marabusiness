@@ -1,3 +1,4 @@
+import '../../utils/app_logger.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -299,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'assets/images/logo.png',
               height: 40,
               errorBuilder: (context, error, stackTrace) {
-                print('🔴 Logo error: $error');
+                logDebug('🔴 Logo error: $error');
                 return _buildDefaultLogo();
               },
             ),

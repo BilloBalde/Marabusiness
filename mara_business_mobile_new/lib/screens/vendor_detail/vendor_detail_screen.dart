@@ -1,5 +1,6 @@
 // lib/screens/vendor_detail/vendor_detail_screen.dart - WISHLIST REMOVED
 
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -879,28 +880,28 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
   if (userReview == null && authProvider.user != null) {
     try {
       final currentUserId = authProvider.user!.id;
-      print('🔍 Looking for user review in list - Current user ID: $currentUserId');
-      print('🔍 Reviews count: ${provider.reviews.length}');
+      logDebug('🔍 Looking for user review in list - Current user ID: $currentUserId');
+      logDebug('🔍 Reviews count: ${provider.reviews.length}');
       
       // Search through reviews to find one matching current user
       for (var review in provider.reviews) {
-        print('🔍 Checking review - user_id: ${review.userId}, current user: $currentUserId');
+        logDebug('🔍 Checking review - user_id: ${review.userId}, current user: $currentUserId');
         if (review.userId == currentUserId) {
           userReview = review;
-          print('✅ Found matching review in list! ID: ${review.id}');
+          logDebug('✅ Found matching review in list! ID: ${review.id}');
           break;
         }
       }
       
       if (userReview == null) {
-        print('🔍 No matching review found in list');
+        logDebug('🔍 No matching review found in list');
       }
     } catch (e) {
-      print('🔍 Error searching reviews: $e');
+      logDebug('🔍 Error searching reviews: $e');
     }
   }
   
-  print('🔍 Final userReview: ${userReview != null ? 'Found (ID: ${userReview.id})' : 'Not found'}');
+  logDebug('🔍 Final userReview: ${userReview != null ? 'Found (ID: ${userReview.id})' : 'Not found'}');
 
   // If user has a review and is not editing
   if (userReview != null && !_isEditingReview) {

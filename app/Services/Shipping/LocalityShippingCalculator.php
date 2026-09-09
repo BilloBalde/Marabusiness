@@ -2,16 +2,17 @@
 
 namespace App\Services\Shipping;
 
+use App\Models\DeliveryZonePrice;
 use App\Models\Locality;
 use App\Models\Shipment;
 use App\Models\Vendor;
-use App\Models\VendorShippingRate;
 
 /**
  * Delivery pricing driven by the buyer's locality alone — no carrier, no zone, no
- * weight, nothing for the buyer to choose. The vendor sets one amount per locality it
- * serves, optionally refined by quantity brackets, and falls back to its default
- * amount for anywhere it has not priced.
+ * weight, nothing for the buyer to choose. A locality's price is shared: whoever set
+ * it (admin or any vendor) fixes the one amount every vendor is quoted, in USD, each
+ * converting it through their own currency.rate_to_usd. A vendor not yet priced by
+ * anyone falls back to its own default_shipping_amount.
  *
  * Returns exactly the array shape of App\Services\ShippingCalculator so the checkout
  * pages, the API and the POS consume it without a single change. Two extra keys,
@@ -42,23 +43,43 @@ class LocalityShippingCalculator
         // carrier calculator so both shapes keep working.
         $items = $cartItems['items'] ?? $cartItems;
 
-        $totals   = $this->calculateTotals($items);
-        $locality = $this->resolveLocality($destinationAddress);
-        $rate     = $this->findRate($vendor, $locality);
-
-        $costLocal = $rate
-            ? $rate->amountForQuantity($totals['quantity'])
-            : (float) ($vendor->default_shipping_amount ?? 0);
-
+        $totals    = $this->calculateTotals($items);
+        $locality  = $this->resolveLocality($destinationAddress);
+        $zonePrice = $this->findZonePrice($locality);
         $rateToUsd = (float) ($vendor->currency?->rate_to_usd ?? 1);
-        $costUsd   = $rateToUsd > 0 ? $costLocal * $rateToUsd : $costLocal;
+
+        if ($zonePrice) {
+            // Shared price: fixed in USD by whoever set it, converted to THIS vendor's
+            // currency. Two vendors billing in different currencies see the same USD
+            // value, each expressed in their own money — that is what "everyone sees
+            // the price for this zone" means once currencies differ.
+            $baseCostUsd   = $zonePrice->usdForQuantity($totals['quantity']);
+            $baseCostLocal = $rateToUsd > 0 ? $baseCostUsd / $rateToUsd : $baseCostUsd;
+        } else {
+            // Nobody has priced this zone yet: the vendor's own fallback, which is
+            // set in the vendor's own currency, unlike the shared price above.
+            $baseCostLocal = (float) ($vendor->default_shipping_amount ?? 0);
+            $baseCostUsd   = $baseCostLocal * $rateToUsd;
+        }
+
+        // A vendor shipping from outside Guinea adds their own flat freight cost on
+        // top of the shared zone price — set once by that vendor, in their own
+        // currency, and never compared against any address's country string. That
+        // string comparison is exactly what broke the legacy carrier calculator
+        // (see ShippingCalculator::determineShippingZone()), so it is deliberately
+        // avoided here: a Guinea-based vendor simply leaves this at zero.
+        $surchargeLocal = (float) ($vendor->international_shipping_surcharge ?? 0);
+        $surchargeUsd   = $surchargeLocal * $rateToUsd;
+
+        $costLocal = $baseCostLocal + $surchargeLocal;
+        $costUsd   = $baseCostUsd + $surchargeUsd;
 
         $option = [
             'carrier'       => self::CARRIER_KEY,
             'name'          => Shipment::CARRIERS[self::CARRIER_KEY] ?? 'Livraison locale',
             'cost'          => round($costUsd, 2),
             'cost_local'    => round($costLocal, 2),
-            'delivery_days' => (int) ($rate->delivery_days ?? self::DEFAULT_DELIVERY_DAYS),
+            'delivery_days' => (int) ($zonePrice->delivery_days ?? self::DEFAULT_DELIVERY_DAYS),
             'zone'          => $this->zoneLabel($locality, $destinationAddress),
             // Locality pricing ignores weight and volume; reported as zero rather than
             // invented so the checkout summary does not display a made-up figure.
@@ -74,7 +95,7 @@ class LocalityShippingCalculator
             'zone'         => $option['zone'],
             'totals'       => $totals,
             'pricing_mode' => Vendor::SHIPPING_MODE_LOCALITY,
-            'is_covered'   => $rate !== null,
+            'is_covered'   => $zonePrice !== null,
         ];
     }
 
@@ -146,14 +167,17 @@ class LocalityShippingCalculator
             ->first();
     }
 
-    private function findRate(Vendor $vendor, ?Locality $locality): ?VendorShippingRate
+    /**
+     * No vendor filter, by design: the price belongs to the zone, not to whoever
+     * quotes it.
+     */
+    private function findZonePrice(?Locality $locality): ?DeliveryZonePrice
     {
         if (! $locality) {
             return null;
         }
 
-        return VendorShippingRate::with('tiers')
-            ->where('vendor_id', $vendor->id)
+        return DeliveryZonePrice::with('tiers')
             ->where('locality_id', $locality->id)
             ->where('is_active', true)
             ->first();

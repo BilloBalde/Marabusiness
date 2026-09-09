@@ -260,6 +260,13 @@ class Product extends Model
     {
         return $this->belongsToMany(Vendor::class, 'vendor_product')
             ->withPivot([
+                // The pivot's own id was never selected, so callers holding a
+                // fully eager-loaded $product->vendors had no way to read the
+                // matching vendor_product row's id without a second query keyed
+                // on the same (product_id, vendor_id) pair — see
+                // HomePage::getVendorProductId(), which did exactly that once per
+                // product on every homepage load.
+                'id',
                 'price',
                 'sale_price',
                 'discount_percent',

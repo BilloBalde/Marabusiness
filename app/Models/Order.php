@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use App\Services\FinanceCalculator;
 
 class Order extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'user_id',
         'vendor_id',
@@ -122,33 +125,90 @@ class Order extends Model
         return "INV{$currentYearMonth}{$formattedIncrement}";
     }
 
-    public static function generateTransactionNumber()
+    /**
+     * The reference stamped on a payment.
+     *
+     * This used to look up existing references with the prefix "TRANS" but return one
+     * prefixed "INV": the search therefore never matched anything it had produced, the
+     * increment stayed at 1, and every payment of a given month was handed the exact
+     * same reference. 87 payments ended up sharing 23 references, one of them used 19
+     * times — a payment could not be identified by its reference at all.
+     *
+     * "TRANS" is the intended prefix: it is what this method already searched for, what
+     * the two Filament screens produce, and it keeps payment references distinct from
+     * order numbers, which use "INV" and were otherwise indistinguishable.
+     */
+    public static function generateTransactionNumber(): string
     {
-        $currentYearMonth = now()->format('Ym'); // Get the current YearMonth (e.g., "202504")
+        $currentYearMonth = now()->format('Ym');
 
-        // Get the latest order number for the current year and month
-        $latestPaiement = DB::table('paiements')
+        $latest = DB::table('paiements')
             ->where('transaction_id', 'like', "TRANS{$currentYearMonth}%")
             ->orderByDesc('transaction_id')
             ->first();
 
-        // Get the latest increment number
-        $increment = 1;
-        if ($latestPaiement) {
-            $lastIncrement = (int)substr($latestPaiement->transaction_id, -4); // Extract last 4 digits of the order number
-            $increment = $lastIncrement + 1;
-        }
+        $increment = $latest
+            ? ((int) substr($latest->transaction_id, -4)) + 1
+            : 1;
 
-        // Format the increment as a 4-digit number
-        $formattedIncrement = str_pad($increment, 4, '0', STR_PAD_LEFT);
+        // Reading the highest reference and adding one races with a concurrent payment,
+        // and cannot resolve a duplicate already present. Step forward until the
+        // candidate is genuinely free.
+        do {
+            $candidate = "TRANS{$currentYearMonth}" . str_pad((string) $increment, 4, '0', STR_PAD_LEFT);
+            $increment++;
+        } while (DB::table('paiements')->where('transaction_id', $candidate)->exists());
 
-        // Return the full order number
-        return "INV{$currentYearMonth}{$formattedIncrement}";
+        return $candidate;
     }
 
     public function paiements()
     {
         return $this->hasMany(Paiement::class);
+    }
+
+    /**
+     * Payments the shop has actually received, as opposed to ones a buyer has merely
+     * declared and nobody has confirmed yet.
+     */
+    public function confirmedPaiements()
+    {
+        return $this->hasMany(Paiement::class)->whereNotNull('confirmed_at');
+    }
+
+    /**
+     * Recomputes the balance from confirmed money alone.
+     *
+     * The same three lines were written out at a dozen call sites, each free to forget
+     * a rule — which is how payment_status came to be left untouched while total_paid
+     * was updated, so a settled order kept reading "En attente de paiement". One
+     * method now owns it.
+     */
+    public function syncPaymentTotals(): void
+    {
+        $paid = (float) $this->confirmedPaiements()->sum('amount');
+        $remaining = max(0, (float) $this->grand_total - $paid);
+
+        $status = match (true) {
+            $paid <= 0    => 'pending',
+            $remaining> 0 => 'partial',
+            default       => 'paid',
+        };
+
+        $this->update([
+            'total_paid'      => $paid,
+            'total_remaining' => $remaining,
+            'payment_status'  => $status,
+        ]);
+    }
+
+    /**
+     * What a buyer has declared but no one has confirmed. Shown to the vendor as
+     * something to act on, and to the buyer so they know it is pending, not lost.
+     */
+    public function declaredAwaitingConfirmation(): float
+    {
+        return (float) $this->paiements()->whereNull('confirmed_at')->sum('amount');
     }
 
     public function financialTransactions()

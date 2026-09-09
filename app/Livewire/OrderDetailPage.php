@@ -35,6 +35,12 @@ class OrderDetailPage extends Component
     {
         $this->order = Order::with(['address', 'items.product', 'vendor.currency', 'latestShipment'])
             ->findOrFail($order_id);
+
+        // The route itself now requires auth (see routes/web.php), but that only
+        // proves someone is logged in — not that this order is theirs. Without this,
+        // any authenticated buyer could read any other buyer's order (items, address,
+        // shipment) by changing the id in the URL.
+        abort_unless($this->order->user_id === Auth::id(), 403);
     }
 
     public function syncTracking(): void
@@ -218,7 +224,7 @@ class OrderDetailPage extends Component
     private function refundStripe()
     {
         try {
-            Stripe::setApiKey(env('STRIPE_SECRET'));
+            Stripe::setApiKey(config('services.stripe.secret'));
             
             // Get the Stripe payment for this order
             $payment = Paiement::where('order_id', $this->order->id)

@@ -4,7 +4,9 @@ namespace App\Livewire;
 
 use App\Models\BulkRfq;
 use App\Models\BulkRfqMessage;
+use App\Models\BulkRfqOffer;
 use App\Models\Vendor;
+use App\Services\RfqOfferConverter;
 use Livewire\Component;
 use Livewire\Attributes\Validate;
 use Livewire\Attributes\Title;
@@ -21,6 +23,9 @@ class RfqChat extends Component
     
     #[Validate('required|string|max:2000')]
     public $newMessage = '';
+
+    public ?int $rejectingOfferId = null;
+    public string $rejectionReason = '';
     
     public function mount($rfq = null)
     {
@@ -142,11 +147,102 @@ class RfqChat extends Component
         }
     }
     
+    /**
+     * Quotes were never shown to the buyer anywhere — only the vendor's chat message
+     * mentioned them in passing — so there was nothing to act on. They are listed here,
+     * next to the conversation they came from.
+     */
+    public function getOffersProperty()
+    {
+        return $this->rfq->offers()->latest()->get();
+    }
+
+    public function isBuyer(): bool
+    {
+        return $this->rfq->user_id === auth()->id();
+    }
+
+    /**
+     * Opens the small reason box under a quote. Kept as plain state rather than a modal
+     * so the buyer still sees the quote they are turning down while they type.
+     */
+    public function startRejecting(int $offerId): void
+    {
+        $this->rejectingOfferId = $offerId;
+        $this->rejectionReason = '';
+    }
+
+    public function cancelRejecting(): void
+    {
+        $this->rejectingOfferId = null;
+        $this->rejectionReason = '';
+    }
+
+    /**
+     * Turning a quote down. The reason is optional: forcing one would only produce
+     * empty-looking justifications, and the vendor still learns the price was refused.
+     */
+    public function rejectOffer(int $offerId): void
+    {
+        if (! $this->isBuyer()) {
+            abort(403, 'Seul l\'acheteur peut refuser un devis.');
+        }
+
+        $offer = BulkRfqOffer::where('bulk_rfq_id', $this->rfq->id)->findOrFail($offerId);
+
+        try {
+            app(RfqOfferConverter::class)->reject($offer, auth()->user(), $this->rejectionReason);
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
+
+        $this->cancelRejecting();
+        $this->rfq->refresh();
+        $this->loadMessages();
+
+        session()->flash('success', 'Devis refusé. Le vendeur en a été informé et peut vous en proposer un autre.');
+    }
+
+    /**
+     * Accepting turns the quote into a normal unpaid order, which the buyer then pays
+     * through the usual order screen.
+     */
+    public function acceptOffer(int $offerId): void
+    {
+        if (! $this->isBuyer()) {
+            abort(403, 'Seul l\'acheteur peut accepter un devis.');
+        }
+
+        $offer = BulkRfqOffer::where('bulk_rfq_id', $this->rfq->id)->findOrFail($offerId);
+
+        try {
+            $order = app(RfqOfferConverter::class)->accept($offer, auth()->user());
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
+
+        $this->rfq->refresh();
+        $this->loadMessages();
+
+        session()->flash('success', "Devis accepté. Votre commande {$order->order_number} a été créée : réglez-la ci-dessous.");
+
+        // The orders list, not the order detail page: the "Payer" button that opens
+        // PaiementModal lives on the list, and the detail page has no payment control
+        // at all. The new order shows there because its total_remaining is above zero.
+        $this->redirectRoute('my-orders', navigate: false);
+    }
+
     public function render()
     {
         return view('livewire.rfq-chat', [
             'otherParty' => $this->getOtherParty(),
             'user' => auth()->user(),
+            'offers' => $this->offers,
+            'isBuyer' => $this->isBuyer(),
         ]);
     }
 }

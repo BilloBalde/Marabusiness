@@ -68,7 +68,7 @@ class WishlistPage extends Component
                 message: 'Please login to add items to cart.',
                 type: 'warning'
             );
-            return $this->redirectRoute('customer_login');
+            return $this->redirectRoute('login');
         }
 
         $selected = array_filter($this->wishlist_items, function ($item) {

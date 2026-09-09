@@ -6,6 +6,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use App\Filament\Resources\VendorResource;
+use Filament\Facades\Filament;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,6 +19,26 @@ class VendorProductsRelationManager extends RelationManager
 
     protected static ?string $icon = 'heroicon-o-tag';
 
+    /**
+     * Nothing here was ever scoped by panel — a vendor opening this tab on a
+     * product they own could pick ANY vendor in the free 'vendor_id' select
+     * below, plant a listing under another vendor's name, or bulk-delete /
+     * activate / deactivate rows belonging to a different vendor entirely on a
+     * product shared between them. Admin still manages any vendor's offer;
+     * a vendor is locked to their own.
+     */
+    protected static function isVendorPanel(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === 'vendor';
+    }
+
+    protected static function vendorId(): ?int
+    {
+        $user = Filament::auth()->user();
+
+        return $user?->vendor->id ?? $user?->vendor_id ?? null;
+    }
+
     public function form(Form $form): Form
     {
         return $form
@@ -27,7 +48,10 @@ class VendorProductsRelationManager extends RelationManager
                     ->required()
                     ->searchable()
                     ->preload()
-                    ->label('Vendor'),
+                    ->label('Vendor')
+                    ->default(fn () => static::isVendorPanel() ? static::vendorId() : null)
+                    ->disabled(fn () => static::isVendorPanel())
+                    ->dehydrated(),
 
                 Forms\Components\TextInput::make('price')
                     ->numeric()
@@ -61,6 +85,13 @@ class VendorProductsRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('vendor.store_name')
+            ->modifyQueryUsing(function (Builder $query) {
+                if (static::isVendorPanel()) {
+                    $query->where('vendor_id', static::vendorId());
+                }
+
+                return $query;
+            })
             ->columns([
                 Tables\Columns\TextColumn::make('vendor.store_name')
                     ->label('Vendor')

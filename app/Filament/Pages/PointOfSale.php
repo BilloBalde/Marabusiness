@@ -836,6 +836,9 @@ class PointOfSale extends Page
                     'currency' => $vendor->currency->code ?? config('app.currency', 'USD'),
                     'payment_status' => $totalPaid >= $totalCost ? 'paid' : 'partial',
                     'transaction_id' => Order::generateTransactionNumber(),
+                    // Taken at the counter by the seller, money in hand.
+                    'confirmed_at'   => now(),
+                    'confirmed_by'   => auth()->id(),
                 ]);
             }
 

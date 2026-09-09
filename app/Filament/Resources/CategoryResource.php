@@ -54,7 +54,20 @@ class CategoryResource extends Resource
     /* -------------------------------------------------------------
      | QUERY SCOPE - Restrict vendors to categories they created
      | ------------------------------------------------------------- */
-    
+    // This comment promised the scoping below but it was never actually written —
+    // the list itself was unfiltered; only the "My Categories" filter (opt-in, off
+    // by default) and EditAction's visibility touched ownership. A vendor opening
+    // "Catégories" saw and could search the entire marketplace's taxonomy.
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        if (static::isVendorPanel()) {
+            $query->where('created_by', Filament::auth()->id());
+        }
+
+        return $query;
+    }
 
     public static function getNavigationGroup(): ?string
     {

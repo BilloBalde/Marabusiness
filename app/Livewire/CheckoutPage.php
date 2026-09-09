@@ -10,6 +10,7 @@ use App\Models\Paiement;
 use App\Models\Vendor;
 use App\Models\FinancialTransaction; // Add this
 use App\Services\Shipping\CartShippingResolver;
+use App\Support\ShippingCarrierFilter;
 use App\Services\FinanceCalculator; // Add this
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -263,7 +264,10 @@ class CheckoutPage extends Component
                 $this->shipping_carrier
             );
             
-            $this->availableCarriers = $shippingResult['carriers'] ?? [];
+            // Only "Local Courier" is offered: DHL/UPS/FedEx/Chronopost/CMA never
+            // modelled a real air/sea distinction, they just carried different
+            // constants in the same formula.
+            $this->availableCarriers = ShippingCarrierFilter::onlyLocal($shippingResult['carriers'] ?? []);
             $this->shippingResults = $shippingResult;
             
             // Auto-select cheapest carrier if current carrier not available
@@ -573,7 +577,7 @@ class CheckoutPage extends Component
                         $this->placingOrder = false;
                         return;
                     }
-                    Stripe::setApiKey(env('STRIPE_SECRET'));
+                    Stripe::setApiKey(config('services.stripe.secret'));
 
                     try {
                         $session = Session::create([
@@ -645,22 +649,10 @@ class CheckoutPage extends Component
                         'transaction_id' => Order::generateTransactionNumber(),
                     ]);
                     
-                    // For a NEW order at checkout, this is the first payment
-                    $newPaid = $pay->amount;
-                    $remaining = max(0, $vendorTotal - $newPaid);
-                    
-                    $paymentStatus = 'pending';
-                    if ($newPaid >= $vendorTotal) {
-                        $paymentStatus = 'paid';
-                    } elseif ($newPaid > 0) {
-                        $paymentStatus = 'partial';
-                    }
-                    
-                    $order->update([
-                        'total_paid' => $newPaid,
-                        'total_remaining' => $remaining,
-                        'payment_status' => $paymentStatus,
-                    ]);
+                    // An Orange Money transfer the buyer says they made. It is recorded,
+                    // but the order stays unpaid until the vendor confirms it arrived —
+                    // syncPaymentTotals() only counts confirmed money.
+                    $order->syncPaymentTotals();
 
                     $this->handleOMPaymentFinancialTransactions($order, $this->amount, $currency);
                     
@@ -986,17 +978,49 @@ class CheckoutPage extends Component
         }
     }
     
+    /**
+     * A locality only makes sense within the country it was picked for. Without this,
+     * switching from Guinea to Senegal after choosing "Ratoma" would silently keep
+     * Ratoma selected — a Guinean commune priced (or not) as if it were Senegalese.
+     */
+    public function updatedCountry(): void
+    {
+        $this->locality_id = null;
+    }
+
     public function updatedShippingCarrier($value)
     {
         $this->shipping_carrier = $value;
     }
 
     /**
-     * Localities the buyer can pick, labelled "Commune (Préfecture)".
+     * Localities the buyer can pick, labelled "Commune (Préfecture)" — scoped to the
+     * country already chosen in the address form above, so a Guinean commune never
+     * shows up as an option while shipping to Senegal or vice versa. Delivery zone
+     * pricing is global (see App\Models\Locality::TYPE_COUNTRY), but only Guinea has
+     * cities seeded today — another country legitimately returns an empty list here,
+     * handled by needsLocalityPicker() rather than treated as an error.
      */
     public function localityOptions(): array
     {
+        $country = \App\Models\Locality::where('type', \App\Models\Locality::TYPE_COUNTRY)
+            ->where('country_code', $this->getCountryCode($this->country))
+            ->first();
+
+        if (! $country) {
+            return [];
+        }
+
         return \App\Models\Locality::selectable()
+            ->where(function ($query) use ($country) {
+                // Two hops from the country covers Guinea's shape (country > region >
+                // commune/prefecture); a country with cities attached one level up is
+                // already covered by the direct-children branch.
+                $regionIds = \App\Models\Locality::where('parent_id', $country->id)->pluck('id');
+
+                $query->where('parent_id', $country->id)
+                    ->orWhereIn('parent_id', $regionIds);
+            })
             ->with('parent')
             ->orderBy('name')
             ->get()
@@ -1017,6 +1041,17 @@ class CheckoutPage extends Component
         }
 
         return false;
+    }
+
+    /**
+     * Shipping by locality is priced marketplace-wide, but only Guinea has cities
+     * seeded so far. A buyer shipping to a country with no localities yet is not
+     * forced through a required field they cannot fill — the vendor's own
+     * default_shipping_amount already covers this case in the calculator.
+     */
+    protected function hasLocalitiesForCountry(): bool
+    {
+        return $this->localityOptions() !== [];
     }
 
     /**
@@ -1117,6 +1152,7 @@ class CheckoutPage extends Component
             'selectedCurrency' => $this->selectedCurrency,
             'localities' => $this->localityOptions(),
             'needs_locality' => $this->needsLocality($groups),
+            'has_localities_for_country' => $this->hasLocalitiesForCountry(),
             'carrier_choice_applies' => ! $this->allVendorsUseLocality($groups),
         ]);
     }

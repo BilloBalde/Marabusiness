@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 class Vendor extends Model
 {
     use Concerns\HasTranslations;
+    use HasFactory;
 
     public const SHIPPING_MODE_CARRIER  = 'carrier';
     public const SHIPPING_MODE_LOCALITY = 'locality';
@@ -39,6 +41,7 @@ class Vendor extends Model
         'carrier_rates',
         'shipping_mode',
         'default_shipping_amount',
+        'international_shipping_surcharge',
     ];
 
     protected $casts = [
@@ -49,6 +52,7 @@ class Vendor extends Model
         'shipping_zones' => 'array',
         'carrier_rates' => 'array',
         'default_shipping_amount' => 'decimal:2',
+        'international_shipping_surcharge' => 'decimal:2',
     ];
 
     public function translations(): HasMany
@@ -142,16 +146,9 @@ class Vendor extends Model
     }
 
     /**
-     * Per-locality delivery prices, in this vendor's own currency.
-     */
-    public function shippingRates(): HasMany
-    {
-        return $this->hasMany(VendorShippingRate::class);
-    }
-
-    /**
      * Vendors default to the historic zone + carrier pricing. Only a vendor moved
-     * to locality mode is quoted by LocalityShippingCalculator.
+     * to locality mode is quoted by LocalityShippingCalculator, against the shared
+     * DeliveryZonePrice catalogue rather than a price of this vendor's own.
      */
     public function usesLocalityShipping(): bool
     {
@@ -189,21 +186,41 @@ class Vendor extends Model
         return json_decode($value ?? '[]', true) ?: [];
     }
 
-    // NEW: Calculate average vendor rating
+    /**
+     * These three ran a fresh query per vendor per access — 20 extra queries for
+     * 8 vendors on the homepage alone (10 rating averages, 10 follower counts).
+     * A caller that eager-loads the aggregate — e.g.
+     * Vendor::withAvg('approvedVendorReviews as vendor_rating', 'rating') — has
+     * it sitting in $this->attributes under that same name already; each accessor
+     * uses it when present and only falls back to a live query for a caller that
+     * didn't eager-load, exactly like before.
+     */
     public function getVendorRatingAttribute()
     {
+        if (array_key_exists('vendor_rating', $this->attributes)) {
+            return $this->attributes['vendor_rating'] ?? 0;
+        }
+
         return $this->approvedVendorReviews()->avg('rating') ?? 0;
     }
 
     // NEW: Get vendor reviews count
     public function getVendorReviewsCountAttribute()
     {
+        if (array_key_exists('vendor_reviews_count', $this->attributes)) {
+            return (int) $this->attributes['vendor_reviews_count'];
+        }
+
         return $this->approvedVendorReviews()->count();
     }
 
     // NEW: Get followers count
     public function getFollowersCountAttribute()
     {
+        if (array_key_exists('followers_count', $this->attributes)) {
+            return (int) $this->attributes['followers_count'];
+        }
+
         return $this->followers()->count();
     }
 
@@ -253,7 +270,12 @@ class Vendor extends Model
                 ];
             });
 
-        return $productReviews->merge($vendorReviews)
+        // Both sides were just mapped into plain stdClass objects, but ->get()->map()
+        // keeps returning an Eloquent Collection — and its merge() calls ->getKey() on
+        // every item to de-duplicate by primary key, which stdClass doesn't have.
+        // collect() drops down to the base Collection, whose merge() is a plain
+        // array merge and never touches getKey().
+        return collect($productReviews)->merge($vendorReviews)
             ->sortByDesc('created_at');
     }
 

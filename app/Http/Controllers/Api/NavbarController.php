@@ -14,8 +14,23 @@ class NavbarController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $role = $user ? $user->roles->first()->name : null;
-        $managerId = \App\Models\User::role('manager')->value('id');
+        // ->first() is null for a signed-in account with no role at all — every
+        // registration path assigns 'customer' immediately, so this is always an
+        // anomaly, but reading ->name on that null crashed this endpoint outright
+        // for exactly that account (the same bug already fixed in the web navbar
+        // partial, resources/views/livewire/partials/navbar.blade.php).
+        $role = $user ? ($user->roles->first()->name ?? 'customer') : null;
+
+        // Runs unconditionally for every call, logged in or not. Spatie's role()
+        // scope throws if the 'manager' role row itself doesn't exist (not just if
+        // nobody holds it) — normally harmless since that row exists today, but a
+        // database missing it (a fresh deploy before seeders run) would break this
+        // endpoint for every mobile-app user, not just one page.
+        try {
+            $managerId = \App\Models\User::role('manager')->value('id');
+        } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist $e) {
+            $managerId = null;
+        }
 
         // Get currencies
         $currencies = Currency::where('is_active', true)

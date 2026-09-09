@@ -1,3 +1,4 @@
+<div>{{-- livewire-root : Livewire n'accepte qu'un seul element racine --}}
 <div class="bg-gray-50 min-h-screen py-10">
 
     <div class="max-w-7xl mx-auto px-6">
@@ -489,3 +490,5 @@
         transition: transform 0.2s;
     }
 </style>
+
+</div>

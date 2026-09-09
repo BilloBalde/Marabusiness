@@ -10,6 +10,7 @@ use App\Models\Vendor;
 use App\Models\Currency;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Livewire\WithFileUploads;
@@ -120,34 +121,43 @@ class VendorApplyPage extends Component
             return redirect()->route('vendors.list');
         }
 
-        // 5) Assign vendor role (Spatie)
-        // Make sure role "vendor" exists in DB
-        if (!$user->hasRole('vendor')) {
-            $user->assignRole('vendor');
-        }
+        // 5) Assign the vendor role and create the vendor row together, atomically.
+        // Previously these were two separate steps with a file upload in between: if
+        // anything threw after assignRole() but before Vendor::create() (a bad
+        // upload, a validation/DB failure), the user was left with the "vendor" role
+        // but no vendor row — and canAccessPanel() requires both, so that account was
+        // permanently locked out of the vendor panel with no self-service way back in
+        // (confirmed against real accounts stuck in exactly this state). Wrapping both
+        // writes in one transaction means either both happen or neither does.
+        $vendor = DB::transaction(function () use ($user) {
+            // Assign vendor role (Spatie). Make sure role "vendor" exists in DB.
+            if (!$user->hasRole('vendor')) {
+                $user->assignRole('vendor');
+            }
 
-        $logoPath = null;
+            $logoPath = null;
 
-        if ($this->logo) {
-            $logoPath = $this->logo->store('vendors', 'public_uploads');
-        }
+            if ($this->logo) {
+                $logoPath = $this->logo->store('vendors', 'public_uploads');
+            }
 
-        // 6) Create vendor (pending approval)
-        $vendor = Vendor::create([
-            'user_id' => $user->id,
-            'currency_id' => $this->currency_id,
-            'store_name' => $this->store_name,
-            'slug' => Str::slug($this->store_name) . '-' . Str::lower(Str::random(6)),
-            'description' => $this->description,
-            'is_active' => false,
-            'approved_at' => null,
-            'logo_path'  => $logoPath,
-            'address' => $this->address,
-            'city' => $this->city,
-            'state' => $this->state,
-            'country' => $this->country,
-            'zip_code' => $this->zip_code,
-        ]);
+            // 6) Create vendor (pending approval)
+            return Vendor::create([
+                'user_id' => $user->id,
+                'currency_id' => $this->currency_id,
+                'store_name' => $this->store_name,
+                'slug' => Str::slug($this->store_name) . '-' . Str::lower(Str::random(6)),
+                'description' => $this->description,
+                'is_active' => false,
+                'approved_at' => null,
+                'logo_path'  => $logoPath,
+                'address' => $this->address,
+                'city' => $this->city,
+                'state' => $this->state,
+                'country' => $this->country,
+                'zip_code' => $this->zip_code,
+            ]);
+        });
 
         session()->flash('success', 'Application submitted! Your vendor account is pending approval.');
 

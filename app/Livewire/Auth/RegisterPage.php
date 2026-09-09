@@ -36,8 +36,11 @@ class RegisterPage extends Component
 
         $user->assignRole('customer');
 
-        // log the user in
+        // log the user in — session id rotated for the same reason as the login
+        // page: registering does not deserve to inherit a session an attacker
+        // planted on this browser before the form was submitted.
         Auth::login($user);
+        session()->regenerate();
         LivewireAlert::title('Utilisateur Ajouté')
             ->text('Utilisateur ajouté et connecté avec succès')
             ->success()

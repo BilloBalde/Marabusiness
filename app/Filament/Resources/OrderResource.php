@@ -90,28 +90,14 @@ class OrderResource extends Resource
         return "INV{$currentYearMonth}{$formattedIncrement}";
     }
 
-    public static function generateTransactionNumber()
+    /**
+     * Was a third copy of the same generator. Three copies meant the one fixed bug —
+     * the model's returning "INV" while searching "TRANS" — could sit undetected next
+     * to two correct versions.
+     */
+    public static function generateTransactionNumber(): string
     {
-        $currentYearMonth = now()->format('Ym'); // Get the current YearMonth (e.g., "202504")
-
-        // Get the latest order number for the current year and month
-        $latestPaiement = DB::table('paiements')
-            ->where('transaction_id', 'like', "TRANS{$currentYearMonth}%")
-            ->orderByDesc('transaction_id')
-            ->first();
-
-        // Get the latest increment number
-        $increment = 1;
-        if ($latestPaiement) {
-            $lastIncrement = (int)substr($latestPaiement->transaction_id, -4); // Extract last 4 digits of the order number
-            $increment = $lastIncrement + 1;
-        }
-
-        // Format the increment as a 4-digit number
-        $formattedIncrement = str_pad($increment, 4, '0', STR_PAD_LEFT);
-
-        // Return the full order number
-        return "TRANS{$currentYearMonth}{$formattedIncrement}";
+        return Order::generateTransactionNumber();
     }
 
     public static function form(Form $form): Form
@@ -272,7 +258,9 @@ class OrderResource extends Resource
                                 if ($record) {
                                     // For edit/view: use stored total_paid from database
                                     //$paid = $record->total_paid ?? 0;
-                                    $paid = $record->paiements()->sum('amount') ?? 0;
+                                    // Money the shop has actually received — not what a
+                                    // buyer has merely declared and nobody confirmed yet.
+                                    $paid = $record->confirmedPaiements()->sum('amount') ?? 0;
                                 } else {
                                     // For create: use amount field
                                     $paid = (float) ($get('amount') ?? 0);
@@ -302,7 +290,9 @@ class OrderResource extends Resource
                                 $grandTotal = $itemsTotal + $shipping;
                                 if ($record) {
                                     // For edit/view: use actual payments
-                                    $paid = $record->paiements()->sum('amount') ?? 0;
+                                    // Money the shop has actually received — not what a
+                                    // buyer has merely declared and nobody confirmed yet.
+                                    $paid = $record->confirmedPaiements()->sum('amount') ?? 0;
                                 } else {
                                     // For create: use amount field
                                     $paid = (float) ($get('amount') ?? 0);
@@ -329,7 +319,9 @@ class OrderResource extends Resource
                                 $grandTotal = $itemsTotal + $shipping;
                                 
                                 if ($record) {
-                                    $paid = $record->paiements()->sum('amount') ?? 0;
+                                    // Money the shop has actually received — not what a
+                                    // buyer has merely declared and nobody confirmed yet.
+                                    $paid = $record->confirmedPaiements()->sum('amount') ?? 0;
                                 } else {
                                     $paid = (float) ($get('amount') ?? 0);
                                 }

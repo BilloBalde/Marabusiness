@@ -217,30 +217,16 @@ class EditOrder extends EditRecord
     protected function recalculateOrderTotals(Model $order): void
     {
         $order->refresh();
-        
+
         // Recalculate grand total from items + shipping
         $itemsTotal = $order->items()->sum('total_amount');
         $shippingAmount = $order->shipping_amount ?? 0;
         $grandTotal = $itemsTotal + $shippingAmount;
-        
-        // Get total paid from payments
-        $totalPaid = $order->paiements()->sum('amount');
-        $remaining = max(0, $grandTotal - $totalPaid);
-        
-        // Determine payment status
-        if ($remaining <= 0 && $totalPaid > 0) {
-            $paymentStatus = 'paid';
-        } elseif ($totalPaid > 0 && $totalPaid < $grandTotal) {
-            $paymentStatus = 'partial';
-        } else {
-            $paymentStatus = 'pending';
-        }
-        
-        $order->update([
-            'grand_total' => $grandTotal,
-            'total_paid' => $totalPaid,
-            'total_remaining' => $remaining,
-            'payment_status' => $paymentStatus,
-        ]);
+        $order->update(['grand_total' => $grandTotal]);
+
+        // Balance is recomputed from confirmed payments only, against the fresh
+        // grand_total above — summing every payment regardless of confirmation is
+        // what let a buyer's own unconfirmed declaration get banked as real money.
+        $order->syncPaymentTotals();
     }
 }

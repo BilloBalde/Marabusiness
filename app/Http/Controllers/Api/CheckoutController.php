@@ -11,6 +11,7 @@ use App\Models\Paiement;
 use App\Models\Vendor;
 use App\Models\FinancialTransaction;
 use App\Services\Shipping\CartShippingResolver;
+use App\Support\ShippingCarrierFilter;
 use App\Services\FinanceCalculator;
 use App\Services\LengoPayService;
 use Illuminate\Http\Request;
@@ -101,6 +102,11 @@ class CheckoutController extends Controller
                 $destinationAddress,
                 $request->shipping_carrier ?? 'local'
             );
+
+            // Only "Local Courier" is quoted: DHL/UPS/FedEx/Chronopost/CMA never
+            // modelled a real air/sea distinction, they just carried different
+            // constants in the same formula.
+            $shippingResult['carriers'] = ShippingCarrierFilter::onlyLocal($shippingResult['carriers'] ?? []);
 
             // Enhance the response with additional vendor data for Flutter app
             $enhancedCarriers = [];
@@ -411,11 +417,10 @@ class CheckoutController extends Controller
                         'transaction_id' => Order::generateTransactionNumber(),
                     ]);
                     
-                    $order->update([
-                        'total_paid' => $request->amount,
-                        'total_remaining' => max(0, $total - $request->amount),
-                        'payment_status' => $request->amount >= $total ? 'paid' : 'partial',
-                    ]);
+                    // The buyer has declared an Orange Money transfer; the vendor still
+                    // has to confirm it arrived. syncPaymentTotals() counts confirmed
+                    // money only, so the order stays unpaid until then.
+                    $order->syncPaymentTotals();
 
                     $this->handleOMPaymentFinancialTransactions($order, $request->amount, $currency);
                     
@@ -739,7 +744,12 @@ private function calculateFullShipping($request, $selectedItems)
         $request->shipping_carrier
     );
 
-    // 🔥 FIX: Get the selected carrier data from the carriers array
+    // Only "Local Courier" is ever charged, regardless of what shipping_carrier the
+    // request asked for — otherwise a client could still be billed a DHL/CMA-tier
+    // price by naming it explicitly, even with those options hidden from the UI.
+    $shippingResult['carriers'] = ShippingCarrierFilter::onlyLocal($shippingResult['carriers'] ?? []);
+
+    // Get the selected carrier data from the carriers array
     $selectedCarrierKey = $request->shipping_carrier;
     $carrierData = $shippingResult['carriers'][$selectedCarrierKey] ?? null;
     

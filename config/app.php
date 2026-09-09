@@ -70,6 +70,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Query Logging
+    |--------------------------------------------------------------------------
+    |
+    | Writes every SQL statement and its bindings to the log. Deliberately its own
+    | switch rather than following APP_DEBUG: bindings carry customer ids and e-mail
+    | addresses, and a catalogue page issues dozens of queries per request.
+    |
+    */
+
+    'log_queries' => (bool) env('LOG_QUERIES', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

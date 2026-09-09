@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Order;
 use App\Models\Paiement;
+use App\Support\PaymentReconciliation;
 use Livewire\Component;
 use Illuminate\Support\Facades\Log;
 use Stripe\Stripe;
@@ -50,7 +51,7 @@ class SuccessPageStripe extends Component
     private function verifyAndCreatePayment()
     {
         try {
-            Stripe::setApiKey(env('STRIPE_SECRET'));
+            Stripe::setApiKey(config('services.stripe.secret'));
             
             // Retrieve Stripe session
             $session = Session::retrieve($this->sessionId);
@@ -126,6 +127,8 @@ class SuccessPageStripe extends Component
                 'payment_status' => 'paid',
                 'transaction_id' => $this->sessionId,
                 'stripe_payment_intent' => $session->payment_intent,
+                // Verified against Stripe itself: received, not merely declared.
+                'confirmed_at' => now(),
             ]);
 
             Log::info('Stripe payment created', [
@@ -137,17 +140,25 @@ class SuccessPageStripe extends Component
                 'rate' => $rate,
             ]);
 
-            // Update order totals
-            $totalPaid = $this->order->paiements()->where('payment_status', 'paid')->sum('amount');
-            $totalRemaining = max(0, $this->order->grand_total - $totalPaid);
-            
-            // Update order payment status
-            $paymentStatus = $totalRemaining <= 0 ? 'paid' : 'partial';
+            // Update order totals. Stripe only ever charges whole USD cents, so
+            // converting its charge back to the vendor's currency almost never
+            // reproduces the order's exact local total — a residual under one cent's
+            // worth counts as settled, not owed.
+            // Confirmed money only, not filtered on payment_status='paid': a
+            // partial cash-on-delivery payment on the same order is real money the
+            // vendor confirmed receiving, and belongs in this balance too. Filtering
+            // on 'paid' silently dropped it — this is the divergence that left a
+            // real order (INV2026090006) showing a balance due that was already
+            // collected.
+            $totalPaid = $this->order->confirmedPaiements()->sum('amount');
+            $reconciled = PaymentReconciliation::resolve(
+                (float) $this->order->grand_total, (float) $totalPaid, $rate
+            );
 
             $this->order->update([
-                'total_paid' => $totalPaid,
-                'total_remaining' => $totalRemaining,
-                'payment_status' => $paymentStatus,
+                'total_paid' => $reconciled['total_paid'],
+                'total_remaining' => $reconciled['total_remaining'],
+                'payment_status' => $reconciled['payment_status'],
                 'payment_method' => 'stripe',
             ]);
 

@@ -1,5 +1,6 @@
-// Create migration: create_shipping_zones_table
 <?php
+
+// Create migration: create_shipping_zones_table
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;

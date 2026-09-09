@@ -1,3 +1,4 @@
+<div>{{-- livewire-root : Livewire n'accepte qu'un seul element racine --}}
 <div class="bg-gradient-to-b from-gray-50 to-white min-h-screen py-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
@@ -381,7 +382,8 @@
                     Description du produit
                 </h2>
                 <div class="prose prose-lg max-w-none text-gray-700">
-                    {!! $product->description !!}
+                    {{-- Vendor-authored HTML: sanitized, never rendered raw. --}}
+                    {!! \App\Support\HtmlSanitizer::clean($product->description) !!}
                 </div>
             </div>
 
@@ -628,7 +630,7 @@
                 <div class="bg-blue-50 rounded-xl p-6 mb-8 border border-blue-200 text-center">
                     <i class="fas fa-lock text-blue-400 text-2xl mb-2"></i>
                     <p class="text-blue-700">
-                        <a href="{{ route('customer_login') }}" class="font-semibold underline hover:text-blue-800">Connectez-vous</a> 
+                        <a href="{{ route('login') }}" class="font-semibold underline hover:text-blue-800">Connectez-vous</a> 
                         pour laisser un avis.
                     </p>
                 </div>
@@ -745,3 +747,4 @@
         }
     }
 </script>
+</div>

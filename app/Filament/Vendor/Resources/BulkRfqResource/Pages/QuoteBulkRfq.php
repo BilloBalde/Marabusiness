@@ -3,30 +3,46 @@
 namespace App\Filament\Vendor\Resources\BulkRfqResource\Pages;
 
 use App\Filament\Vendor\Resources\BulkRfqResource;
-use App\Models\BulkRfq;
+use App\Mail\RfqQuoteReceived;
 use App\Models\BulkRfqOffer;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
+use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class QuoteBulkRfq extends Page implements Forms\Contracts\HasForms
 {
     use Forms\Concerns\InteractsWithForms;
 
+    /**
+     * Without this trait a custom resource page cannot resolve the {record} route
+     * parameter, so /vendor/bulk-rfqs/{id}/quote answered 404 before any of the code
+     * below ever ran — which is why the platform has RFQs and chat messages but not a
+     * single vendor quote. ViewBulkRfq works because ViewRecord pulls the trait in.
+     * It declares its own public $record, so the page must not redeclare one.
+     */
+    use InteractsWithRecord;
+
     protected static string $resource = BulkRfqResource::class;
     protected static string $view = 'filament.vendor.resources.bulk-rfq-resource.pages.quote-bulk-rfq';
 
-    public BulkRfq $record;
     public ?array $data = [];
 
-    public function mount($record): void
+    public function mount(int | string $record): void
     {
-        $this->record = BulkRfq::with(['product', 'user'])->findOrFail($record);
+        // Resolves through BulkRfqResource::getEloquentQuery(), which is already
+        // scoped to the signed-in vendor.
+        $this->record = $this->resolveRecord($record);
+        $this->record->load(['product', 'user']);
 
-        // Check if vendor is authorized
+        // Kept as defence in depth: the scoped query above would already hide another
+        // vendor's RFQ, but this states the rule explicitly and answers 403 rather
+        // than 404 if that scoping ever changes.
         if ($this->record->vendor_id !== auth()->user()->vendor?->id) {
             abort(403, 'Unauthorized');
         }
@@ -75,11 +91,12 @@ class QuoteBulkRfq extends Page implements Forms\Contracts\HasForms
                             ->step(0.01),
                             
                         Forms\Components\Select::make('currency')
-                            ->options([
-                                'USD' => 'USD',
-                                'EUR' => 'EUR',
-                                'GNF' => 'GNF',
-                            ])
+                            // Was a hardcoded USD/EUR/GNF list. EUR is not in the
+                            // currencies table, so a quote priced in it could never be
+                            // converted into an order — the buyer would hit a dead end
+                            // at acceptance. Only currencies the platform can convert
+                            // are offered.
+                            ->options(fn () => \App\Models\Currency::orderBy('code')->pluck('code', 'code'))
                             ->required(),
                             
                         Forms\Components\TextInput::make('lead_time_days')
@@ -127,7 +144,7 @@ class QuoteBulkRfq extends Page implements Forms\Contracts\HasForms
     {
         $data = $this->form->getState();
         
-        DB::transaction(function () use ($data) {
+        $offer = DB::transaction(function () use ($data) {
             // Create the quote/offer
             $offer = BulkRfqOffer::create([
                 'bulk_rfq_id' => $this->record->id,
@@ -155,8 +172,12 @@ class QuoteBulkRfq extends Page implements Forms\Contracts\HasForms
                            ' per unit, MOQ: ' . number_format($data['moq']) . 
                            ' units, Lead time: ' . $data['lead_time_days'] . ' days',
             ]);
+
+            return $offer;
         });
-        
+
+        $this->notifyBuyer($offer);
+
         Notification::make()
             ->title('Quote Submitted Successfully')
             ->body('Your quotation has been sent to the buyer.')
@@ -164,6 +185,32 @@ class QuoteBulkRfq extends Page implements Forms\Contracts\HasForms
             ->send();
             
         $this->redirect(BulkRfqResource::getUrl('view', ['record' => $this->record]));
+    }
+
+    /**
+     * Sent after the commit, never inside it: the quote is already recorded and visible
+     * in the conversation, so a mail failure must not roll it back. Until now nothing
+     * reached the buyer outside the site — they had to think to reopen the chat to
+     * discover a quote had arrived.
+     */
+    private function notifyBuyer(BulkRfqOffer $offer): void
+    {
+        $email = $this->record->user?->email;
+
+        if (! $email) {
+            Log::warning("Devis #{$offer->id} : l'acheteur n'a pas d'e-mail, notification non envoyée.");
+
+            return;
+        }
+
+        try {
+            Mail::to($email)->send(new RfqQuoteReceived($offer->fresh(['rfq.product', 'rfq.user', 'vendor'])));
+        } catch (\Throwable $e) {
+            Log::error("Échec de la notification de devis à l'acheteur.", [
+                'offer_id' => $offer->id,
+                'error'    => $e->getMessage(),
+            ]);
+        }
     }
 
     protected function getHeaderActions(): array

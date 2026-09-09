@@ -42,11 +42,31 @@ class PaiementModal extends Component
         $this->showModal = true;
     }
 
-    protected $rules = [
-        'payment_method' => 'required|string',
-        'amount'         => 'nullable|numeric|min:1',
-        'image'          => 'nullable|image|max:2048',
-    ];
+    /**
+     * The receipt is required for Orange Money and optional for cash on delivery.
+     * Money really moves on an Orange Money transfer, and the buyer has a
+     * confirmation screen to show for it; there is nothing to photograph when you
+     * hand notes to a courier, and the vendor confirms that one on receipt anyway.
+     */
+    protected function rules(): array
+    {
+        return [
+            'payment_method' => 'required|string',
+            'amount'         => 'nullable|numeric|min:1',
+            'image'          => in_array($this->payment_method, Paiement::METHODS_REQUIRING_PROOF, true)
+                ? 'required|image|max:2048'
+                : 'nullable|image|max:2048',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return [
+            'image.required' => 'Joignez la capture de votre transfert Orange Money : sans elle, le vendeur ne peut pas vérifier le paiement.',
+            'image.image'    => 'Le justificatif doit être une image (capture d\'écran ou photo).',
+            'image.max'      => 'Le justificatif ne doit pas dépasser 2 Mo.',
+        ];
+    }
 
     public function save()
     {
@@ -81,7 +101,7 @@ class PaiementModal extends Component
                 return;
             }
 
-            Stripe::setApiKey(env('STRIPE_SECRET'));
+            Stripe::setApiKey(config('services.stripe.secret'));
 
             try {
                 $session = Session::create([
@@ -154,34 +174,64 @@ class PaiementModal extends Component
             ? $this->image->store('payments', 'public')
             : null;
 
-        $vendor      = $order->vendor;
-        $currency    = $vendor->currency->code ?? 'USD';
-        $rate        = $vendor->rate_to_usd ?? 1;
+        $vendor   = $order->vendor;
+        $currency = $vendor->currency->code ?? 'USD';
 
-        $paidUsd     = $this->amount / $rate;
-        $totalUsd    = $order->grand_total / $rate;
+        // What is genuinely still owed, derived from the payments themselves rather
+        // than the total_remaining column, which is 0 both on a settled order and on
+        // older orders where it was never filled in. Declarations awaiting the
+        // vendor's confirmation count here too, so a buyer cannot declare the same
+        // amount twice while the first one is still being checked.
+        $alreadyPaid  = (float) $order->paiements()->sum('amount');
+        $remainingDue = max(0, (float) $order->grand_total - $alreadyPaid);
 
+        if ($remainingDue <= 0) {
+            $this->addError('amount', $order->declaredAwaitingConfirmation() > 0
+                ? 'Un paiement est déjà déclaré pour cette commande et attend la validation du vendeur.'
+                : 'Cette commande est déjà réglée.');
+
+            return;
+        }
+
+        // paiements.amount is NOT NULL, and the form let this through empty: choosing
+        // "cash on delivery" without typing an amount — the natural thing to do, since
+        // you pay the courier — crashed on a database constraint. An unstated amount
+        // means the buyer is settling the balance. Capped so a second submission cannot
+        // push total_paid past the order total.
+        $amount = min((float) ($this->amount ?: $remainingDue), $remainingDue);
+
+        // Compared in the order's own currency. The previous version divided by
+        // $vendor->rate_to_usd — a column that lives on currencies, not vendors, so it
+        // was always null and the "USD" comparison was never one.
+        $settles = ($alreadyPaid + $amount) >= (float) $order->grand_total;
+
+        // Declared, not received. This is the buyer saying they have paid; the order's
+        // balance only moves once the vendor confirms the money arrived. Marking it
+        // paid here is what let a buyer settle their own cash-on-delivery order before
+        // the courier had collected anything.
         Paiement::create([
             'order_id'       => $order->id,
-            'amount'         => $this->amount,
+            'amount'         => $amount,
             'image'          => $imagePath,
             'payment_method' => $this->payment_method,
             'currency'       => $currency,
-            'payment_status' => $paidUsd >= $totalUsd ? 'paid' : 'partial',
+            'payment_status' => $settles ? 'paid' : 'partial',
             'transaction_id' => Order::generateTransactionNumber(),
+            'confirmed_at'   => null,
+            'confirmed_by'   => null,
         ]);
 
-        // Update order totals
-        $order->update([
-            'total_paid'      => $order->paiements()->sum('amount'),
-            'total_remaining' => max(0, $order->grand_total - $order->paiements()->sum('amount')),
-        ]);
+        // Recomputes from confirmed money only, so this declaration leaves the order
+        // where it was until the vendor acts on it.
+        $order->update(['payment_method' => $this->payment_method]);
+        $order->syncPaymentTotals();
 
-        $this->updateOrderFinancialTransactionsForPayment($order, $this->payment_method, $this->amount, 'Payment received');
+        $this->updateOrderFinancialTransactionsForPayment($order, $this->payment_method, $amount, 'Payment declared by buyer');
 
         $this->reset(['amount', 'image', 'payment_method', 'showModal']);
         $this->dispatch('payment-made');
         $this->dispatch('close-modal');
+        $this->dispatch('payment-declared');
     }
 
     /** -------------------------------------------------------------

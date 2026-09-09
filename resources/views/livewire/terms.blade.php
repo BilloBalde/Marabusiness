@@ -1,3 +1,4 @@
+<div>{{-- livewire-root : Livewire n'accepte qu'un seul element racine --}}
 <div class="w-full max-w-[90rem] py-10 px-4 sm:px-6 lg:px-8 mx-auto">
     @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.terms-of-use', 'hasSub' => false, 'subContent' => '', 'subLink' => ''])
     
@@ -465,3 +466,4 @@
         animation: gradientShift 3s ease infinite;
     }
 </style>
+</div>

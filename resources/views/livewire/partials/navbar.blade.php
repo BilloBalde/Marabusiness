@@ -5,11 +5,27 @@
         $currentLangLabel = $langLabels[$currentLocale] ?? strtoupper($currentLocale);
         if(Auth::check()){
             $user = auth()->user();
-            $role = $user->roles->first()->name;
+            // ->first() is null for a signed-in account with no role at all — every
+            // registration path assigns 'customer' immediately, so this is always an
+            // anomaly rather than a designed state, but reading ->name on that null
+            // crashed the navbar (and so every page using it) outright for exactly
+            // that account. Falls back to the least-privileged label rather than
+            // hiding the account menu entirely.
+            $role = $user->roles->first()->name ?? 'customer';
         }else{
             $role = 'Not logged in';
         }
-        $managerId = \App\Models\User::role('manager')->value('id');
+        // Runs unconditionally on every page load, logged in or not. Spatie's
+        // role() scope throws if the 'manager' role row itself doesn't exist (not
+        // just if nobody holds it) — normally harmless since that row exists today,
+        // but it means a database missing that one seeded row (a fresh deploy
+        // before seeders run, a migration rolled back) would 500 the entire site
+        // for every visitor. Degrades to a dead "contact us" link instead.
+        try {
+            $managerId = \App\Models\User::role('manager')->value('id');
+        } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist $e) {
+            $managerId = null;
+        }
     @endphp
 
     {{-- ============================== --}}
@@ -138,13 +154,13 @@
                     <div class="absolute right-0 w-28 bg-white border rounded-md shadow-md opacity-0 invisible
                                 group-hover:opacity-100 group-hover:visible transition duration-150">
 
-                        <a href="{{ route('locale.switch','en') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]" wire:navigate.hover>
+                        <a href="{{ route('lang.switch','en') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]" wire:navigate.hover>
                             <span class="fi fi-us"></span> EN
                         </a>
-                        <a href="{{ route('locale.switch','fr') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]" wire:navigate.hover>
+                        <a href="{{ route('lang.switch','fr') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]" wire:navigate.hover>
                             <span class="fi fi-fr"></span> FR
                         </a>
-                        <a href="{{ route('locale.switch','zh') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]" wire:navigate.hover>
+                        <a href="{{ route('lang.switch','zh') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]" wire:navigate.hover>
                             <span class="fi fi-cn"></span> 中文
                         </a>
 
@@ -331,17 +347,17 @@
                     </div>
                     
                     <div id="mobile-lang-menu" class="hidden mt-2 space-y-1 pl-10">
-                        <a href="{{ route('locale.switch','en') }}" 
+                        <a href="{{ route('lang.switch','en') }}" 
                         class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 {{ $currentLocale == 'en' ? 'bg-[#F5E6B3] text-[#D4AF37]' : 'text-gray-600' }}" wire:navigate.hover>
                             <span class="fi fi-us rounded"></span>
                             <span>English</span>
                         </a>
-                        <a href="{{ route('locale.switch','fr') }}" 
+                        <a href="{{ route('lang.switch','fr') }}" 
                         class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 {{ $currentLocale == 'fr' ? 'bg-[#F5E6B3] text-[#D4AF37]' : 'text-gray-600' }}" wire:navigate.hover>
                             <span class="fi fi-fr rounded"></span>
                             <span>Français</span>
                         </a>
-                        <a href="{{ route('locale.switch','zh') }}" 
+                        <a href="{{ route('lang.switch','zh') }}" 
                         class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 {{ $currentLocale == 'zh' ? 'bg-[#F5E6B3] text-[#D4AF37]' : 'text-gray-600' }}" wire:navigate.hover>
                             <span class="fi fi-cn rounded"></span>
                             <span>中文</span>

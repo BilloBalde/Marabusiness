@@ -1,3 +1,4 @@
+<div>{{-- livewire-root : Livewire n'accepte qu'un seul element racine --}}
 <footer class="w-full bg-gray-900 text-gray-300">
     <!-- Main Footer -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
@@ -325,3 +326,4 @@ footer .border-gray-700:hover {
     }
 }
 </style>
+</div>

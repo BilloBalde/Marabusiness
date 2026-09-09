@@ -1,3 +1,4 @@
+<div>{{-- livewire-root : Livewire n'accepte qu'un seul element racine --}}
 <x-modal wire:model="showModal">
 @if ($showModal && $order)
 
@@ -56,8 +57,24 @@
             @error('amount') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
         </div>
 
+        @php $preuveObligatoire = in_array($payment_method, \App\Models\Paiement::METHODS_REQUIRING_PROOF, true); @endphp
+
         <div class="space-y-1">
-            <label class="font-medium text-gray-700">Preuve de paiement</label>
+            <label class="font-medium text-gray-700">
+                Preuve de paiement
+                @if($preuveObligatoire)
+                    <span class="text-red-600">*</span>
+                @else
+                    <span class="font-normal text-gray-500">(facultatif)</span>
+                @endif
+            </label>
+
+            @if($preuveObligatoire)
+                <p class="text-sm text-gray-600">
+                    Joignez la capture de votre transfert Orange Money : le vendeur en a besoin
+                    pour vérifier que l'argent est bien arrivé.
+                </p>
+            @endif
 
             <input type="file" wire:model="image"
                    class="w-full border rounded-lg px-3 py-2">
@@ -144,3 +161,5 @@ document.addEventListener('livewire:init', () => {
     });
 });
 </script>
+
+</div>

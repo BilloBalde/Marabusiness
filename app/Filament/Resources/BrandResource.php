@@ -58,6 +58,22 @@ class BrandResource extends Resource
         return $user?->vendor->id ?? $user?->vendor_id ?? null;
     }
 
+    /**
+     * Same gap as ProductResource/CategoryResource: nothing scoped the list itself,
+     * so a vendor opening "Marques" saw every brand on the marketplace, not just
+     * theirs. Scoped to the same created_by ownership the Edit action already checks.
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        if (static::isVendorPanel()) {
+            $query->where('created_by', Filament::auth()->id());
+        }
+
+        return $query;
+    }
+
     protected static ?string $recordTitleAttribute = 'name';
     public static function form(Form $form): Form
     {
@@ -181,7 +197,11 @@ class BrandResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    // Unlike ProductResource/CategoryResource's bulk delete, this one
+                    // had no ->visible() check at all — a vendor could select and bulk
+                    // delete any brand, not just their own. Restricted to match.
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->visible(fn() => !$isVendorPanel),
                 ]),
             ]);
     }

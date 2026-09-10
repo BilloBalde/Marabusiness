@@ -5,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/vendor_provider.dart';
-import '../../core/constants/app_constants.dart';
 import '../../widgets/terms_modal.dart';
 import '../../services/api_service.dart';
 import 'package:go_router/go_router.dart';

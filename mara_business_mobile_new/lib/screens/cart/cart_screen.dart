@@ -1,5 +1,6 @@
 // lib/screens/cart/cart_screen.dart - COMPLETE REDESIGN MATCHING LIVEWIRE
 
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +9,6 @@ import '../../core/models/cart.dart';
 import '../../core/providers/cart_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../widgets/empty_state.dart';
-import '../../core/constants/app_constants.dart';
 import '../../utils/currency_formatter.dart';
 
 class CartScreen extends StatefulWidget {
@@ -334,9 +334,7 @@ class _CartScreenState extends State<CartScreen> {
                                         backgroundColor: Colors.grey[200],
                                         backgroundImage: vendor.vendorLogo != null
                                             ? CachedNetworkImageProvider(
-                                                vendor.vendorLogo!.startsWith('http') 
-                                                    ? vendor.vendorLogo! 
-                                                    : '${AppConstants.baseUrl}/uploads/${vendor.vendorLogo!}',
+                                                ImageUrl.resolve(vendor.vendorLogo),
                                               )
                                             : null,
                                         child: vendor.vendorLogo == null
@@ -819,9 +817,7 @@ class _CartScreenState extends State<CartScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: CachedNetworkImage(
-                imageUrl: item.image.startsWith('http') 
-                    ? item.image 
-                    : '${AppConstants.baseUrl}/uploads/${item.image}',
+                imageUrl: ImageUrl.resolve(item.image),
                 width: 70,
                 height: 70,
                 fit: BoxFit.cover,

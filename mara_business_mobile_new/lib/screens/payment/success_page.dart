@@ -1,5 +1,6 @@
 // lib/screens/payment/success_page.dart
 
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -9,7 +10,6 @@ import '../../core/providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../core/models/api_response.dart';
 import '../../utils/currency_formatter.dart';
-import '../../core/constants/app_constants.dart';
 import '../../widgets/common/loading_widget.dart';
 
 class SuccessPage extends StatefulWidget {
@@ -135,14 +135,8 @@ class _SuccessPageState extends State<SuccessPage> {
     return carriers[carrier] ?? carrier;
   }
 
-  String _getFullImageUrl(String? path) {
-    if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http')) return path;
-    if (path.startsWith('/')) {
-      return '${AppConstants.baseUrl}$path';
-    }
-    return '${AppConstants.baseUrl}/uploads/$path';
-  }
+  /// See ImageUrl: this was one of five copies that disagreed with each other.
+  String _getFullImageUrl(String? path) => ImageUrl.resolve(path);
 
   String _formatDate(String? dateStr) {
     if (dateStr == null) return 'N/A';

@@ -1,9 +1,9 @@
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/providers/home_provider.dart';
 import '../../core/providers/vendor_provider.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/models/home_models.dart';
 import 'package:go_router/go_router.dart';
@@ -266,9 +266,7 @@ Widget _buildVendorCard(Vendor vendor) {
               color: Colors.grey[100],
               child: vendor.logo != null && vendor.logo != 'logo' && vendor.logo!.isNotEmpty
                   ? CachedNetworkImage(
-                      imageUrl: vendor.logo!.startsWith('http')
-                          ? vendor.logo!
-                          : '${AppConstants.baseUrl}/uploads/${vendor.logo}',
+                      imageUrl: ImageUrl.resolve(vendor.logo),
                       fit: BoxFit.cover,
                       errorWidget: (context, error, stack) => Center(
                         child: Container(

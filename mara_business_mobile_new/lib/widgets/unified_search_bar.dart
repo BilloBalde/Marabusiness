@@ -1,9 +1,9 @@
+import '../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart'; // Add this import
 import 'package:cached_network_image/cached_network_image.dart';
 import '../core/providers/unified_search_provider.dart';
-import '../core/constants/app_constants.dart';
 import '../core/models/home_models.dart';
 
 class UnifiedSearchBar extends StatefulWidget {
@@ -267,9 +267,7 @@ class _UnifiedSearchBarState extends State<UnifiedSearchBar> {
           image: category.image != null
               ? DecorationImage(
                   image: CachedNetworkImageProvider(
-                    category.image!.startsWith('http')
-                        ? category.image!
-                        : '${AppConstants.baseUrl}/uploads/${category.image}',
+                    ImageUrl.resolve(category.image),
                   ),
                   fit: BoxFit.cover,
                 )
@@ -299,9 +297,7 @@ class _UnifiedSearchBarState extends State<UnifiedSearchBar> {
         radius: 16,
         backgroundImage: vendor.logo != null && vendor.logo != 'logo'
             ? CachedNetworkImageProvider(
-                vendor.logo!.startsWith('http')
-                    ? vendor.logo!
-                    : '${AppConstants.baseUrl}/uploads/${vendor.logo}',
+                ImageUrl.resolve(vendor.logo),
               )
             : null,
         child: vendor.logo == null || vendor.logo == 'logo'
@@ -336,9 +332,7 @@ class _UnifiedSearchBarState extends State<UnifiedSearchBar> {
           image: product.imageUrl != null
               ? DecorationImage(
                   image: CachedNetworkImageProvider(
-                    product.imageUrl!.startsWith('http')
-                        ? product.imageUrl!
-                        : '${AppConstants.baseUrl}/uploads/${product.imageUrl}',
+                    ImageUrl.resolve(product.imageUrl),
                   ),
                   fit: BoxFit.cover,
                 )

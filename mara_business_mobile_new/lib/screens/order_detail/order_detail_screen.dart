@@ -1,5 +1,6 @@
 // lib/screens/order_detail/order_detail_screen.dart
 
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +10,6 @@ import '../../widgets/common/loading_widget.dart';
 import '../../utils/currency_formatter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'payment_modal.dart';
-import '../../core/constants/app_constants.dart'; 
 import 'package:cached_network_image/cached_network_image.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -31,14 +31,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final TextEditingController _cancelReasonController = TextEditingController();
   bool _isCancelling = false;
 
-  String _getFullImageUrl(String? path) {
-    if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http')) return path;
-    if (path.startsWith('/')) {
-      return '${AppConstants.baseUrl}$path';
-    }
-    return '${AppConstants.baseUrl}/uploads/$path';
-  }
+  /// One of five near-identical helpers, each handling a case the others got
+  /// wrong. ImageUrl owns the rule now. An empty path yields the placeholder
+  /// rather than '', which rendered as a broken image.
+  String _getFullImageUrl(String? path) => ImageUrl.resolve(path);
 
   @override
   void initState() {

@@ -1,9 +1,9 @@
 // product_card.dart - WISHLIST REMOVED
 
+import '../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../core/models/product_unified.dart';
-import '../core/constants/app_constants.dart';
 
 class ProductCard extends StatelessWidget {
   final UnifiedProduct product;
@@ -63,9 +63,7 @@ class ProductCard extends StatelessWidget {
                   ),
                   child: product.imageUrl != null && product.imageUrl!.isNotEmpty
                       ? CachedNetworkImage(
-                          imageUrl: product.imageUrl!.startsWith('http')
-                              ? product.imageUrl!
-                              : '${AppConstants.baseUrl}/uploads/${product.imageUrl}',
+                          imageUrl: ImageUrl.resolve(product.imageUrl),
                           height: imageHeight,
                           width: double.infinity,
                           fit: BoxFit.cover,

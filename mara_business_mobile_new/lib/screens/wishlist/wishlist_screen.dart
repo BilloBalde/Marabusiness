@@ -1,9 +1,9 @@
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/providers/wishlist_provider.dart';
-import '../../core/constants/app_constants.dart';
 
 class WishlistScreen extends StatefulWidget {
   const WishlistScreen({super.key});
@@ -301,9 +301,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
 
   Widget _buildWishlistItemCard(Map<String, dynamic> item, String variationText) {
     final imageUrl = item['image'] != null
-        ? (item['image'].startsWith('http')
-            ? item['image']
-            : '${AppConstants.baseUrl}/uploads/${item['image']}')
+        ? ImageUrl.resolve(item['image'] as String?)
         : null;
 
     return GestureDetector(

@@ -1,7 +1,7 @@
+import '../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../core/models/home_models.dart'; // Import the Category model
-import '../core/constants/app_constants.dart';
 
 class CategoryCard extends StatelessWidget {
   final Category category; // Change from Map<String, dynamic> to Category
@@ -37,10 +37,9 @@ class CategoryCard extends StatelessWidget {
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(30),
                       child:CachedNetworkImage(
-                        // Was via.placeholder.com, a service that no longer exists.
-                        imageUrl: category.image != null && category.image!.isNotEmpty
-                            ? '${AppConstants.baseUrl}/uploads/${category.image}'
-                            : '${AppConstants.baseUrl}/uploads/default.png',
+                        // Was via.placeholder.com, a service that no longer exists;
+                        // ImageUrl falls back to the local placeholder on its own.
+                        imageUrl: ImageUrl.resolve(category.image),
                         imageBuilder: (context, imageProvider) => Container(
                           width: 60,
                           height: 60,

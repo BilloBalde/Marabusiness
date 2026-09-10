@@ -1,3 +1,4 @@
+import '../../utils/image_url.dart';
 import '../../utils/app_logger.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/material.dart';
@@ -13,7 +14,6 @@ import '../../widgets/product_card.dart';
 import '../../widgets/category_card.dart';
 import '../../widgets/service_card.dart';
 import '../../widgets/unified_search_bar.dart';
-import '../../core/constants/app_constants.dart';
 import 'package:go_router/go_router.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -652,13 +652,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _getFullImageUrl(String path) {
-    if (path.startsWith('http')) {
-      return path;
-    }
-    final cleanPath = path.replaceAll(RegExp(r'^[/\\]+'), '');
-    return '${AppConstants.baseUrl}/uploads/$cleanPath';
-  }
+  /// This copy was the only one that stripped leading slashes and backslashes.
+  /// ImageUrl keeps that behaviour for every screen.
+  String _getFullImageUrl(String path) => ImageUrl.resolve(path);
 
   Widget _buildPromoBanners() {
     return Padding(
@@ -970,9 +966,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     image: vendor.logo != null && vendor.logo != 'logo'
                         ? DecorationImage(
                             image: CachedNetworkImageProvider(
-                              vendor.logo!.startsWith('http')
-                                  ? vendor.logo!
-                                  : '${AppConstants.baseUrl}/uploads/${vendor.logo}',
+                              ImageUrl.resolve(vendor.logo),
                             ),
                             fit: BoxFit.cover,
                           )

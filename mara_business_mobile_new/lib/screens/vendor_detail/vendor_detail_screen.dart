@@ -1,5 +1,6 @@
 // lib/screens/vendor_detail/vendor_detail_screen.dart - WISHLIST REMOVED
 
+import '../../utils/image_url.dart';
 import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +8,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/vendor_detail_provider.dart';
 import '../../core/providers/home_provider.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/models/vendor_models.dart';
 import '../../core/models/home_models.dart';
 import 'package:go_router/go_router.dart';
@@ -318,9 +318,7 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
               image: vendor.logo != null
                   ? DecorationImage(
                       image: CachedNetworkImageProvider(
-                        vendor.logo!.startsWith('http')
-                            ? vendor.logo!
-                            : '${AppConstants.baseUrl}/uploads/${vendor.logo}',
+                        ImageUrl.resolve(vendor.logo),
                       ),
                       fit: BoxFit.cover,
                     )
@@ -643,9 +641,7 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             child: product.imageUrl != null
                 ? CachedNetworkImage(
-                    imageUrl: product.imageUrl!.startsWith('http')
-                        ? product.imageUrl!
-                        : '${AppConstants.baseUrl}/uploads/${product.imageUrl}',
+                    imageUrl: ImageUrl.resolve(product.imageUrl),
                     height: 140,
                     width: double.infinity,
                     fit: BoxFit.cover,

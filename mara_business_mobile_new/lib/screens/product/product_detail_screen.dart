@@ -1,5 +1,6 @@
 // lib/screens/product/product_detail_screen.dart - WISHLIST REMOVED
 
+import '../../utils/image_url.dart';
 import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -122,14 +123,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  String _getFullImageUrl(String? path) {
-    if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http')) return path;
-    if (path.startsWith('uploads/')) {
-      return '${AppConstants.baseUrl}/$path';
-    }
-    return '${AppConstants.baseUrl}/uploads/$path';
-  }
+  /// This copy was the only one that noticed a path already starting with
+  /// 'uploads/'. ImageUrl keeps that behaviour for every screen.
+  String _getFullImageUrl(String? path) => ImageUrl.resolve(path);
 
   String? _getYoutubeId(String? url) {
     if (url == null) return null;

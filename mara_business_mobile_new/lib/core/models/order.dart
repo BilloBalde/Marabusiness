@@ -29,6 +29,17 @@ class Order {
   // Additional fields needed for profile
   bool? _hasReview; // Cache for review status
 
+  /// Money the buyer has declared that the vendor has not confirmed collecting.
+  ///
+  /// An unconfirmed declaration deliberately does not count towards total_paid,
+  /// so such an order still reports payment_status 'pending' — identical to one
+  /// where nothing was ever paid. Without this field the app cannot tell those
+  /// apart, and offers the payment button again to someone who has already
+  /// handed cash to the courier.
+  final double declaredAwaitingConfirmation;
+
+  bool get hasPaymentAwaitingConfirmation => declaredAwaitingConfirmation > 0;
+
   double get grandTotalUsd {
     if (rateToUsd != null && rateToUsd! > 0) {
       return grandTotal * rateToUsd!;
@@ -48,6 +59,7 @@ class Order {
     this.cancellationReason,
     required this.totalPaid,
     required this.totalRemaining,
+    this.declaredAwaitingConfirmation = 0,
     required this.shippingAmount,
     required this.currency,
     required this.paymentMethod,
@@ -96,6 +108,10 @@ class Order {
       rateToUsd: (json['rate_to_usd'] as num?)?.toDouble(),
       totalPaid: (json['total_paid'] ?? 0).toDouble(),
       totalRemaining: (json['total_remaining'] ?? 0).toDouble(),
+      // Defaults to 0 so an older API build, which does not send this, simply
+      // behaves as it did before rather than throwing.
+      declaredAwaitingConfirmation:
+          (json['declared_awaiting_confirmation'] ?? 0).toDouble(),
       shippingAmount: (json['shipping_amount'] ?? 0).toDouble(),
       paymentMethod: json['payment_method'] ?? '',
       currency: json['currency'] ?? 'USD',

@@ -89,4 +89,8 @@ class ApiEndpoints {
   static String get chats => '$baseUrl/chats';
   static String chatWith(int userId) => '$baseUrl/chats/$userId';
   static String get sendMessage => '$baseUrl/chats/send';
+  // The API has served these two since the chat routes were added; only the
+  // first three were ever declared here, and none of the five were called.
+  static String get unreadMessages => '$baseUrl/chats/unread/count';
+  static String get markMessagesRead => '$baseUrl/chats/mark-read';
 }

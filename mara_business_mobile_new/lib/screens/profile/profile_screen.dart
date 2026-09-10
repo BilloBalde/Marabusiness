@@ -9,6 +9,7 @@ import '../../core/providers/order_provider.dart';
 import '../../core/providers/address_provider.dart';
 import '../../core/models/order.dart';
 import '../../widgets/common/loading_widget.dart';
+import '../../services/api_service.dart';
 import '../../utils/currency_formatter.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -28,13 +29,37 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   double _totalSpent = 0;
   int _reviewsCount = 0;
 
+  /// Drives the badge on the Messages row. Loaded separately from the profile
+  /// so a chat endpoint that fails never keeps the rest of the page from
+  /// rendering — an unread count is the least important thing here.
+  int _unreadMessages = 0;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadUserData();
+      _loadUnreadMessages();
     });
+  }
+
+  Future<void> _loadUnreadMessages() async {
+    try {
+      final response = await context.read<ApiService>().getUnreadMessageCount();
+      if (!mounted || !response.success) return;
+
+      final payload = response.data is Map ? response.data['data'] : null;
+      final count = payload is Map ? payload['unread_count'] : null;
+
+      setState(() {
+        _unreadMessages = count is int ? count : int.tryParse('$count') ?? 0;
+      });
+    } catch (e) {
+      // Silent on purpose: a missing badge is not worth an error on a screen
+      // whose job is showing the profile.
+      logDebug('🔴 Unread message count failed: $e');
+    }
   }
 
   @override
@@ -131,7 +156,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: const Color(0xFFD4AF37).withOpacity(0.1),
+                color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -226,7 +251,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFD4AF37).withOpacity(0.3),
+                  color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -246,7 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         border: Border.all(color: Colors.white, width: 3),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -317,7 +342,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -352,7 +377,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     if (canEdit)
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         child: IconButton(
@@ -377,7 +402,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     Container(
                       height: 30,
                       width: 1,
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                     ),
                     _buildStatItem(
                       icon: Icons.monetization_on_outlined,
@@ -388,7 +413,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     Container(
                       height: 30,
                       width: 1,
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                     ),/* 
                     _buildStatItem(
                       icon: Icons.reviews_outlined,
@@ -413,7 +438,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -461,7 +486,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -503,7 +528,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -522,6 +547,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       color: Color(0xFF1F2937),
                     ),
                   ),
+                ),
+                _buildMenuItem(
+                  icon: Icons.forum_outlined,
+                  title: 'Messages',
+                  subtitle: 'Échangez avec vos vendeurs',
+                  // The badge is only painted when there is something unread, so
+                  // an empty inbox shows a plain row rather than a "0".
+                  badge: _unreadMessages > 0 ? '$_unreadMessages' : null,
+                  onTap: () => context.push('/messages'),
                 ),
                 _buildMenuItem(
                   icon: Icons.help_outline,
@@ -583,7 +617,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, color: color.withOpacity(0.9), size: 22),
+          Icon(icon, color: color.withValues(alpha: 0.9), size: 22),
           const SizedBox(height: 4),
           Text(
             value,
@@ -596,7 +630,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           Text(
             label,
             style: TextStyle(
-              color: color.withOpacity(0.8),
+              color: color.withValues(alpha: 0.8),
               fontSize: 11,
             ),
           ),
@@ -621,7 +655,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color, size: 24),
@@ -671,7 +705,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -788,7 +822,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     leading: Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: const Color(0xFFD4AF37).withOpacity(0.1),
+        color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(icon, color: const Color(0xFFD4AF37), size: 20),
@@ -982,7 +1016,7 @@ Widget _buildOrdersTab() {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _getStatusColor(order.paymentStatus).withOpacity(0.1),
+                      color: _getStatusColor(order.paymentStatus).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -1159,7 +1193,7 @@ Widget _buildOrdersTab() {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD4AF37).withOpacity(0.1),
+                        color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -1181,7 +1215,7 @@ Widget _buildOrdersTab() {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(

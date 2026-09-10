@@ -12,6 +12,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 use Stripe\Stripe;
 use Stripe\Checkout\Session;
+use App\Support\Money;
 
 #[Title('Success Page - MARA BUSINESS')]
 class SuccessPage extends Component
@@ -89,9 +90,12 @@ class SuccessPage extends Component
                         $orderCurrency = $order->vendor?->currency?->code ?? 'USD';
                         $orderRate = $order->vendor?->currency?->rate_to_usd ?? 1;
                         
-                        $localAmount = $orderCurrency === 'USD' 
-                            ? $totalAmount 
-                            : $totalAmount / $orderRate;
+                        // `?? 1` above catches a missing currency row, not a rate
+                        // of zero, and dividing by zero here is fatal while
+                        // recording money Stripe has already collected.
+                        $localAmount = $orderCurrency === 'USD'
+                            ? $totalAmount
+                            : Money::fromUsd((float) $totalAmount, (float) $orderRate);
                         
                         // Create payment record
                         Paiement::create([

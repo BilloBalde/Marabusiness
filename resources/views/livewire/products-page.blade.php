@@ -42,7 +42,16 @@
                         max="2000"
                         wire:model.live.debounce.300ms="price_range"
                         class="w-full accent-yellow-600">
-                    <p class="text-sm text-gray-600 mt-1">{{ $price_range }} USD</p>
+                    {{-- At 0 the filter is switched off (ProductsPage: if price_range
+                         > 0), but the label read "0 USD", announcing a maximum price
+                         of nothing over a list showing every product. --}}
+                    <p class="text-sm text-gray-600 mt-1">
+                        @if($price_range > 0)
+                            Jusqu'à {{ number_format($price_range) }} USD
+                        @else
+                            Tous les prix
+                        @endif
+                    </p>
                 </div>
 
                 {{-- SORT --}}
@@ -87,9 +96,13 @@
                                 $salePrice = $vp->sale_price ?? null;
                             }
 
+                            // via.placeholder.com has been shut down, so this rendered a
+                            // broken image on every product without a picture — and sent
+                            // each visitor's browser to a dead third party to find that
+                            // out. The placeholder ships with the app now.
                             $img = isset($product->images[0])
                                 ? url('uploads/' . $product->images[0])
-                                : 'https://via.placeholder.com/400x400?text=No+Image';
+                                : url('uploads/default.png');
                         @endphp
 
                         @if($displayPrice > 0 || $hasVariations)

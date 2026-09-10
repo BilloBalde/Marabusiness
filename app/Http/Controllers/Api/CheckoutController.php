@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Stripe\Checkout\Session;
 use Stripe\Stripe;
+use App\Support\Money;
 
 class CheckoutController extends Controller
 {
@@ -221,6 +222,25 @@ class CheckoutController extends Controller
         DB::beginTransaction();
 
         try {
+            // Stock was last checked when these items went into the cart, and the
+            // cart cookie lives thirty days. Nothing between there and here looked
+            // again, while updateStock() below writes max(0, stock - quantity) —
+            // so selling three of something with one left stored 0 rather than
+            // -2, and the oversell left no trace in the data at all. Checked here,
+            // inside the transaction and with the rows locked, so two checkouts
+            // racing for the same last unit cannot both pass.
+            $shortfalls = $this->findStockShortfalls($selectedItems);
+
+            if ($shortfalls !== []) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stock insuffisant pour certains articles.',
+                    'out_of_stock' => $shortfalls,
+                ], 409);
+            }
+
             $orders = [];
             $redirectUrl = null;
             $emailErrors = [];
@@ -848,6 +868,56 @@ private function calculateFullShipping($request, $selectedItems)
         return $stripeItems;
     }
 
+    /**
+     * Lines whose quantity exceeds what is actually on the shelf right now.
+     *
+     * Resolves each line exactly the way updateStock() does — variation stock when
+     * the line names one, the vendor_product row otherwise — so the check and the
+     * decrement can never disagree about which number they are looking at.
+     *
+     * lockForUpdate() holds the rows for the rest of the transaction: a second
+     * checkout for the same last unit waits here instead of reading the same
+     * pre-decrement value and passing too.
+     *
+     * @return list<array{name: string, requested: int, available: int}>
+     */
+    private function findStockShortfalls($items): array
+    {
+        $shortfalls = [];
+
+        foreach ($items as $item) {
+            $requested = (int) $item['quantity'];
+
+            if (!empty($item['variation_id'])) {
+                $available = \App\Models\VendorProductVariation::where('vendor_product_id', $item['vendor_product_id'])
+                    ->where('id', $item['variation_id'])
+                    ->lockForUpdate()
+                    ->value('stock');
+            } else {
+                $available = \App\Models\VendorProduct::where('vendor_id', $item['vendor_id'])
+                    ->where('product_id', $item['product_id'])
+                    ->lockForUpdate()
+                    ->value('stock');
+            }
+
+            // A line whose row has vanished is a broken cart entry, not a stock
+            // question; leave it to the order-building code to fail loudly.
+            if ($available === null) {
+                continue;
+            }
+
+            if ($requested > (int) $available) {
+                $shortfalls[] = [
+                    'name' => $item['name'] ?? ($item['product_name'] ?? 'Article'),
+                    'requested' => $requested,
+                    'available' => (int) $available,
+                ];
+            }
+        }
+
+        return $shortfalls;
+    }
+
     private function updateStock($items)
     {
         foreach ($items as $item) {
@@ -901,11 +971,12 @@ private function calculateFullShipping($request, $selectedItems)
         return $countryCodes[$country] ?? strtoupper(substr($country, 0, 2));
     }
 
+    /**
+     * Byte-for-byte the same method as CheckoutPage's copy. App\Support\Money
+     * owns the rule now, so the web and the API can no longer drift apart.
+     */
     private function convertUsdToVendorCurrency($usdAmount, $vendorRateToUsd)
     {
-        if ($vendorRateToUsd <= 0) {
-            return $usdAmount;
-        }
-        return $usdAmount / $vendorRateToUsd;
+        return Money::fromUsd((float) $usdAmount, $vendorRateToUsd === null ? null : (float) $vendorRateToUsd);
     }
 }

@@ -21,3 +21,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Flutter web build served from Laravel for browser testing. A build artifact,
+# rebuilt on demand from mara_business_mobile_new; never part of the source.
+/public/app

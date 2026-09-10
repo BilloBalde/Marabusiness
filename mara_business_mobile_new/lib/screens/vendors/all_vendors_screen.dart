@@ -247,7 +247,7 @@ Widget _buildVendorCard(Vendor vendor) {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -275,7 +275,7 @@ Widget _buildVendorCard(Vendor vendor) {
                           width: 60,
                           height: 60,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFD4AF37).withOpacity(0.1),
+                            color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: Center(
@@ -296,7 +296,7 @@ Widget _buildVendorCard(Vendor vendor) {
                         width: 60,
                         height: 60,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFD4AF37).withOpacity(0.1),
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: Center(

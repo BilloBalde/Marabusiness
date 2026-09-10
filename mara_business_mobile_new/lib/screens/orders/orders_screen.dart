@@ -130,7 +130,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.05),
+                  color: Colors.grey.withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -195,7 +195,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD4AF37).withOpacity(0.1),
+                      color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -306,7 +306,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             decoration: BoxDecoration(
-              color: _selectedStatus == _getStatusFromTab(label) ? const Color(0xFFD4AF37).withOpacity(0.1) : Colors.grey[200],
+              color: _selectedStatus == _getStatusFromTab(label) ? const Color(0xFFD4AF37).withValues(alpha: 0.1) : Colors.grey[200],
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -539,7 +539,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: order.statusColor.withOpacity(0.1),
+                          color: order.statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -556,7 +556,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: order.paymentStatusColor.withOpacity(0.1),
+                          color: order.paymentStatusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(

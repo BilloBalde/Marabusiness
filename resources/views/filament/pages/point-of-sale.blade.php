@@ -363,7 +363,7 @@
                         <div class="pos-product-card">
                             <img src="{{ $product['image']
                                 ? Storage::disk('public_uploads')->url($product['image'])
-                                : 'https://via.placeholder.com/300x200?text=Product' }}"
+                                : url('uploads/default.png') }}"
                                  alt="{{ $product['name'] }}">
 
                             <div class="font-semibold text-sm truncate">{{ $product['name'] }}</div>
@@ -439,7 +439,7 @@
                             <div class="flex items-center gap-3">
                                 <img src="{{ $line['image']
                                     ? Storage::disk('public_uploads')->url($line['image'])
-                                    : 'https://via.placeholder.com/60x60?text=Product' }}"
+                                    : url('uploads/default.png') }}"
                                      alt="{{ $line['name'] }}">
                                 <div>
                                     <div class="font-semibold text-sm">{{ $line['name'] }}</div>

@@ -55,6 +55,8 @@ import 'screens/privacy_screen.dart';
 import '../screens/contact/contact_screen.dart';
 import 'screens/payment/cancel_page.dart';
 import 'screens/payment/success_page.dart';
+import 'screens/chat/chat_list_screen.dart';
+import 'screens/chat/chat_screen.dart';
 
 // Widgets
 import 'widgets/bottom_nav_bar.dart';
@@ -70,6 +72,9 @@ const List<String> _authenticatedOnlyPrefixes = [
   '/addresses',
   '/checkout',
   '/edit-profile',
+  // Every chat route is behind auth:sanctum server-side and would 401; catching
+  // it here sends the user to the login screen instead of an empty list.
+  '/messages',
 ];
 
 final GoRouter _router = GoRouter(
@@ -340,6 +345,34 @@ final GoRouter _router = GoRouter(
         final orderId = int.parse(state.pathParameters['orderId']!);
         return NoTransitionPage(
           child: OrderDetailScreen(orderId: orderId),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/messages',
+      name: 'messages',
+      pageBuilder: (context, state) => const NoTransitionPage(
+        child: ChatListScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/messages/:userId',
+      name: 'chat',
+      pageBuilder: (context, state) {
+        // The contact's name rides in the query string so the conversation can
+        // title itself immediately, rather than showing a blank bar until the
+        // messages land. A malformed id falls back to the list instead of
+        // throwing inside a route builder.
+        final userId = int.tryParse(state.pathParameters['userId'] ?? '');
+        if (userId == null) {
+          return const NoTransitionPage(child: ChatListScreen());
+        }
+
+        return NoTransitionPage(
+          child: ChatScreen(
+            userId: userId,
+            contactName: state.uri.queryParameters['name'] ?? 'Conversation',
+          ),
         );
       },
     ),

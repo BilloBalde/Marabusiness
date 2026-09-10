@@ -66,8 +66,23 @@ class ApiService {
       }
 
       if (error.response?.statusCode == 401) {
+        // Only a session that existed can expire.
+        //
+        // This fired on every 401, including the one a guest gets from /cart
+        // just by opening the home page — so browsing anonymously bounced
+        // straight to the sign-in screen, wiping storage on the way. Caught by
+        // running the web build: the home page loaded and then jumped to login
+        // on its own.
+        //
+        // With no token, a 401 means "this endpoint needs auth", which the
+        // calling screen handles. With a token, it means the session died, and
+        // that is what the redirect is for.
+        final hadToken = _token != null;
         _token = null;
-        onUnauthorized?.call();
+
+        if (hadToken) {
+          onUnauthorized?.call();
+        }
       }
 
       return handler.next(error);
@@ -444,14 +459,24 @@ Future<ApiResponse> post(String endpoint, {Map<String, dynamic>? data}) async {
         }
       });
       
-      // Add logo file if exists
-      /* if (logoFile != null) {
-        String fileName = logoFile.path.split('/').last;
+      // The logo was picked, previewed to the applicant, and then dropped: this
+      // block was commented out, as was the `logoFile:` argument at the call site
+      // in vendor_apply_screen. The server has accepted it the whole time
+      // (VendorController: 'logo' => 'nullable|image|max:2048', stored to the
+      // vendors disk as logo_path), so a vendor watched their logo appear in the
+      // form, submitted, and it silently never arrived.
+      //
+      // Size is not a concern here: the picker already downsizes to 1024x1024 at
+      // quality 85 before this point, well inside the server's 2 MB limit.
+      if (logoFile != null) {
         formData.files.add(MapEntry(
           'logo',
-          await MultipartFile.fromFile(logoFile.path, filename: fileName),
+          await MultipartFile.fromFile(
+            logoFile.path,
+            filename: logoFile.path.split(RegExp(r'[/\\]')).last,
+          ),
         ));
-      } */
+      }
       
       final response = await _dio.post(
         ApiEndpoints.submitVendorApplication, // Your application endpoint
@@ -654,17 +679,31 @@ Future<ApiResponse> createPaymentSession(int orderId, String paymentMethod) asyn
   }
 }
 
+/// Declares an offline payment (Orange Money, or cash) on an order.
+///
+/// No screen calls this yet — the payment modal only offers cash on delivery
+/// and LengoPay. It is kept because /payment/offline is a live endpoint, but
+/// its signature was wrong in the same way the server was: it hardcoded 'om'
+/// and demanded a proof image for every method. Proof is required for Orange
+/// Money, where money moves and there is a receipt to screenshot, and optional
+/// for cash, where there is nothing to photograph — matching
+/// Paiement::METHODS_REQUIRING_PROOF. Wiring a screen to this must pass the
+/// method the buyer actually chose.
 Future<ApiResponse> submitOfflinePayment({
   required int orderId,
   required double amount,
-  required File image,
+  String paymentMethod = 'om',
+  File? image,
 }) async {
   try {
-    String fileName = image.path.split('/').last;
-    FormData formData = FormData.fromMap({
-      'payment_method': 'om',
+    final formData = FormData.fromMap({
+      'payment_method': paymentMethod,
       'amount': amount,
-      'image': await MultipartFile.fromFile(image.path, filename: fileName),
+      if (image != null)
+        'image': await MultipartFile.fromFile(
+          image.path,
+          filename: image.path.split(RegExp(r'[/\\]')).last,
+        ),
     });
 
     final response = await _dio.post(
@@ -1393,6 +1432,53 @@ Future<ApiResponse> deleteProductReview(int reviewId) async {
   Future<ApiResponse> setDefaultAddress(int addressId) async {
     try {
       final response = await _dio.post(ApiEndpoints.setDefaultAddress(addressId));
+      return _handleResponse(response);
+    } on DioException catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  // ---------------------------------------------------------------- chat
+  //
+  // ChatController has served these five routes all along and the app called
+  // none of them. Who a buyer may talk to is decided server-side (a vendor they
+  // have actually ordered from, or a manager), so the client only asks.
+
+  Future<ApiResponse> getChatContacts() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.chats);
+      return _handleResponse(response);
+    } on DioException catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  /// Loads a conversation. The server marks the other side's messages read as a
+  /// side effect of this call, so there is no separate mark-read to make here.
+  Future<ApiResponse> getChatMessages(int userId) async {
+    try {
+      final response = await _dio.get(ApiEndpoints.chatWith(userId));
+      return _handleResponse(response);
+    } on DioException catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  Future<ApiResponse> sendChatMessage(int receiverId, String message) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.sendMessage,
+        data: {'receiver_id': receiverId, 'message': message},
+      );
+      return _handleResponse(response);
+    } on DioException catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  Future<ApiResponse> getUnreadMessageCount() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.unreadMessages);
       return _handleResponse(response);
     } on DioException catch (e) {
       return _handleError(e);

@@ -221,7 +221,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
               if (_isSelectionMode)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  color: const Color(0xFFD4AF37).withOpacity(0.1),
+                  color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                   child: Row(
                     children: [
                       Text(
@@ -316,7 +316,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),

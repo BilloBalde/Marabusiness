@@ -8,6 +8,7 @@ use App\Models\VendorProduct;
 use App\Models\Currency;
 use App\Models\VendorProductReview;
 use App\Support\HtmlSanitizer;
+use App\Support\Money;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
@@ -103,16 +104,16 @@ class ProductController extends Controller
             $vendorRate = $vendor->currency->rate_to_usd ?? 1;
             
             // Convert prices
-            $basePriceUSD = $vendorProduct->price * $vendorRate;
+            $basePriceUSD = Money::toUsd((float) $vendorProduct->price, $vendorRate);
             // rate_to_usd converts into USD, so the requested currency divides.
-            $displayPrice = $basePriceUSD / ($currencyRate > 0 ? $currencyRate : 1);
+            $displayPrice = Money::fromUsd($basePriceUSD, $currencyRate);
             
             $salePrice = null;
             $discount = null;
             
             if ($vendorProduct->sale_price) {
-                $salePriceUSD = $vendorProduct->sale_price * $vendorRate;
-                $salePrice = $salePriceUSD / ($currencyRate > 0 ? $currencyRate : 1);
+                $salePriceUSD = Money::toUsd((float) $vendorProduct->sale_price, $vendorRate);
+                $salePrice = Money::fromUsd($salePriceUSD, $currencyRate);
                 
                 if ($basePriceUSD > 0) {
                     $discount = round(100 - ($salePriceUSD / $basePriceUSD * 100));

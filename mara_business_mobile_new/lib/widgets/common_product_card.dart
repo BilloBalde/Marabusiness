@@ -121,7 +121,12 @@ class CommonProductCard extends StatelessWidget {
   }
 
   String _getFullImageUrl(String? path) {
-    if (path == null || path.isEmpty) return 'https://via.placeholder.com/400x400?text=No+Image';
+    // via.placeholder.com has been shut down, so every product without a picture
+    // showed a failed load and, on a phone, spent a network round trip to a dead
+    // third party to get there. The placeholder is served by our own host now.
+    if (path == null || path.isEmpty) {
+      return '${AppConstants.baseUrl}/uploads/default.png';
+    }
     if (path.startsWith('http')) return path;
     return '${AppConstants.baseUrl}/uploads/$path';
   }
@@ -147,7 +152,7 @@ class CommonProductCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),

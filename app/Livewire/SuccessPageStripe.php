@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Stripe\Stripe;
 use Stripe\Checkout\Session;
 use Illuminate\Support\Facades\Mail;
+use App\Support\Money;
 
 class SuccessPageStripe extends Component
 {
@@ -105,10 +106,12 @@ class SuccessPageStripe extends Component
             $currency = $metadata->currency ?? ($this->order->vendor->currency->code ?? 'USD');
             $rate = $metadata->rate ?? ($this->order->vendor->currency->rate_to_usd ?? 1);
             
-            // FIXED: Calculate local amount from USD amount
-            // If amountUsd = 1.2 USD and rate = 0.00012 (for GNF)
-            // Then: 1.2 / 0.00012 = 10,000 GNF
-            $amountLocal = $amountUsd / $rate;
+            // 1.2 USD at a GNF rate of 0.00012 is 10,000 GNF.
+            //
+            // `?? 1` above catches a vendor with no currency row, but not a rate
+            // of zero — and dividing by zero here is fatal, in the middle of
+            // recording a payment Stripe has already taken.
+            $amountLocal = Money::fromUsd((float) $amountUsd, (float) $rate);
 
             Log::info('Stripe payment conversion', [
                 'order_id' => $this->order->id,

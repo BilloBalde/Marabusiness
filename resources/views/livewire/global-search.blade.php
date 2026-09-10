@@ -20,9 +20,10 @@
 
             @foreach($results as $product)
                 @php
+                    // Was via.placeholder.com, a service that no longer exists.
                     $img = isset($product->images[0])
                         ? url('uploads/' . $product->images[0])
-                        : 'https://via.placeholder.com/40';
+                        : url('uploads/default.png');
                 @endphp
 
                 <a href="/products/{{ $product->slug }}/{{ $product->vendorProducts[0]->id }}"

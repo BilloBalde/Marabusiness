@@ -37,9 +37,10 @@ class CategoryCard extends StatelessWidget {
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(30),
                       child:CachedNetworkImage(
+                        // Was via.placeholder.com, a service that no longer exists.
                         imageUrl: category.image != null && category.image!.isNotEmpty
                             ? '${AppConstants.baseUrl}/uploads/${category.image}'
-                            : 'https://via.placeholder.com/80',
+                            : '${AppConstants.baseUrl}/uploads/default.png',
                         imageBuilder: (context, imageProvider) => Container(
                           width: 60,
                           height: 60,

@@ -8,6 +8,8 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Paiement;
 use App\Models\Vendor;
+use App\Models\VendorProduct;
+use App\Models\VendorProductVariation;
 use App\Models\FinancialTransaction; // Add this
 use App\Services\Shipping\CartShippingResolver;
 use App\Support\ShippingCarrierFilter;
@@ -20,6 +22,7 @@ use Livewire\Attributes\Title;
 use Livewire\WithFileUploads;
 use Stripe\Checkout\Session;
 use Stripe\Stripe;
+use App\Support\Money;
 
 #[Title('Checkout Page - MARA BUSINESS')]
 class CheckoutPage extends Component
@@ -352,13 +355,14 @@ class CheckoutPage extends Component
     
     /** -------------------------------------------------------------
      *   Convert USD to vendor currency
+     *
+     *   Byte-for-byte the same method as CheckoutController's private copy, one
+     *   of about twenty hand-written conversions that agreed on neither the
+     *   guard nor the rounding. App\Support\Money owns the rule now.
      * ------------------------------------------------------------- */
     protected function convertUsdToVendorCurrency($usdAmount, $vendorRateToUsd)
     {
-        if ($vendorRateToUsd <= 0) {
-            return $usdAmount;
-        }
-        return $usdAmount / $vendorRateToUsd;
+        return Money::fromUsd((float) $usdAmount, $vendorRateToUsd === null ? null : (float) $vendorRateToUsd);
     }
 
     /** -------------------------------------------------------------
@@ -430,6 +434,42 @@ class CheckoutPage extends Component
                 ]);
             }
             
+            /**
+             * Stock was last checked when these items went into the cart, and the
+             * cart cookie lives thirty days. The decrement further down writes
+             * max(0, stock - quantity), so ordering five of something with one
+             * left stored 0 rather than -2 and the oversell left no trace at all.
+             * Refused here, before a single order row exists.
+             *
+             * Unlike the API endpoint this method runs outside a transaction, so
+             * the rows cannot be locked and two simultaneous checkouts can still
+             * both pass. That is a narrower window than a thirty-day-old cart, but
+             * it is not closed: closing it needs placeOrder() wrapped in a
+             * transaction, which is a separate change.
+             */
+            $shortfalls = [];
+            foreach ($groups as $group) {
+                foreach ($group['items'] as $item) {
+                    $available = !empty($item['variation_id'])
+                        ? VendorProductVariation::where('vendor_product_id', $item['vendor_product_id'])
+                            ->where('id', $item['variation_id'])->value('stock')
+                        : VendorProduct::where('vendor_id', $item['vendor_id'])
+                            ->where('product_id', $item['product_id'])->value('stock');
+
+                    if ($available !== null && (int) $item['quantity'] > (int) $available) {
+                        $shortfalls[] = ($item['product_name'] ?? 'Article')
+                            . " (demandé {$item['quantity']}, disponible {$available})";
+                    }
+                }
+            }
+
+            if ($shortfalls !== []) {
+                session()->flash('error', 'Stock insuffisant : ' . implode(', ', $shortfalls)
+                    . '. Ajustez votre panier avant de commander.');
+
+                return null;
+            }
+
             /** Create orders for each vendor */
             foreach ($groups as $vendorId => $group) {
                 $vendor = $group['vendor'];

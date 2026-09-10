@@ -472,7 +472,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -498,7 +498,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: order.paymentStatusColor.withOpacity(0.1),
+                        color: order.paymentStatusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -550,7 +550,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: order.statusColor.withOpacity(0.1),
+                        color: order.statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -602,7 +602,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -764,7 +764,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -877,8 +877,58 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
 
-          // Payment Button for unpaid orders (unchanged)
-          if ((order.paymentStatus == 'pending' || order.paymentStatus == 'partial') && !isCancelled)
+          // A payment the buyer has declared and the vendor has not confirmed
+          // leaves the order at payment_status 'pending' — unconfirmed money
+          // deliberately does not count towards the balance. That is correct
+          // accounting but it made the screen below offer "payer" to someone who
+          // had already handed cash to the courier, and tapping it declared the
+          // same money twice. The server refuses the second declaration now (409);
+          // this says why before they tap.
+          if (order.hasPaymentAwaitingConfirmation && !isCancelled)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.hourglass_top, color: Colors.orange[800]),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Paiement en attente de validation',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange[900],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Vous avez déclaré ${CurrencyFormatter.format(order.declaredAwaitingConfirmation, order.currency)}. '
+                          'Le vendeur doit confirmer la réception avant que la commande soit soldée.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange[900],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Payment Button for unpaid orders — hidden while a declaration is
+          // still awaiting the vendor, so it cannot be submitted twice.
+          if ((order.paymentStatus == 'pending' || order.paymentStatus == 'partial') &&
+              !order.hasPaymentAwaitingConfirmation &&
+              !isCancelled)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -886,7 +936,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),

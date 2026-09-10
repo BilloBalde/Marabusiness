@@ -183,7 +183,7 @@ class _FaqScreenState extends State<FaqScreen> with SingleTickerProviderStateMix
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFD4AF37).withOpacity(0.3),
+            color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -257,7 +257,7 @@ class _FaqScreenState extends State<FaqScreen> with SingleTickerProviderStateMix
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFD4AF37).withOpacity(0.1),
+                color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: const Color(0xFFD4AF37), size: 20),
@@ -281,7 +281,7 @@ class _FaqScreenState extends State<FaqScreen> with SingleTickerProviderStateMix
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFFD4AF37).withOpacity(0.1),
+              color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: const Color(0xFFD4AF37), size: 20),
@@ -415,7 +415,7 @@ class _FaqScreenState extends State<FaqScreen> with SingleTickerProviderStateMix
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: color, size: 18),

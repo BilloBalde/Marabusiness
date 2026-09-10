@@ -39,7 +39,6 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
 
   int? _selectedCurrencyId;
   File? _logoFile;
-  String? _logoPath;
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -140,7 +139,6 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
     if (pickedFile != null) {
       setState(() {
         _logoFile = File(pickedFile.path);
-        _logoPath = pickedFile.path;
       });
     }
   }
@@ -200,7 +198,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
     
       final response = await apiService.submitVendorApplication(
         applicationData,
-        //logoFile: _logoFile,
+        logoFile: _logoFile,
       );
 
       logDebug('📥 Response: ${response.data}');
@@ -336,7 +334,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,7 +354,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,7 +381,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -468,7 +466,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

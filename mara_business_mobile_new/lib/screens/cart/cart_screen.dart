@@ -236,6 +236,52 @@ class _CartScreenState extends State<CartScreen> {
             );
           }
 
+          // CartProvider records an error on every failed load, and this screen
+          // never read it — so a dropped connection or a server fault fell
+          // through to the empty state and told the customer "votre panier est
+          // vide". Their cart may be full; only the request failed. Worse, the
+          // one way out offered was "Continuer Shopping", sending someone off to
+          // rebuild a basket that was never lost. This must be checked before
+          // isEmpty, since a failed load leaves the cart empty too.
+          if (cart.error != null && cart.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Impossible de charger votre panier',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      cart.error!,
+                      style: TextStyle(color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => cart.loadCart(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD4AF37),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Réessayer'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
           if (cart.isEmpty) {
             return EmptyState(
               icon: Icons.shopping_cart_outlined,
@@ -378,7 +424,7 @@ class _CartScreenState extends State<CartScreen> {
                         color: Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withOpacity(0.3),
+                            color: Colors.grey.withValues(alpha: 0.3),
                             offset: const Offset(0, -2),
                             blurRadius: 4,
                           ),

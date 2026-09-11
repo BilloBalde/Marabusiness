@@ -4,6 +4,21 @@ services:
     name: marabusiness
     env: php
     region: oregon  # or virginia, ohio, frankfurt, singapore
+    # Measured 2026-09-12 against the live site: every request — a static CSS
+    # file, an /uploads/ image, the Laravel homepage itself — clusters around
+    # 400ms-1s of time-to-first-byte on an already-open connection, with no
+    # meaningful difference between a request Laravel never touches (a static
+    # file) and one that hits the database. That pattern is the signature of
+    # network round-trip distance, not application or query slowness: this
+    # app's whole user base is Guinea (GNF pricing, Conakry addresses, Orange
+    # Money / LengoPay), roughly 9,500-10,000 km from Oregon. None of the
+    # region choices above sit close to West Africa, but `frankfurt` — roughly
+    # 5,000 km from Conakry — is the nearest on offer and would likely cut the
+    # round trip meaningfully. Changing `region` here is not a live migration:
+    # Render provisions a new instance with a new persistent disk, so the
+    # database and every uploaded file need moving over deliberately (same
+    # backup-first discipline as a migration) rather than being carried across
+    # automatically.
     buildCommand: |
       composer install --no-dev --optimize-autoloader
       php artisan optimize
@@ -30,11 +45,15 @@ services:
     # single-threaded development server — one request at a time, so a slow one
     # (an invoice PDF, a Stripe call) blocked every other visitor until it
     # finished. Render's native PHP environment (env: php) runs its own
-    # production web server (Apache + PHP-FPM) automatically when no
-    # startCommand overrides it, which is what every other native PHP service
-    # on Render already relies on. Verify the very first deploy after this
-    # change actually comes up and serves the site before trusting it —
-    # this could not be tested locally (no Composer, no Apache/PHP-FPM here).
+    # production web server automatically when no startCommand overrides it,
+    # which is what every other native PHP service on Render already relies
+    # on. Confirmed live on 2026-09-12 by reading the `Server` response header
+    # on afrobridgeinnov.com: it is nginx + php-fpm, not Apache as first
+    # guessed here when this line could only be reasoned about, not observed
+    # (no Composer, no nginx/Apache/PHP-FPM on the local dev machine). Whatever
+    # nginx config Render generates for this is not a file in this repo — there
+    # is no nginx.conf here to edit, and `public/.htaccess` (an Apache-only
+    # mechanism) is never read by it at all.
     #
     # Without a persistent disk, the service's filesystem is ephemeral — nothing
     # written to storage/database.sqlite survives a redeploy, a restart, or the

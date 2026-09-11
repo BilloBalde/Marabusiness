@@ -4,6 +4,7 @@ namespace App\Filament\Vendor\Resources;
 
 use App\Filament\Resources\OrderResource as BaseOrderResource;
 use App\Filament\Vendor\Resources\OrderResource\Pages;
+use App\Models\Order;
 use App\Models\Paiement;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -61,9 +62,37 @@ class OrderResource extends BaseOrderResource
             ->count();
     }
 
+    /**
+     * Buyers waiting on a price.
+     *
+     * The RFQ feature had no signal of any kind — its resource was hidden from
+     * navigation and no notification was ever sent — so requests simply sat
+     * there. A negotiation waiting on the vendor is exactly the kind of item this
+     * badge was built for: it goes back to zero when the work is done.
+     */
+    protected static function awaitingPriceCount(): int
+    {
+        $vendorId = auth()->user()?->vendor?->id;
+
+        if (! $vendorId) {
+            return 0;
+        }
+
+        // Le scope compte aussi les prix périmés, que rien ne remet en 'open' sur
+        // cet hébergement ; voir Order::scopeAwaitingVendorPrice().
+        return Order::where('vendor_id', $vendorId)
+            ->awaitingVendorPrice()
+            ->count();
+    }
+
+    protected static function pendingVendorActions(): int
+    {
+        return static::pendingPaymentConfirmations() + static::awaitingPriceCount();
+    }
+
     public static function getNavigationBadge(): ?string
     {
-        $count = static::pendingPaymentConfirmations();
+        $count = static::pendingVendorActions();
 
         // Nothing to do, nothing shown: a permanent badge stops being read.
         return $count > 0 ? (string) $count : null;
@@ -71,19 +100,32 @@ class OrderResource extends BaseOrderResource
 
     public static function getNavigationBadgeColor(): string|array|null
     {
-        return static::pendingPaymentConfirmations() > 0 ? 'warning' : null;
+        return static::pendingVendorActions() > 0 ? 'warning' : null;
     }
 
     public static function getNavigationBadgeTooltip(): ?string
     {
-        $count = static::pendingPaymentConfirmations();
+        $payments = static::pendingPaymentConfirmations();
+        $prices = static::awaitingPriceCount();
 
-        if ($count === 0) {
+        if ($payments === 0 && $prices === 0) {
             return null;
         }
 
-        return $count === 1
-            ? 'Un paiement déclaré attend votre confirmation'
-            : "{$count} paiements déclarés attendent votre confirmation";
+        $parts = [];
+
+        if ($payments > 0) {
+            $parts[] = $payments === 1
+                ? 'un paiement déclaré attend votre confirmation'
+                : "{$payments} paiements déclarés attendent votre confirmation";
+        }
+
+        if ($prices > 0) {
+            $parts[] = $prices === 1
+                ? 'un client attend votre prix'
+                : "{$prices} clients attendent votre prix";
+        }
+
+        return ucfirst(implode(', ', $parts));
     }
 }

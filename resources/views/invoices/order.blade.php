@@ -160,17 +160,24 @@
         <tbody>
             @foreach($order->items as $item)
                 @php
+                    // file_get_contents() tournait ici, avant le file_exists() de
+                    // la ligne suivante : un article sans image donnait
+                    // file_get_contents(null) — « ValueError: Path cannot be
+                    // empty » — et toute la facture retournait une erreur 500.
+                    // Un produit supprimé faisait la même chose, product? étant
+                    // alors null. La lecture n'a lieu que si le fichier est là.
                     $img = $item->product?->images[0] ?? null;
                     $thumbPath = $img ? public_path('uploads/' . $img) : null;
-                    $thumbBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($thumbPath));
-                    //echo $thumbPath;
+                    $thumbBase64 = ($thumbPath && is_file($thumbPath))
+                        ? 'data:image/png;base64,' . base64_encode(file_get_contents($thumbPath))
+                        : null;
                 @endphp
 
                 <tr style="text-align: center;">
                     <td>{{ $item->product?->name }}</td>
 
                     <td>
-                        @if ($thumbPath && file_exists($thumbPath))
+                        @if ($thumbBase64)
                             <img src="{{ $thumbBase64 }}" class="thumb">
                         @else
                             —
@@ -183,6 +190,21 @@
                 </tr>
             @endforeach
 
+            {{-- Un prix négocié : les lignes ci-dessus portent déjà le tarif
+                 convenu (OrderNegotiation::repriceItems les répartit), si bien que
+                 la facture n'expliquait pas d'où venait l'écart avec le prix du
+                 catalogue. La remise est nommée ici, à l'échelle de la commande —
+                 c'est à ce niveau qu'elle a été accordée. --}}
+            @if ($order->pre_negotiation_total && $order->pre_negotiation_total > $order->grand_total)
+                <tr>
+                    <td colspan="4" style="text-align:right;">Prix initial :</td>
+                    <td>{{ number_format($order->pre_negotiation_total, 2) }}{{ $order->vendor->currency->symbol }}</td>
+                </tr>
+                <tr>
+                    <td colspan="4" style="text-align:right;">Remise négociée :</td>
+                    <td>−{{ number_format($order->pre_negotiation_total - $order->grand_total, 2) }}{{ $order->vendor->currency->symbol }}</td>
+                </tr>
+            @endif
             <tr class="total-row">
                 <td colspan="4" style="text-align:right;">Grand Total:</td>
                 <td>{{ number_format($order->grand_total, 2) }}{{ $order->vendor->currency->symbol }}</td>

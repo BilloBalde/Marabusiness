@@ -74,6 +74,16 @@ class PaiementModal extends Component
 
         $order = $this->order;
 
+        // A price still under discussion is not a price to collect. Nothing here
+        // looked at the order's status — only at what was left to pay — so an
+        // order in negotiation was payable at whatever provisional figure the
+        // basket happened to carry.
+        if ($order->isNegotiating()) {
+            session()->flash('error', "Le prix de cette commande est en cours de négociation. Acceptez le prix proposé avant de régler.");
+
+            return;
+        }
+
         // ======================================================
         // 🚀 1) STRIPE PAYMENT — REDIRECT IMMEDIATELY
         // ======================================================

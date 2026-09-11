@@ -57,6 +57,8 @@ import 'screens/payment/cancel_page.dart';
 import 'screens/payment/success_page.dart';
 import 'screens/chat/chat_list_screen.dart';
 import 'screens/chat/chat_screen.dart';
+import 'screens/negotiation/negotiation_list_screen.dart';
+import 'screens/negotiation/negotiation_screen.dart';
 
 // Widgets
 import 'widgets/bottom_nav_bar.dart';
@@ -75,6 +77,10 @@ const List<String> _authenticatedOnlyPrefixes = [
   // Every chat route is behind auth:sanctum server-side and would 401; catching
   // it here sends the user to the login screen instead of an empty list.
   '/messages',
+  // Same reasoning: NegotiationController is entirely behind auth:sanctum, and a
+  // 401 would render as "aucune négociation" — telling someone their
+  // discussions are gone rather than asking them to sign in.
+  '/negotiations',
 ];
 
 final GoRouter _router = GoRouter(
@@ -374,6 +380,27 @@ final GoRouter _router = GoRouter(
             contactName: state.uri.queryParameters['name'] ?? 'Conversation',
           ),
         );
+      },
+    ),
+    GoRoute(
+      path: '/negotiations',
+      name: 'negotiations',
+      pageBuilder: (context, state) => const NoTransitionPage(
+        child: NegotiationListScreen(),
+      ),
+    ),
+    GoRoute(
+      // Adressée par order_id : le prix convenu vit sur la commande, pas sur le
+      // fil de discussion.
+      path: '/negotiations/:orderId',
+      name: 'negotiation',
+      pageBuilder: (context, state) {
+        final orderId = int.tryParse(state.pathParameters['orderId'] ?? '');
+        if (orderId == null) {
+          return const NoTransitionPage(child: NegotiationListScreen());
+        }
+
+        return NoTransitionPage(child: NegotiationScreen(orderId: orderId));
       },
     ),
     GoRoute(

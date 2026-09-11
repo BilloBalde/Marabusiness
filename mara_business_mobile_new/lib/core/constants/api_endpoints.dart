@@ -85,6 +85,16 @@ class ApiEndpoints {
   static String addressDetail(int addressId) => '$baseUrl/addresses/$addressId';
   static String setDefaultAddress(int addressId) => '$baseUrl/addresses/$addressId/default';
   
+  // Négociation de prix. Le serveur les adresse par order_id, pas par rfq_id :
+  // le prix convenu vit sur la commande, qui est la source de vérité pour le
+  // paiement, et le fil de discussion n'en est qu'un accessoire.
+  static String get negotiations => '$baseUrl/negotiations';
+  static String negotiationDetail(int orderId) => '$baseUrl/negotiations/$orderId';
+  static String negotiationMessages(int orderId) => '$baseUrl/negotiations/$orderId/messages';
+  static String negotiationAccept(int orderId) => '$baseUrl/negotiations/$orderId/accept';
+  static String negotiationRefuse(int orderId) => '$baseUrl/negotiations/$orderId/refuse';
+  static String negotiationCancel(int orderId) => '$baseUrl/negotiations/$orderId/cancel';
+
   // Chat
   static String get chats => '$baseUrl/chats';
   static String chatWith(int userId) => '$baseUrl/chats/$userId';

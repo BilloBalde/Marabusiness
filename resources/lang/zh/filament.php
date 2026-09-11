@@ -31,4 +31,14 @@ return [
         'catalog' => '目录',
         'configuration' => '配置',
     ],
+
+    'order_tabs' => [
+        'all' => '全部',
+        'negotiating' => '议价',
+        'new' => '新订单',
+        'processing' => '处理中',
+        'shipped' => '已发货',
+        'delivered' => '已送达',
+        'cancelled' => '已取消',
+    ],
 ];

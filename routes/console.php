@@ -31,3 +31,20 @@ Schedule::command('shipments:sync')
     ->onFailure(function () {
         \Illuminate\Support\Facades\Log::error('shipments:sync scheduled run failed.');
     });
+
+// Negotiated prices that ran out. Hourly is enough: a price is valid for days,
+// so the worst a late sweep costs is an order showing a lapsed figure for a few
+// minutes longer.
+//
+// The same caveat as above applies, and matters less here on purpose. Nothing
+// runs this on a timer in production, so the expiry is enforced where it is
+// actually used instead: OrderNegotiation::accept() re-reads the expiry inside
+// its transaction and refuses a lapsed price, and Order::hasLiveOffer() drives
+// what the buyer is offered. This command tidies up and tells the thread; it is
+// not what makes an expired price unusable.
+Schedule::command('negotiations:expire')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onFailure(function () {
+        \Illuminate\Support\Facades\Log::error('negotiations:expire scheduled run failed.');
+    });

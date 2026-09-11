@@ -920,9 +920,51 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
 
+          // Une commande en négociation renvoie vers la discussion, pas vers le
+          // paiement : il n'y a pas encore de prix à régler.
+          if (order.isNegotiating)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD4AF37)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Négociation en cours',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Cette commande ne peut pas être réglée tant que le prix '
+                    "n'est pas convenu avec la boutique.",
+                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => context.push('/negotiations/${order.id}'),
+                      icon: const Icon(Icons.forum_outlined, size: 18),
+                      label: const Text('Ouvrir la discussion'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD4AF37),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // Payment Button for unpaid orders — hidden while a declaration is
           // still awaiting the vendor, so it cannot be submitted twice.
-          if ((order.paymentStatus == 'pending' || order.paymentStatus == 'partial') &&
+          if (!order.isNegotiating &&
+              (order.paymentStatus == 'pending' || order.paymentStatus == 'partial') &&
               !order.hasPaymentAwaitingConfirmation &&
               !isCancelled)
             Container(

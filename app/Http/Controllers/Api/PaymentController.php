@@ -84,6 +84,16 @@ class PaymentController extends Controller
             ], 400);
         }
 
+        // A price still under discussion is not a price to collect. Only
+        // payment_status was ever checked here, so an order in negotiation would
+        // have been payable at whatever provisional figure the basket carried.
+        if ($order->isNegotiating()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le prix de cette commande est en cours de négociation. Acceptez le prix proposé avant de régler.',
+            ], 409);
+        }
+
         $vendor = $order->vendor;
         $currency = $vendor->currency->code ?? 'USD';
 
@@ -188,6 +198,15 @@ class PaymentController extends Controller
         $order = Order::where('user_id', $user->id)
             ->with('vendor.currency')
             ->findOrFail($orderId);
+
+        // Same reason as createPaymentSession: nothing is owed until a price is
+        // agreed, so nothing can be declared against it either.
+        if ($order->isNegotiating()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le prix de cette commande est en cours de négociation. Acceptez le prix proposé avant de régler.',
+            ], 409);
+        }
 
         // A declaration already waiting on the vendor blocks a second one, exactly
         // as PaiementModal does on the web — otherwise a buyer whose first

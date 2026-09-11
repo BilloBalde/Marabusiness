@@ -15,7 +15,11 @@ class OrderStats extends BaseWidget
         $stats = DB::table('orders as o')
             ->join('vendors as v', 'o.vendor_id', '=', 'v.id')
             ->join('currencies as c', 'v.currency_id', '=', 'c.id')
-            ->where('o.status', '!=', 'cancelled')
+            // 'negotiating' alongside 'cancelled': an order whose price is still
+            // being argued over carries a provisional figure nobody has agreed to,
+            // and counting it inflates revenue with a number that is about to
+            // change.
+            ->whereNotIn('o.status', ['cancelled', 'negotiating'])
             ->select(
                 DB::raw('COUNT(o.id) as total_orders'),
                 DB::raw('SUM(o.grand_total * c.rate_to_usd) as total_revenue_usd'),
@@ -30,7 +34,7 @@ class OrderStats extends BaseWidget
         
         return [
             Stat::make('Total Orders', $stats->total_orders ?? 0)
-                ->description('All non-cancelled orders')
+                ->description('Excluding cancelled and under negotiation')
                 ->descriptionIcon('heroicon-o-shopping-bag')
                 ->color('primary'),
             

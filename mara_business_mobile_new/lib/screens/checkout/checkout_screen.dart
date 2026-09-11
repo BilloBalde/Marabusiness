@@ -78,6 +78,145 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     provider.updateShippingAddress(address);
   }
 
+  /// Ouvre une négociation sur la part d'une boutique dans le panier.
+  ///
+  /// Une adresse valide est exigée comme pour une commande ordinaire : ce qui est
+  /// créé ici EST une commande, simplement impayable tant qu'aucun prix n'est
+  /// convenu. Le moyen de paiement, lui, n'est demandé qu'à l'acceptation.
+  Future<void> _negotiate(VendorOrderSummary vendor) async {
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Complétez votre adresse de livraison avant de négocier'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    _updateShippingAddressFromForm();
+
+    final provider = context.read<CheckoutProvider>();
+
+    if (!provider.hasShippingCalculated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Calculez d\'abord la livraison'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final request = await _askForPrice(vendor);
+    if (request == null || !mounted) return;
+
+    final orderId = await provider.openNegotiation(
+      vendorId: vendor.vendorId,
+      message: request.message,
+      targetPrice: request.targetPrice,
+    );
+
+    if (!mounted) return;
+
+    if (orderId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.orderError ?? "Impossible d'ouvrir la négociation"),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    context.push('/negotiations/$orderId');
+  }
+
+  /// Le prix souhaité et le premier message. Le prix est facultatif : une
+  /// discussion peut s'ouvrir sans chiffre, le message non.
+  Future<_NegotiationRequest?> _askForPrice(VendorOrderSummary vendor) {
+    final priceController = TextEditingController();
+    final messageController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    return showDialog<_NegotiationRequest>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Discuter le prix — ${vendor.vendorName}'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total actuel : ${vendor.total.toStringAsFixed(2)} ${vendor.currency}',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: priceController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'Votre prix souhaité (facultatif)',
+                    suffixText: vendor.currency,
+                    border: const OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    final parsed = double.tryParse(value.trim().replaceAll(',', '.'));
+                    if (parsed == null || parsed <= 0) {
+                      return 'Entrez un montant valide';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: messageController,
+                  minLines: 2,
+                  maxLines: 4,
+                  // Même plafond que l'API, pour ne pas écrire longuement en vain.
+                  maxLength: 2000,
+                  decoration: const InputDecoration(
+                    labelText: 'Votre message à la boutique',
+                    counterText: '',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) =>
+                      (value == null || value.trim().isEmpty) ? 'Écrivez un message' : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Retour'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+
+              final raw = priceController.text.trim().replaceAll(',', '.');
+              Navigator.of(context).pop(_NegotiationRequest(
+                targetPrice: raw.isEmpty ? null : double.tryParse(raw),
+                message: messageController.text.trim(),
+              ));
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD4AF37),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Envoyer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
@@ -944,6 +1083,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 ],
                               ),
 
+                              // Discuter le prix avec CETTE boutique. Par vendeur,
+                              // parce que c'est la seule personne qui peut concéder
+                              // quelque chose sur ces lignes-là — et parce que
+                              // order_items ne porte pas de vendor_product_id, donc
+                              // une remise ligne à ligne ne pourrait pas être
+                              // appliquée même si on la voulait.
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: checkoutProvider.isPlacingOrder
+                                      ? null
+                                      : () => _negotiate(vendor),
+                                  icon: const Icon(Icons.forum_outlined, size: 16),
+                                  label: const Text(
+                                    'Discuter le prix',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFD4AF37),
+                                    side: const BorderSide(color: Color(0xFFD4AF37)),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                  ),
+                                ),
+                              ),
+
                               if (vendor != checkoutProvider.summary!.vendors.last)
                                 const Divider(height: 20),
                             ],
@@ -1203,4 +1368,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _zipController.clear();
     _country = 'Guinea';
   }
+}
+/// Ce que le client a saisi avant d'ouvrir la discussion : un prix souhaité,
+/// facultatif, et un message qui ne l'est pas.
+class _NegotiationRequest {
+  final double? targetPrice;
+  final String message;
+
+  const _NegotiationRequest({this.targetPrice, required this.message});
 }

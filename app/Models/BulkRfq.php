@@ -11,6 +11,9 @@ class BulkRfq extends Model
         'vendor_id',
         'product_id',
         'vendor_product_id',
+        // Set when the request came from checkout on a whole vendor basket; null
+        // for the original single-product flow, which builds its order later.
+        'order_id',
         'status',
         'quantity',
         'target_price',
@@ -54,6 +57,24 @@ class BulkRfq extends Model
     public function vendorProduct()
     {
         return $this->belongsTo(VendorProduct::class);
+    }
+
+    /**
+     * The order this negotiation is about.
+     *
+     * Present for a checkout negotiation, where the order exists from the first
+     * message. Null for the original single-product request, where an order only
+     * appears once an offer is accepted (RfqOfferConverter).
+     */
+    public function order()
+    {
+        return $this->belongsTo(Order::class);
+    }
+
+    /** A checkout negotiation rather than a single-product quote request. */
+    public function isOrderNegotiation(): bool
+    {
+        return $this->order_id !== null;
     }
 
     // Offers from vendors

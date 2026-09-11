@@ -9,17 +9,29 @@
                         <a href="{{ route('user.rfqs') }}" class="text-gray-400 hover:text-gray-600">
                             <i class="fas fa-arrow-left"></i>
                         </a>
+                        {{-- L'en-tête nommait le produit, que la négociation d'un panier
+                             n'a pas : elle porte sur une commande entière. Le titre dit
+                             donc de quoi on discute dans les deux cas. --}}
                         <div>
-                            <h1 class="text-xl font-semibold text-gray-900">RFQ #{{ $rfq->id }} Chat</h1>
+                            <h1 class="text-xl font-semibold text-gray-900">
+                                @if($rfq->order)
+                                    Négociation — commande {{ $rfq->order->order_number }}
+                                @else
+                                    Demande n°{{ $rfq->id }}
+                                @endif
+                            </h1>
                             <p class="text-sm text-gray-500">
-                                Product: {{ $rfq->product->name ?? 'N/A' }} • 
-                                {{ $otherParty['type'] === 'vendor' ? 'Vendor' : 'Buyer' }}: {{ $otherParty['name'] }}
+                                @if($rfq->product)
+                                    {{ $rfq->product->name }} •
+                                @elseif($rfq->order)
+                                    {{ $rfq->order->items->count() }} article(s) •
+                                @endif
+                                {{ $otherParty['type'] === 'vendor' ? 'Boutique' : 'Client' }} : {{ $otherParty['name'] }}
                             </p>
                         </div>
                     </div>
                     <div class="text-right">
                         <div class="text-sm font-medium text-gray-900">
-                            Status: 
                             @php
                                 $statusColors = [
                                     'pending' => 'text-yellow-600 bg-yellow-100',
@@ -27,18 +39,110 @@
                                     'accepted' => 'text-blue-600 bg-blue-100',
                                     'rejected' => 'text-red-600 bg-red-100',
                                 ];
+                                $statusLabels = [
+                                    'pending' => 'En attente du vendeur',
+                                    'quoted' => 'Prix proposé',
+                                    'accepted' => 'Prix accepté',
+                                    'rejected' => 'Refusée',
+                                    'cancelled' => 'Annulée',
+                                ];
                             @endphp
                             <span class="px-2 py-1 rounded-full text-xs {{ $statusColors[$rfq->status] ?? 'text-gray-600 bg-gray-100' }}">
-                                {{ ucfirst($rfq->status) }}
+                                {{ $statusLabels[$rfq->status] ?? ucfirst($rfq->status) }}
                             </span>
                         </div>
                         <p class="text-xs text-gray-500 mt-1">
-                            Quantity: {{ number_format($rfq->quantity) }} units
+                            {{ number_format($rfq->quantity, 0, ',', ' ') }} article(s)
                         </p>
                     </div>
                 </div>
             </div>
         </div>
+
+        {{-- Négociation sur une commande : l'acheteur voit ce qu'il paie aujourd'hui,
+             ce que le vendeur propose, et jusqu'à quand. Sans ce panneau le prix ne
+             vivrait que dans le texte d'un message, sans moyen d'y donner suite. --}}
+        @if($negotiatedOrder)
+            <div class="p-6 pb-0 space-y-4">
+                @if(session('error'))
+                    <div class="rounded-lg bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">
+                        {{ session('error') }}
+                    </div>
+                @endif
+
+                <div class="rounded-xl border border-gray-200 p-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                            Commande {{ $negotiatedOrder->order_number }}
+                        </h2>
+                        <span class="text-xs px-2 py-1 rounded-full
+                            {{ $negotiatedOrder->hasLiveOffer() ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-700' }}">
+                            {{ $negotiatedOrder->hasLiveOffer() ? 'Prix proposé' : 'En discussion' }}
+                        </span>
+                    </div>
+
+                    <dl class="mt-3 space-y-1 text-sm">
+                        <div class="flex justify-between">
+                            <dt class="text-gray-500">Prix initial</dt>
+                            <dd class="{{ $negotiatedOrder->hasLiveOffer() ? 'line-through text-gray-400' : 'text-gray-800' }}">
+                                {{ number_format((float) $negotiatedOrder->pre_negotiation_total, 2) }}
+                                {{ $negotiatedOrder->vendor?->currency?->code }}
+                            </dd>
+                        </div>
+
+                        @if($rfq->target_price)
+                            <div class="flex justify-between">
+                                <dt class="text-gray-500">Votre prix souhaité</dt>
+                                <dd class="text-gray-800">
+                                    {{ number_format((float) $rfq->target_price, 2) }}
+                                    {{ $negotiatedOrder->vendor?->currency?->code }}
+                                </dd>
+                            </div>
+                        @endif
+
+                        @if($negotiatedOrder->hasLiveOffer())
+                            <div class="flex justify-between font-semibold text-[#D4AF37] text-base pt-1">
+                                <dt>Prix proposé</dt>
+                                <dd>
+                                    {{ number_format((float) $negotiatedOrder->negotiated_total, 2) }}
+                                    {{ $negotiatedOrder->vendor?->currency?->code }}
+                                </dd>
+                            </div>
+                            <p class="text-xs text-gray-500">
+                                Valable jusqu'au
+                                {{ $negotiatedOrder->negotiated_expires_at?->format('d/m/Y à H:i') }}
+                            </p>
+                        @elseif($negotiatedOrder->offerHasExpired())
+                            <p class="text-xs text-red-600 pt-1">
+                                Le prix proposé a expiré. Demandez-en un nouveau au vendeur.
+                            </p>
+                        @endif
+                    </dl>
+
+                    @if($isBuyer && $negotiatedOrder->isNegotiating())
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            @if($negotiatedOrder->hasLiveOffer())
+                                <button wire:click="acceptNegotiatedPrice"
+                                        wire:confirm="Accepter ce prix et passer au paiement ?"
+                                        class="flex-1 bg-[#D4AF37] text-white text-sm font-medium px-4 py-2 rounded-lg">
+                                    Accepter et payer
+                                </button>
+                                <button wire:click="refuseNegotiatedPrice"
+                                        class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700">
+                                    Refuser
+                                </button>
+                            @endif
+
+                            <button wire:click="cancelNegotiation"
+                                    wire:confirm="Annuler définitivement cette commande ?"
+                                    class="px-4 py-2 text-sm text-red-600 border border-red-200 rounded-lg">
+                                Annuler la commande
+                            </button>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        @endif
 
         {{-- Devis reçus : jusqu'ici l'acheteur ne voyait le prix que dans le texte d'un
              message, sans aucun moyen d'y donner suite. --}}
@@ -104,7 +208,10 @@
                                           rows="2"
                                           maxlength="1000"
                                           placeholder="Ex. : prix trop élevé pour cette quantité, délai trop long…"
-                                          class="mt-1 w-full rounded-lg border-gray-300 text-sm focus:border-red-500 focus:ring-red-500"></textarea>
+                                          {{-- « border-gray-300 » seul ne pose pas de bordure : Tailwind
+                                               y règle la couleur, pas l'épaisseur. Il manquait « border »
+                                               et la marge intérieure. --}}
+                                          class="mt-1 w-full p-3 rounded-lg border border-gray-300 text-sm focus:border-red-500 focus:ring-red-500"></textarea>
                                 <div class="mt-3 flex items-center justify-end gap-3">
                                     <button type="button" wire:click="cancelRejecting"
                                             class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">
@@ -171,8 +278,8 @@
                     <div class="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
                         <i class="fas fa-comment text-2xl text-gray-400"></i>
                     </div>
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">Start the conversation</h3>
-                    <p class="text-gray-500">Send your first message to {{ $otherParty['name'] }}</p>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Démarrez la discussion</h3>
+                    <p class="text-gray-500">Écrivez votre premier message à {{ $otherParty['name'] }}</p>
                 </div>
             @endif
         </div>
@@ -184,7 +291,7 @@
                     <textarea
                         wire:model="newMessage"
                         rows="1"
-                        placeholder="Type your message here..."
+                        placeholder="Écrivez votre message…"
                         class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                         x-data="{
                             resize() {
@@ -201,10 +308,10 @@
                         wire:loading.attr="disabled"
                     >
                         <i class="fas fa-paper-plane mr-2"></i>
-                        <span wire:loading.remove>Send</span>
+                        <span wire:loading.remove>Envoyer</span>
                         <span wire:loading>
                             <i class="fas fa-spinner fa-spin mr-2"></i>
-                            Sending...
+                            Envoi…
                         </span>
                     </button>
                 </form>

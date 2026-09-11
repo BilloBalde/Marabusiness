@@ -31,4 +31,18 @@ return [
         'catalog' => 'Catalogue',
         'configuration' => 'Configuration',
     ],
+
+    // Onglets de la liste des commandes. « negotiating » manquait en même temps
+    // que le statut lui-même : une commande en discussion n'apparaissait que sous
+    // « Toutes », si bien que la pastille de navigation comptait des clients en
+    // attente d'un prix sans aucune liste vers laquelle cliquer.
+    'order_tabs' => [
+        'all' => 'Toutes',
+        'negotiating' => 'Négociations',
+        'new' => 'Nouvelles',
+        'processing' => 'En préparation',
+        'shipped' => 'Expédiées',
+        'delivered' => 'Livrées',
+        'cancelled' => 'Annulées',
+    ],
 ];

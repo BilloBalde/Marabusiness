@@ -1484,4 +1484,82 @@ Future<ApiResponse> deleteProductReview(int reviewId) async {
       return _handleError(e);
     }
   }
+
+  // NÉGOCIATION DE PRIX
+  //
+  // Aucun de ces appels ne décide quoi que ce soit : le serveur porte les règles
+  // (qui fixe un prix, ce qu'un prix expiré autorise, le stock à l'acceptation),
+  // et répond 409 quand il refuse. L'écran affiche ce message-là plutôt que d'en
+  // inventer un.
+  Future<ApiResponse> openNegotiation(Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.post(ApiEndpoints.negotiations, data: data);
+      return _handleResponse(response);
+    } on DioException catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  Future<ApiResponse> getNegotiations() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.negotiations);
+      return _handleResponse(response);
+    } on DioException catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  Future<ApiResponse> getNegotiation(int orderId) async {
+    try {
+      final response = await _dio.get(ApiEndpoints.negotiationDetail(orderId));
+      return _handleResponse(response);
+    } on DioException catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  Future<ApiResponse> sendNegotiationMessage(int orderId, String message) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.negotiationMessages(orderId),
+        data: {'message': message},
+      );
+      return _handleResponse(response);
+    } on DioException catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  Future<ApiResponse> acceptNegotiatedPrice(int orderId) async {
+    try {
+      final response = await _dio.post(ApiEndpoints.negotiationAccept(orderId));
+      return _handleResponse(response);
+    } on DioException catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  Future<ApiResponse> refuseNegotiatedPrice(int orderId, {String? reason}) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.negotiationRefuse(orderId),
+        data: reason == null ? null : {'reason': reason},
+      );
+      return _handleResponse(response);
+    } on DioException catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  Future<ApiResponse> cancelNegotiation(int orderId, {String? reason}) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.negotiationCancel(orderId),
+        data: reason == null ? null : {'reason': reason},
+      );
+      return _handleResponse(response);
+    } on DioException catch (e) {
+      return _handleError(e);
+    }
+  }
 }

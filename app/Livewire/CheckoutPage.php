@@ -14,6 +14,7 @@ use App\Models\FinancialTransaction; // Add this
 use App\Services\Shipping\CartShippingResolver;
 use App\Support\ShippingCarrierFilter;
 use App\Services\FinanceCalculator; // Add this
+use App\Services\OrderNegotiation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -72,6 +73,12 @@ class CheckoutPage extends Component
     // Loading states
     public $calculatingShipping = false;
     public $placingOrder = false;
+
+    // Price negotiation: which vendor group has its panel open, and what the
+    // buyer has typed into it.
+    public $negotiatingVendorId = null;
+    public $negotiationTargetPrice = null;
+    public $negotiationMessage = '';
 
     public function mount()
     {
@@ -148,6 +155,123 @@ class CheckoutPage extends Component
     public function clearSelectedAddress(): void
     {
         $this->selected_address_id = null;
+    }
+
+    /**
+     * Opens the "discuter le prix" panel for one vendor group.
+     *
+     * Inline rather than a modal: the buyer should still see the basket they are
+     * pricing while they type a number for it.
+     */
+    public function openNegotiation(int $vendorId): void
+    {
+        $this->negotiatingVendorId = $vendorId;
+        $this->negotiationTargetPrice = null;
+        $this->negotiationMessage = '';
+        $this->resetValidation();
+    }
+
+    public function cancelNegotiation(): void
+    {
+        $this->negotiatingVendorId = null;
+        $this->negotiationTargetPrice = null;
+        $this->negotiationMessage = '';
+        $this->resetValidation();
+    }
+
+    /**
+     * Sends the basket of one vendor to that vendor as a price discussion.
+     *
+     * The order is created straight away so both sides have something concrete to
+     * talk about, but it cannot be paid until a price is agreed. Only this
+     * vendor's lines leave the cart — the rest of the basket can still be checked
+     * out normally, which is the whole reason checkout groups by vendor.
+     */
+    public function startNegotiation()
+    {
+        if (! $this->negotiatingVendorId) {
+            return;
+        }
+
+        // The order needs a real delivery address and a shipping figure, so the
+        // same address rules as placing an order apply here.
+        $this->validate([
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'city' => 'required|string|max:255',
+            'phone' => 'required|string|max:255',
+            'street_address' => 'required|string|max:255',
+            'state' => 'required|string|max:255',
+            'country' => 'required|string|max:255',
+            'negotiationMessage' => 'required|string|max:2000',
+            'negotiationTargetPrice' => 'nullable|numeric|min:0',
+        ], [], [
+            'negotiationMessage' => 'message',
+            'negotiationTargetPrice' => 'prix souhaité',
+        ]);
+
+        $groups = $this->getGroupedCartItems();
+        $group = $groups->get($this->negotiatingVendorId);
+
+        if (! $group) {
+            session()->flash('error', "Cette boutique n'est plus dans votre panier.");
+            $this->cancelNegotiation();
+
+            return;
+        }
+
+        $shippingBreakdown = $this->getSelectedShipping()['vendors'] ?? [];
+        $vendorShippingUsd = (float) ($shippingBreakdown[$this->negotiatingVendorId]['cost'] ?? 0);
+        $vendorShippingLocal = $this->convertUsdToVendorCurrency($vendorShippingUsd, $group['rate_to_usd']);
+
+        $sourceAddress = $this->selected_address_id
+            ? Address::where('user_id', Auth::id())->whereNull('order_id')->find($this->selected_address_id)
+            : null;
+
+        try {
+            $order = (new OrderNegotiation())->open(
+                buyer: Auth::user(),
+                vendor: $group['vendor'],
+                items: $group['items']->all(),
+                shippingLocal: $vendorShippingLocal,
+                shippingUsd: $vendorShippingUsd,
+                targetPrice: $this->negotiationTargetPrice !== null && $this->negotiationTargetPrice !== ''
+                    ? (float) $this->negotiationTargetPrice
+                    : null,
+                message: $this->negotiationMessage,
+                address: [
+                    'first_name' => $sourceAddress?->first_name ?? $this->first_name,
+                    'last_name' => $sourceAddress?->last_name ?? $this->last_name,
+                    'phone' => $sourceAddress?->phone ?? $this->phone,
+                    'street_address' => $sourceAddress?->street_address ?? $this->street_address,
+                    'city' => $sourceAddress?->city ?? $this->city,
+                    'state' => $sourceAddress?->state ?? $this->state,
+                    'zip_code' => $sourceAddress?->zip_code ?? $this->zip_code,
+                    'locality_id' => $sourceAddress?->locality_id ?? $this->locality_id,
+                    'country' => $sourceAddress?->country ?? $this->country,
+                    'latitude' => $sourceAddress?->latitude ?? $this->latitude,
+                    'longitude' => $sourceAddress?->longitude ?? $this->longitude,
+                ],
+                shippingCarrier: $this->shipping_carrier,
+                zone: $shippingBreakdown[$this->negotiatingVendorId]['zone'] ?? null,
+            );
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
+
+        // Only this vendor's lines leave the cart; the others stay checkout-able.
+        foreach ($group['items'] as $item) {
+            CartManagement::removeCartItem($item['cart_key']);
+        }
+
+        $this->cancelNegotiation();
+        $this->dispatch('cart-updated');
+
+        session()->flash('success', "Votre demande est partie. Suivez la discussion ci-dessous.");
+
+        return redirect()->route('rfq.chat', $order->negotiation);
     }
 
     protected function getFinanceCalculator()
@@ -435,15 +559,19 @@ class CheckoutPage extends Component
             }
             
             /**
-             * Stock was last checked when these items went into the cart, and the
-             * cart cookie lives thirty days. The decrement further down writes
-             * max(0, stock - quantity), so ordering five of something with one
-             * left stored 0 rather than -2 and the oversell left no trace at all.
-             * Refused here, before a single order row exists.
+             * Stock was last checked when these items went into the cart, and a
+             * cart never expires. CartManagement::getCartItemsFromCookie() reads
+             * cart_items rows keyed on user_id — the cookie in its name is a
+             * leftover from an older implementation — and nothing ever prunes
+             * them, so the gap between the check and here has no upper bound.
+             * The decrement further down writes max(0, stock - quantity), so
+             * ordering five of something with one left stored 0 rather than -2 and
+             * the oversell left no trace at all. Refused here, before a single
+             * order row exists.
              *
              * Unlike the API endpoint this method runs outside a transaction, so
              * the rows cannot be locked and two simultaneous checkouts can still
-             * both pass. That is a narrower window than a thirty-day-old cart, but
+             * both pass. That window is far narrower than a months-old cart, but
              * it is not closed: closing it needs placeOrder() wrapped in a
              * transaction, which is a separate change.
              */

@@ -174,8 +174,18 @@ class OrderResource extends Resource
                             ->required()
                             ->default('pending'),
 
+                        // Same gap as the table's status column: without a
+                        // 'negotiating' option, editing an order under negotiation
+                        // opened this required field with nothing selected and
+                        // forced whoever saved to pick another status — ending the
+                        // discussion by accident and making the order payable at a
+                        // price nobody had agreed. Disabled while negotiating, so
+                        // Filament leaves the column alone (a disabled field is not
+                        // dehydrated); the way out is the price / accept / cancel
+                        // path, which writes the agreed total and its entries.
                         ToggleButtons::make('status')
                             ->options([
+                                Order::STATUS_NEGOTIATING => 'Negotiating',
                                 'new' => 'New',
                                 'processing' => 'Processing',
                                 'shipped' => 'Shipped',
@@ -185,7 +195,12 @@ class OrderResource extends Resource
                             ->default('new')
                             ->inline()
                             ->required()
+                            ->disabled(fn (?Order $record): bool => $record?->status === Order::STATUS_NEGOTIATING)
+                            ->helperText(fn (?Order $record): ?string => $record?->status === Order::STATUS_NEGOTIATING
+                                ? "Commande en négociation : le statut se règle en fixant le prix ou en annulant."
+                                : null)
                             ->colors([
+                                Order::STATUS_NEGOTIATING => 'warning',
                                 'new' => 'info',
                                 'processing' => 'warning',
                                 'shipped' => 'success',
@@ -193,6 +208,7 @@ class OrderResource extends Resource
                                 'cancelled' => 'danger'
                             ])
                             ->icons([
+                                Order::STATUS_NEGOTIATING => 'heroicon-m-chat-bubble-left-right',
                                 'new' => 'heroicon-m-sparkles',
                                 'processing' => 'heroicon-m-arrow-path',
                                 'shipped' => 'heroicon-m-truck',
@@ -679,6 +695,12 @@ class OrderResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // Aucun tri par défaut n'était posé : la table sortait dans l'ordre
+            // naturel de la base, c'est-à-dire par id croissant. La commande la
+            // plus récente — celle qui attend quelque chose — se retrouvait donc
+            // sur la DERNIÈRE page. Une boutique avec cinquante commandes ne
+            // pouvait pas trouver la négociation que sa pastille lui signalait.
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('order_number')->sortable()->searchable(),
                 TextColumn::make('user.name')->sortable()->searchable()->label('Customer'),
@@ -689,14 +711,24 @@ class OrderResource extends Resource
                 TextColumn::make('payment_status')->searchable()->sortable(),
                 TextColumn::make('vendor.store_name')->label('Vendor')->searchable()->sortable(),
                 TextColumn::make('shipping_carrier')->label('Shipping Carrier')->searchable()->sortable(),
+                // 'negotiating' was absent from these options, so an order under
+                // negotiation showed an empty dropdown here — and anyone could pick
+                // "New" from it, making an order payable at its catalogue price
+                // while the vendor had not yet named one and the buyer had agreed
+                // to nothing. The status is listed so the row reads correctly, and
+                // the control is locked while the discussion is open: leaving a
+                // negotiation goes through the price/accept/cancel path, which
+                // writes the agreed total and the financial entries with it.
                 SelectColumn::make('status')
                     ->options([
+                        Order::STATUS_NEGOTIATING => 'Negotiating',
                         'new' => 'New',
                         'processing' => 'Processing',
                         'shipped' => 'Shipped',
                         'delivered' => 'Delivered',
                         'cancelled' => 'Cancelled'
                     ])
+                    ->disabled(fn (Order $record): bool => $record->status === Order::STATUS_NEGOTIATING)
                     ->sortable()
                     ->searchable(),
                 TextColumn::make('created_at')->searchable()->sortable()->datetime()->toggleable(isToggledHiddenByDefault: true),
@@ -735,6 +767,7 @@ class OrderResource extends Resource
                     ]),
                 SelectFilter::make('status')
                     ->options([
+                        Order::STATUS_NEGOTIATING => 'Negotiating',
                         'new' => 'New',
                         'processing' => 'Processing',
                         'shipped' => 'Shipped',

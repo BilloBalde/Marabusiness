@@ -501,8 +501,81 @@ void _generateSummaryWithoutShipping() {
     }
   }
 
+  /// Ouvre une négociation de prix sur la part d'une boutique.
+  ///
+  /// Mêmes préalables que [placeOrder] — une adresse et un transporteur, parce
+  /// que la commande créée ici est une vraie commande — moins le moyen de
+  /// paiement : il n'y a rien à régler tant qu'aucun prix n'est convenu. Le
+  /// serveur recalcule lui-même les frais de port ; ce qui part d'ici, c'est
+  /// l'adresse et le transporteur choisis, pas un montant.
+  ///
+  /// Renvoie l'order_id de la négociation créée, ou null. En cas d'échec,
+  /// [orderError] porte le message du serveur.
+  Future<int?> openNegotiation({
+    required int vendorId,
+    required String message,
+    double? targetPrice,
+  }) async {
+    if (_shippingAddress == null) {
+      _orderError = 'Veuillez renseigner une adresse de livraison';
+      notifyListeners();
+      return null;
+    }
+
+    if (!_hasShippingCalculated || _shippingResult == null) {
+      _orderError = 'Veuillez d\'abord calculer la livraison';
+      notifyListeners();
+      return null;
+    }
+
+    _isPlacingOrder = true;
+    _orderError = null;
+    notifyListeners();
+
+    try {
+      final addressData = _shippingAddress!.toJson();
+      if (_latitude != null && _longitude != null) {
+        addressData['latitude'] = _latitude;
+        addressData['longitude'] = _longitude;
+      }
+
+      final response = await _apiService.openNegotiation({
+        'vendor_id': vendorId,
+        'selected_ids': _selectedIds,
+        'address': addressData,
+        'shipping_carrier': _selectedCarrier,
+        'message': message,
+        if (targetPrice != null) 'target_price': targetPrice,
+      });
+
+      _isPlacingOrder = false;
+
+      if (response.success && response.data != null) {
+        // Ces articles ont quitté le panier côté serveur : le recharger, sinon
+        // l'écran continue de les proposer au paiement.
+        await _cartProvider.loadCart();
+        notifyListeners();
+
+        final negotiation = response.data['negotiation'];
+        if (negotiation is Map && negotiation['order_id'] != null) {
+          final id = negotiation['order_id'];
+          return id is int ? id : int.tryParse('$id');
+        }
+        return null;
+      }
+
+      _orderError = response.message ?? "Impossible d'ouvrir la négociation";
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _orderError = e.toString();
+      _isPlacingOrder = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
   // Generate summary from cart items and shipping result
-// Generate summary from cart items and shipping result
 void _generateSummary() {
   final selectedItems = _cartProvider.items
       .where((item) => _selectedIds.contains(item.vendorProductId))

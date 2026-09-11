@@ -150,9 +150,19 @@ class Order {
   bool get isProcessing => status == 'processing';
   bool get isShipped => trackingNumber != null && trackingNumber!.isNotEmpty;
   bool get isCancellable => status == 'new' || status == 'pending';
-  
+
+  /// Une commande dont le prix est encore en discussion.
+  ///
+  /// Elle a payment_status 'pending' comme une commande impayée ordinaire, ce qui
+  /// suffisait à faire apparaître « Payer maintenant » : le serveur répond 409,
+  /// mais un bouton qui ne peut que échouer n'a rien à faire là. On sort par le
+  /// prix accepté, refusé ou annulé, pas par le paiement.
+  bool get isNegotiating => status == 'negotiating';
+
   String get statusLabel {
     switch (status) {
+      case 'negotiating':
+        return 'En négociation';
       case 'new':
         return 'Nouvelle';
       case 'pending':
@@ -170,6 +180,8 @@ class Order {
 
   Color get statusColor {
     switch (status) {
+      case 'negotiating':
+        return const Color(0xFFD4AF37);
       case 'new':
       case 'pending':
         return Colors.amber;

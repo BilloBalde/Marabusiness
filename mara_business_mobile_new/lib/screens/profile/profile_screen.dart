@@ -557,6 +557,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   badge: _unreadMessages > 0 ? '$_unreadMessages' : null,
                   onTap: () => context.push('/messages'),
                 ),
+                // Sans cette entrée, une négociation ouverte depuis le checkout
+                // n'était joignable que par l'écran vers lequel on venait d'être
+                // envoyé : quitter l'application, c'était la perdre.
+                _buildMenuItem(
+                  icon: Icons.handshake_outlined,
+                  title: 'Mes négociations',
+                  subtitle: 'Vos discussions de prix',
+                  onTap: () => context.push('/negotiations'),
+                ),
                 _buildMenuItem(
                   icon: Icons.help_outline,
                   title: 'Centre d\'Aide',

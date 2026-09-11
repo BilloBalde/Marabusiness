@@ -10,6 +10,22 @@ services:
       chmod -R 755 storage bootstrap/cache
       # Create SQLite database if not exists
       touch storage/database.sqlite
+    # N'AJOUTEZ PAS `php artisan migrate` ci-dessus, ni dans un preDeployCommand.
+    #
+    # La documentation de Render est explicite : « You can't access persistent
+    # disks during a service's build command or pre-deploy command (these
+    # commands run on separate compute). » Le disque déclaré plus bas n'est monté
+    # qu'au runtime. Une migration lancée depuis le build porterait donc sur le
+    # storage/database.sqlite éphémère que le `touch` ci-dessus vient de créer —
+    # jeté dès le déploiement terminé — et Artisan afficherait « Migrated » sans
+    # que la vraie base ait changé. L'échec serait silencieux et convaincant,
+    # c'est-à-dire la pire sorte.
+    #
+    # Les migrations s'appliquent depuis /admin/database-maintenance, qui tourne
+    # dans le processus web et voit donc le disque. La page liste ce qui est en
+    # attente, copie le fichier de base, puis migre. Même remède que le bouton
+    # « Synchroniser le suivi » de la page Logistiques, posé face à la même
+    # contrainte (voir aussi routes/console.php).
     # No startCommand: this used to force `php artisan serve`, PHP's own
     # single-threaded development server — one request at a time, so a slow one
     # (an invoice PDF, a Stripe call) blocked every other visitor until it

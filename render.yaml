@@ -51,13 +51,21 @@ services:
       name: marabusiness-data
       mountPath: /opt/render/project/src/storage
       sizeGB: 1
-    # NOT covered by this disk: config/filesystems.php's 'public_uploads' disk
-    # (product images, payment proofs) writes to public/uploads — outside
-    # storage/ entirely, so those files are still wiped on every redeploy. A
-    # second disk, if Render's render.yaml schema supports more than one per
-    # service, or moving these uploads onto the 'public' disk (storage/app/
-    # public, already inside the mount above) would close that gap too — left
-    # for a deliberate follow-up rather than guessed at here.
+    # config/filesystems.php's 'public_uploads' disk (product images, payment
+    # proofs) writes to public/uploads — outside storage/ entirely, so those
+    # files used to be wiped on every redeploy despite this disk. Fixed without
+    # a second disk or moving any of the 32 write sites: App\Support\UploadsStorage
+    # makes public/uploads a link (junction on Windows, symlink elsewhere) to
+    # storage/app/public/uploads, which IS inside this mount. Every write still
+    # targets public_path('uploads') exactly as before and lands on the
+    # persisted disk without knowing it. AppServiceProvider::boot() poses the
+    # link on the first request after each deploy — public/uploads is no
+    # longer in git, so a fresh checkout never has it, and the disk's existing
+    # content survives because nothing here ever touches storage/ at build or
+    # pre-deploy time (see DatabaseMaintenance's docblock for why that's
+    # impossible on Render, and UploadsStorage's docblock for two Windows-only
+    # traps this took to get right: is_link() does not recognise a junction,
+    # and Filesystem::link() never signals success or failure on Windows).
     envVars:
       - key: APP_ENV
         value: production

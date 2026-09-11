@@ -3,6 +3,9 @@
 /public/build
 /public/hot
 /public/storage
+# Créé au démarrage par App\Support\UploadsStorage, jamais par git checkout —
+# voir resources/seed-uploads/README.md et config/filesystems.php's `links`.
+/public/uploads
 /storage/*.key
 /storage/pail
 /vendor

@@ -80,6 +80,10 @@ return [
 
     'links' => [
         public_path('storage') => storage_path('app/public'),
+        // Fait aussi partie de ce que `App\Support\UploadsStorage::ensureLinked()`
+        // pose automatiquement à chaque démarrage — cette entrée permet en plus
+        // à `php artisan storage:link` de le faire à la main si besoin.
+        public_path('uploads') => storage_path('app/public/uploads'),
     ],
 
 ];

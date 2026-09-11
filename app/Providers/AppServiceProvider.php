@@ -3,12 +3,14 @@
 namespace App\Providers;
 
 use App\Http\Livewire\CustomerSidebar as LivewireCustomerSidebar;
+use App\Support\UploadsStorage;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Laravel\Socialite\Facades\Socialite;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -42,6 +44,36 @@ class AppServiceProvider extends ServiceProvider
 
         $this->routeSocialiteThroughProxy();
         $this->logQueriesWhenAsked();
+        $this->ensureUploadsStorageIsLinked();
+    }
+
+    /**
+     * Voir App\Support\UploadsStorage — sur Render, seul `storage/` survit à un
+     * déploiement ; `public/uploads`, où le disque `public_uploads` écrit
+     * réellement, n'y est pas. Ce lien fait que chaque écriture continue de
+     * viser `public_path('uploads')` sans le savoir, et atterrit en réalité
+     * dans le dossier persistant.
+     *
+     * Réservé aux requêtes HTTP : sur `php artisan test`, cela aurait tenté de
+     * poser un vrai lien à chaque amorçage de test — un coût inutile répété
+     * des centaines de fois, sur une machine de développement où rien ne sert
+     * jamais ces fichiers par ce chemin pendant les tests.
+     *
+     * Attrapé plutôt que laissé remonter : un disque plein ou un problème de
+     * permissions ne doit pas transformer toute page du site en 500 juste
+     * parce que les images ne peuvent pas (encore) s'afficher.
+     */
+    private function ensureUploadsStorageIsLinked(): void
+    {
+        if ($this->app->runningInConsole()) {
+            return;
+        }
+
+        try {
+            UploadsStorage::ensureLinked();
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     /**

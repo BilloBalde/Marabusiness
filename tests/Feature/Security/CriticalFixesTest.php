@@ -186,9 +186,21 @@ class CriticalFixesTest extends TestCase
 
         $breakdown = (new FinanceCalculator())->calculateOrderBreakdown($order);
 
-        // No commission setting in a fresh test database, so the vendor keeps it all —
-        // the point is that the percentage is computed, not zeroed by the guard.
+        // This asserted a flat 100%, on the premise that a fresh test database
+        // carries no commission setting. A migration now seeds a platform-wide
+        // rate, so the vendor no longer keeps everything and the premise is gone.
+        //
+        // The rate itself is not this test's business — it belongs to
+        // PlatformCommissionTest, and pinning it here would break this security
+        // test every time the owner changes their pricing. What matters here is
+        // the guard around the division: a real total must produce a real
+        // percentage rather than the zero that a null or zero total returns.
         $this->assertSame(1000.0, (float) $breakdown['gross_amount']);
-        $this->assertSame(100.0, $breakdown['breakdown']['net_percentage']);
+        $this->assertGreaterThan(0.0, $breakdown['breakdown']['net_percentage']);
+        $this->assertEqualsWithDelta(
+            $breakdown['net_amount'] / $breakdown['gross_amount'] * 100,
+            $breakdown['breakdown']['net_percentage'],
+            0.001
+        );
     }
 }

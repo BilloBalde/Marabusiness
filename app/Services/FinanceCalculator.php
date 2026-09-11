@@ -66,18 +66,50 @@ class FinanceCalculator
         return $total > 0 ? $part / $total * 100 : 0.0;
     }
 
+    /**
+     * La commission de la plateforme sur un montant, pour une boutique.
+     *
+     * Une ligne propre à la boutique l'emporte sur la règle globale
+     * (vendor_id null), et c'est la règle globale qui s'applique à tout le
+     * reste.
+     *
+     * Deux corrections par rapport à la version d'avant, toutes deux visibles
+     * sur l'argent :
+     *
+     * 1. Le filtre is_active se fait dans la requête, pas après. Avant, la ligne
+     *    de la boutique était choisie puis rejetée si elle était inactive, et la
+     *    méthode renvoyait 0 — sans jamais retomber sur la règle globale.
+     *    Désactiver l'exception d'une boutique dans l'admin voulait donc dire
+     *    « cette boutique ne paie plus rien », là où l'écran laisse entendre
+     *    « cette boutique repasse au taux par défaut ».
+     *
+     * 2. Le OR est parenthésé. `where(a)->orWhereNull(b)` collé aux autres
+     *    conditions les fait fuir hors du OR dès qu'on en ajoute une ; ici la
+     *    condition d'activité en serait sortie.
+     *
+     * Ce que cette méthode ne fait toujours pas : consulter payment_method.
+     * La colonne existe, le modèle la documente (« null for all, or 'stripe',
+     * 'orange_money' »), et rien ne la lit — une commission propre à un moyen de
+     * paiement s'appliquerait donc à tous. La corriger demande de faire
+     * descendre le moyen de paiement jusqu'ici, ce qui touche six appelants ;
+     * c'est un lot à part, pas un effet de bord de celui-ci.
+     */
     public function calculateCommission($amount, $vendorId = null): float
     {
-        // Get commission setting for vendor or global
-        $commissionSetting = CommissionSetting::where('vendor_id', $vendorId)
-            ->orWhereNull('vendor_id')
-            ->orderBy('vendor_id', 'desc') // Vendor-specific first
+        $commissionSetting = CommissionSetting::query()
+            ->where('is_active', true)
+            ->where(function ($query) use ($vendorId) {
+                $query->where('vendor_id', $vendorId)
+                    ->orWhereNull('vendor_id');
+            })
+            // La ligne de la boutique d'abord, la règle globale en repli.
+            ->orderByRaw('CASE WHEN vendor_id IS NULL THEN 1 ELSE 0 END')
             ->first();
-            
-        if (!$commissionSetting || !$commissionSetting->is_active) {
+
+        if (! $commissionSetting) {
             return 0;
         }
-        
+
         if ($commissionSetting->commission_type === 'percentage') {
             $commission = ($amount * $commissionSetting->commission_rate) / 100;
         } else {

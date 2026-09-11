@@ -81,8 +81,16 @@ class PaiementResource extends Resource
                     ])
                     ->required(),
 
+                // 'public', pas 'public_uploads' : c'est le disque que le
+                // modal web (PaiementModal) et l'API mobile
+                // (PaymentController::submitOfflinePayment) utilisent
+                // réellement pour écrire une preuve de paiement, et celui que
+                // PaiementsRelationManager lit déjà pour l'afficher sous une
+                // commande. Avec 'public_uploads' ici, cette page ne montrait
+                // jamais les preuves que les acheteurs envoient — seulement
+                // celles créées depuis cette page elle-même.
                 FileUpload::make('image')
-                    ->disk('public_uploads')
+                    ->disk('public')
                     ->directory('payments')
                     ->label('Payment Screenshot')
                     ->previewable(true),
@@ -109,7 +117,7 @@ class PaiementResource extends Resource
                 Tables\Columns\TextColumn::make('payment_status'),
                 ImageColumn::make('image')
                     ->label('Image')
-                    ->disk('public_uploads')
+                    ->disk('public')
                     ->circular(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])

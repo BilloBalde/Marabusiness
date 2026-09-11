@@ -284,10 +284,27 @@ class Order extends Model
      * a rule — which is how payment_status came to be left untouched while total_paid
      * was updated, so a settled order kept reading "En attente de paiement". One
      * method now owns it.
+     *
+     * Each confirmed payment is converted into the order's OWN frozen rate_to_usd
+     * before being summed — not just added as a raw number. `paiements.currency` is
+     * a real, independent column: nothing forces it to match the order's currency,
+     * and on this database it sometimes does not (an order priced at 54.03 in its
+     * own currency carrying a single confirmed payment of 3,000,000 GNF is real,
+     * live data, not a hypothetical). Summing raw amounts across two different
+     * currencies produced exactly what that pairing shows — total_paid dwarfing
+     * grand_total by a factor of tens of thousands, and the order reading "paid"
+     * regardless of what actually arrived.
      */
     public function syncPaymentTotals(): void
     {
-        $paid = (float) $this->confirmedPaiements()->sum('amount');
+        $paid = (float) $this->confirmedPaiements()
+            ->get(['amount', 'currency'])
+            ->sum(fn (Paiement $payment) => \App\Support\Money::convert(
+                (float) $payment->amount,
+                $this->rateToUsdFor($payment->currency),
+                (float) $this->rate_to_usd,
+            ));
+
         $remaining = max(0, (float) $this->grand_total - $paid);
 
         $status = match (true) {
@@ -301,6 +318,38 @@ class Order extends Model
             'total_remaining' => $remaining,
             'payment_status'  => $status,
         ]);
+    }
+
+    /**
+     * The rate to convert a payment's own currency into USD, for syncPaymentTotals().
+     *
+     * The common case — a payment in the order's own currency — never queries
+     * `currencies`: it reuses the rate already frozen on the order, which is also
+     * more correct than a fresh lookup would be, since a vendor's currency and its
+     * rate can change after the order was placed. A lookup only happens for a
+     * payment recorded in some OTHER currency, and an unresolvable code (renamed,
+     * deleted, or simply typo'd on a manual entry) returns null — Money::convert()
+     * then passes the amount through unconverted, the same fallback it already
+     * uses for a zero or missing rate, rather than silently dropping the payment
+     * from the balance.
+     *
+     * Compared case-insensitively: currency codes are meant to be stored
+     * uppercase (every Currency row is), but this database has real Paiement
+     * rows carrying 'gnf' next to others carrying 'GNF' for the very same
+     * order — manual entry that never went through a code that normalises it.
+     * An exact-case comparison would treat those as two different currencies
+     * and either skip the free fast path or fail the lookup below for a
+     * payment that is, in fact, already in the order's own currency.
+     */
+    private function rateToUsdFor(?string $paymentCurrency): ?float
+    {
+        $orderCurrency = $this->vendor?->currency?->code;
+
+        if ($paymentCurrency === null || strcasecmp($paymentCurrency, (string) $orderCurrency) === 0) {
+            return $this->rate_to_usd;
+        }
+
+        return Currency::whereRaw('UPPER(code) = ?', [strtoupper($paymentCurrency)])->value('rate_to_usd');
     }
 
     /**

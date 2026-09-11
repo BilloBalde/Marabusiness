@@ -1,13 +1,11 @@
 // lib/screens/order_detail/payment_modal.dart
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart'; // Add this for context.read
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/order.dart';
 import '../../utils/currency_formatter.dart';
 import '../../services/api_service.dart'; // Add this for ApiService
-import '../../core/models/api_response.dart'; // Add this for ApiResponse
 
 class PaymentModal extends StatefulWidget {
   final Order order;
@@ -308,7 +306,7 @@ class _PaymentModalState extends State<PaymentModal> {
           boxShadow: isSelected && enabled
               ? [
                   BoxShadow(
-                    color: const Color(0xFFD4AF37).withOpacity(0.2),
+                    color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   )
@@ -356,16 +354,16 @@ class _PaymentModalState extends State<PaymentModal> {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -417,18 +415,26 @@ class _PaymentModalState extends State<PaymentModal> {
       final apiService = context.read<ApiService>();
       
       if (_selectedMethod == 'cod') {
-        // For COD, just confirm the order
-        // You might want to call an API to confirm COD
         final response = await apiService.createPaymentSession(
           widget.order.id,
           'cod',
         );
-        if (response.success && mounted) {
+        if (!mounted) return;
+
+        if (response.success) {
           Navigator.pop(context);
           widget.onPaymentSuccess();
-          _showSuccess('Commande confirmée! Vous avez payé à la livraison.');
+          // Not "confirmée" — the buyer has declared the cash payment, the vendor
+          // still has to confirm the courier collected it. Saying it was confirmed
+          // is what made buyers think a delivery was settled when it was not.
+          _showSuccess('Paiement à la livraison enregistré. En attente de validation du vendeur.');
+        } else {
+          // This branch did not exist: the server refusing (a payment already
+          // declared, an expired session) left the button spinning back to idle
+          // with no message at all, so the buyer simply tapped again.
+          _showError(response.message ?? 'Erreur de paiement');
         }
-      } 
+      }
       else if (_selectedMethod == 'lengopay') {
         // Create LengoPay session
         final response = await apiService.createPaymentSession(

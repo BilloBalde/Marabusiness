@@ -1,3 +1,4 @@
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -5,7 +6,6 @@ import '../../core/models/home_models.dart'; // For Category
 import '../../core/models/brand_models.dart'; // For Brand
 import '../../core/providers/home_provider.dart';
 import '../../core/providers/brand_provider.dart';
-import '../../core/constants/app_constants.dart';
 import '../products/products_screen.dart';
 
 class AllCategoriesScreen extends StatefulWidget {
@@ -333,7 +333,7 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD4AF37).withOpacity(0.1),
+                      color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(icon, color: const Color(0xFFD4AF37), size: 20),
@@ -374,7 +374,7 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
                 border: Border.all(color: Colors.grey[200]!),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -418,7 +418,7 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -434,7 +434,7 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
                 color: Colors.grey[50],
                 borderRadius: BorderRadius.circular(30),
                 border: Border.all(
-                  color: const Color(0xFFD4AF37).withOpacity(0.3),
+                  color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
                   width: 2,
                 ),
               ),
@@ -442,9 +442,7 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
                 borderRadius: BorderRadius.circular(30),
                 child: category.image != null
                     ? CachedNetworkImage(
-                        imageUrl: category.image!.startsWith('http')
-                            ? category.image!
-                            : '${AppConstants.baseUrl}/uploads/${category.image}',
+                        imageUrl: ImageUrl.resolve(category.image),
                         fit: BoxFit.cover,
                         placeholder: (_, __) => const Center(
                           child: CircularProgressIndicator(strokeWidth: 2),
@@ -502,7 +500,7 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -521,9 +519,7 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
                 image: brand.image != null
                     ? DecorationImage(
                         image: CachedNetworkImageProvider(
-                          brand.image!.startsWith('http')
-                              ? brand.image!
-                              : '${AppConstants.baseUrl}/uploads/${brand.image}',
+                          ImageUrl.resolve(brand.image),
                         ),
                         fit: BoxFit.cover,
                       )
@@ -560,7 +556,7 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFD4AF37).withOpacity(0.1),
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(

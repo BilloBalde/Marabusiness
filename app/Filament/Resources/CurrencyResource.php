@@ -48,8 +48,23 @@ class CurrencyResource extends Resource
                         ->minValue(0)
                         ->maxValue(6)
                         ->default(2),
+                    // This number is a divisor in nine places — RfqOfferConverter,
+                    // FinanceCalculator, PaymentController and SuccessPageStripe on
+                    // the server, checkout_provider.dart in the mobile app — and only
+                    // LocalityShippingCalculator checked it was positive first. Zero
+                    // was accepted here and is fatal downstream: PHP 8 throws
+                    // DivisionByZeroError, so orders in that currency 500 instead of
+                    // taking payment. Blank was worse still, hitting the NOT NULL
+                    // column and surfacing a raw QueryException.
+                    //
+                    // gt:0 rather than a fixed floor: GNF trades at 0.00012, so any
+                    // round minimum would lock out the marketplace's main currency.
                     Forms\Components\TextInput::make('rate_to_usd')
+                        ->label('Rate to USD')
+                        ->helperText('How much 1 unit of this currency is worth in USD. Must be greater than zero.')
                         ->numeric()
+                        ->required()
+                        ->rule('gt:0')
                         ->default(1),
                     Forms\Components\Toggle::make('is_active')
                         ->default(true),

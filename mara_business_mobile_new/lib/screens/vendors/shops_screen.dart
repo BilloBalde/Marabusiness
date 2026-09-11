@@ -1,5 +1,6 @@
 // shops_screen.dart - SIMPLIFIED VERSION with ONE CARD
 
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -7,7 +8,6 @@ import '../../core/models/home_models.dart';
 import '../../core/providers/vendor_provider.dart';
 import '../../core/providers/home_provider.dart';
 import '../../core/providers/products_page_provider.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../widgets/products_page_card.dart'; // ONLY this card
 import '../../core/models/products_page_models.dart'; // Add this import
@@ -176,7 +176,7 @@ Widget build(BuildContext context) {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFD4AF37).withOpacity(0.1),
+                    color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(color: const Color(0xFFD4AF37)),
                   ),
@@ -187,9 +187,7 @@ Widget build(BuildContext context) {
                         radius: 12,
                         backgroundImage: vendorProvider.selectedVendor!.logo != null
                             ? CachedNetworkImageProvider(
-                                vendorProvider.selectedVendor!.logo!.startsWith('http')
-                                    ? vendorProvider.selectedVendor!.logo!
-                                    : '${AppConstants.baseUrl}/uploads/${vendorProvider.selectedVendor!.logo}',
+                                ImageUrl.resolve(vendorProvider.selectedVendor!.logo),
                               )
                             : null,
                         child: vendorProvider.selectedVendor!.logo == null
@@ -401,7 +399,7 @@ Widget build(BuildContext context) {
                       _selectedSort = 'latest';
                     });
                   },
-                  selectedColor: const Color(0xFFD4AF37).withOpacity(0.2),
+                  selectedColor: const Color(0xFFD4AF37).withValues(alpha: 0.2),
                 ),
                 ChoiceChip(
                   label: const Text('Prix croissant'),
@@ -411,7 +409,7 @@ Widget build(BuildContext context) {
                       _selectedSort = 'price_asc';
                     });
                   },
-                  selectedColor: const Color(0xFFD4AF37).withOpacity(0.2),
+                  selectedColor: const Color(0xFFD4AF37).withValues(alpha: 0.2),
                 ),
                 ChoiceChip(
                   label: const Text('Prix décroissant'),
@@ -421,7 +419,7 @@ Widget build(BuildContext context) {
                       _selectedSort = 'price_desc';
                     });
                   },
-                  selectedColor: const Color(0xFFD4AF37).withOpacity(0.2),
+                  selectedColor: const Color(0xFFD4AF37).withValues(alpha: 0.2),
                 ),
               ],
             ),
@@ -519,7 +517,7 @@ Widget build(BuildContext context) {
         width: 120,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFD4AF37).withOpacity(0.1) : Colors.white,
+          color: isSelected ? const Color(0xFFD4AF37).withValues(alpha: 0.1) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? const Color(0xFFD4AF37) : Colors.grey[300]!,
@@ -540,9 +538,7 @@ Widget build(BuildContext context) {
                 image: vendor.logo != null && vendor.logo != 'logo'
                     ? DecorationImage(
                         image: CachedNetworkImageProvider(
-                          vendor.logo!.startsWith('http')
-                              ? vendor.logo!
-                              : '${AppConstants.baseUrl}/uploads/${vendor.logo}',
+                          ImageUrl.resolve(vendor.logo),
                         ),
                         fit: BoxFit.cover,
                       )

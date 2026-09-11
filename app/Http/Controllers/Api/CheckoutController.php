@@ -10,7 +10,7 @@ use App\Models\OrderItem;
 use App\Models\Paiement;
 use App\Models\Vendor;
 use App\Models\FinancialTransaction;
-use App\Services\Shipping\CartShippingResolver;
+use App\Http\Controllers\Api\Concerns\CalculatesCheckoutShipping;
 use App\Support\ShippingCarrierFilter;
 use App\Services\FinanceCalculator;
 use App\Services\LengoPayService;
@@ -21,15 +21,16 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Stripe\Checkout\Session;
 use Stripe\Stripe;
+use App\Support\Money;
 
 class CheckoutController extends Controller
 {
-    private $shippingCalculator;
+    use CalculatesCheckoutShipping;
+
     private $financeCalculator;
 
     public function __construct()
     {
-        $this->shippingCalculator = new CartShippingResolver();
         $this->financeCalculator = new FinanceCalculator();
     }
 
@@ -97,7 +98,7 @@ class CheckoutController extends Controller
         ];
 
         try {
-            $shippingResult = $this->shippingCalculator->calculateCartShipping(
+            $shippingResult = $this->shippingCalculator()->calculateCartShipping(
                 $groupedItems,
                 $destinationAddress,
                 $request->shipping_carrier ?? 'local'
@@ -221,6 +222,28 @@ class CheckoutController extends Controller
         DB::beginTransaction();
 
         try {
+            // Stock was last checked when these items went into the cart, and a
+            // cart never expires: CartManagement::getCartItemsFromCookie() reads
+            // cart_items rows keyed on user_id — the cookie in the name is a
+            // leftover — and nothing prunes them, so an item can sit there for
+            // months. Nothing between there and here looked
+            // again, while updateStock() below writes max(0, stock - quantity) —
+            // so selling three of something with one left stored 0 rather than
+            // -2, and the oversell left no trace in the data at all. Checked here,
+            // inside the transaction and with the rows locked, so two checkouts
+            // racing for the same last unit cannot both pass.
+            $shortfalls = $this->findStockShortfalls($selectedItems);
+
+            if ($shortfalls !== []) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stock insuffisant pour certains articles.',
+                    'out_of_stock' => $shortfalls,
+                ], 409);
+            }
+
             $orders = [];
             $redirectUrl = null;
             $emailErrors = [];
@@ -691,7 +714,7 @@ class CheckoutController extends Controller
             'longitude' => $request->address['longitude'] ?? null,
         ];
 
-        return $this->shippingCalculator->calculateCartShipping(
+        return $this->shippingCalculator()->calculateCartShipping(
             $groupedItems,
             $destinationAddress,
             $request->shipping_carrier
@@ -704,108 +727,10 @@ class CheckoutController extends Controller
     /**
  * Calculate full shipping with vendor details (same as calculateShipping)
  */
-private function calculateFullShipping($request, $selectedItems)
-{
-    // Group items by vendor with full details
-    $groupedItems = [];
-    foreach ($selectedItems as $item) {
-        $vendorId = $item['vendor_id'];
-        if (!isset($groupedItems[$vendorId])) {
-            $groupedItems[$vendorId] = [];
-        }
-        $groupedItems[$vendorId][] = [
-            'product_id' => $item['product_id'] ?? null,
-            'vendor_product_id' => $item['vendor_product_id'] ?? null,
-            'quantity' => $item['quantity'] ?? 1,
-            'weight' => $item['weight'] ?? 0,
-            'length' => $item['length'] ?? 0,
-            'width' => $item['width'] ?? 0,
-            'height' => $item['height'] ?? 0,
-        ];
-    }
-
-    $destinationAddress = [
-        'first_name' => $request->address['first_name'],
-        'last_name' => $request->address['last_name'],
-        'city' => $request->address['city'],
-        'state' => $request->address['state'],
-        'zip_code' => $request->address['zip_code'] ?? null,
-        'locality_id' => $request->address['locality_id'] ?? null,
-        'country' => $request->address['country'],
-        'country_code' => $this->getCountryCode($request->address['country']),
-        'street_address' => $request->address['street_address'],
-        'latitude' => $request->address['latitude'] ?? null,
-        'longitude' => $request->address['longitude'] ?? null,
-    ];
-
-    $shippingResult = $this->shippingCalculator->calculateCartShipping(
-        $groupedItems,
-        $destinationAddress,
-        $request->shipping_carrier
-    );
-
-    // Only "Local Courier" is ever charged, regardless of what shipping_carrier the
-    // request asked for — otherwise a client could still be billed a DHL/CMA-tier
-    // price by naming it explicitly, even with those options hidden from the UI.
-    $shippingResult['carriers'] = ShippingCarrierFilter::onlyLocal($shippingResult['carriers'] ?? []);
-
-    // Get the selected carrier data from the carriers array
-    $selectedCarrierKey = $request->shipping_carrier;
-    $carrierData = $shippingResult['carriers'][$selectedCarrierKey] ?? null;
-    
-    if (!$carrierData && !empty($shippingResult['carriers'])) {
-        // Fallback to first carrier if selected not found
-        $firstCarrierKey = array_key_first($shippingResult['carriers']);
-        $carrierData = $shippingResult['carriers'][$firstCarrierKey];
-        $selectedCarrierKey = $firstCarrierKey;
-    }
-
-    // Format the result with vendor details from the carrier data
-    $formattedResult = [
-        'name' => $carrierData['name'] ?? 'Local Delivery',
-        'carrier' => $selectedCarrierKey,
-        'total_cost_usd' => $carrierData['total_cost_usd'] ?? 0,
-        'vendors' => [],
-    ];
-
-    // 🔥 Get vendors from carrier data, not from root
-    foreach ($carrierData['vendors'] ?? [] as $vendorId => $vendorData) {
-        $vendorItems = $groupedItems[$vendorId] ?? [];
-        $totalWeight = 0;
-        $totalCbm = 0;
-        $totalItems = 0;
-        
-        foreach ($vendorItems as $item) {
-            $quantity = $item['quantity'];
-            $totalItems += $quantity;
-            $totalWeight += ($item['weight'] ?? 0) * $quantity;
-            
-            $length = $item['length'] ?? 0;
-            $width = $item['width'] ?? 0;
-            $height = $item['height'] ?? 0;
-            $cbmPerItem = ($length * $width * $height) / 1000000;
-            $totalCbm += $cbmPerItem * $quantity;
-        }
-        
-        $formattedResult['vendors'][$vendorId] = [
-            'cost' => $vendorData['cost'] ?? 0,
-            'zone' => $vendorData['zone'] ?? 'Unknown',
-            'delivery_days' => $vendorData['delivery_days'] ?? 3,
-            'total_weight' => $totalWeight,
-            'total_cbm' => $totalCbm,
-            'total_items' => $totalItems,
-        ];
-    }
-
-    // 🔥 Debug log to verify
-    Log::info('Formatted shipping result for placeOrder:', [
-        'selected_carrier' => $selectedCarrierKey,
-        'vendors' => array_keys($formattedResult['vendors']),
-        'vendor_data' => $formattedResult['vendors']
-    ]);
-
-    return $formattedResult;
-}
+    // calculateFullShipping() vit maintenant dans le trait
+    // Concerns\CalculatesCheckoutShipping : ouvrir une négociation crée une
+    // commande avec de vrais frais de port, et les deux chemins doivent les
+    // calculer de la même façon.
 
     private function prepareStripeItems($items, $shippingUSD, $shippingName, $defaultRate)
     {
@@ -848,6 +773,56 @@ private function calculateFullShipping($request, $selectedItems)
         return $stripeItems;
     }
 
+    /**
+     * Lines whose quantity exceeds what is actually on the shelf right now.
+     *
+     * Resolves each line exactly the way updateStock() does — variation stock when
+     * the line names one, the vendor_product row otherwise — so the check and the
+     * decrement can never disagree about which number they are looking at.
+     *
+     * lockForUpdate() holds the rows for the rest of the transaction: a second
+     * checkout for the same last unit waits here instead of reading the same
+     * pre-decrement value and passing too.
+     *
+     * @return list<array{name: string, requested: int, available: int}>
+     */
+    private function findStockShortfalls($items): array
+    {
+        $shortfalls = [];
+
+        foreach ($items as $item) {
+            $requested = (int) $item['quantity'];
+
+            if (!empty($item['variation_id'])) {
+                $available = \App\Models\VendorProductVariation::where('vendor_product_id', $item['vendor_product_id'])
+                    ->where('id', $item['variation_id'])
+                    ->lockForUpdate()
+                    ->value('stock');
+            } else {
+                $available = \App\Models\VendorProduct::where('vendor_id', $item['vendor_id'])
+                    ->where('product_id', $item['product_id'])
+                    ->lockForUpdate()
+                    ->value('stock');
+            }
+
+            // A line whose row has vanished is a broken cart entry, not a stock
+            // question; leave it to the order-building code to fail loudly.
+            if ($available === null) {
+                continue;
+            }
+
+            if ($requested > (int) $available) {
+                $shortfalls[] = [
+                    'name' => $item['name'] ?? ($item['product_name'] ?? 'Article'),
+                    'requested' => $requested,
+                    'available' => (int) $available,
+                ];
+            }
+        }
+
+        return $shortfalls;
+    }
+
     private function updateStock($items)
     {
         foreach ($items as $item) {
@@ -885,27 +860,15 @@ private function calculateFullShipping($request, $selectedItems)
         }
     }
 
-    private function getCountryCode($country)
-    {
-        $countryCodes = [
-            'Guinea' => 'GN',
-            'Senegal' => 'SN',
-            'Ivory Coast' => 'CI',
-            'Mali' => 'ML',
-            'France' => 'FR',
-            'United States' => 'US',
-            'Canada' => 'CA',
-            'United Kingdom' => 'GB',
-        ];
-        
-        return $countryCodes[$country] ?? strtoupper(substr($country, 0, 2));
-    }
+    // getCountryCode() vit maintenant dans le trait
+    // Concerns\CalculatesCheckoutShipping, partagé avec NegotiationController.
 
+    /**
+     * Byte-for-byte the same method as CheckoutPage's copy. App\Support\Money
+     * owns the rule now, so the web and the API can no longer drift apart.
+     */
     private function convertUsdToVendorCurrency($usdAmount, $vendorRateToUsd)
     {
-        if ($vendorRateToUsd <= 0) {
-            return $usdAmount;
-        }
-        return $usdAmount / $vendorRateToUsd;
+        return Money::fromUsd((float) $usdAmount, $vendorRateToUsd === null ? null : (float) $vendorRateToUsd);
     }
 }

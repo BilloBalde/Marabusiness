@@ -127,7 +127,13 @@ class CookieConsentService
                 'cookies' => [
                     ['name' => 'language', 'purpose' => 'Langue préférée', 'duration' => '6 mois'],
                     ['name' => 'currency', 'purpose' => 'Devise préférée', 'duration' => '6 mois'],
-                    ['name' => 'cart_items', 'purpose' => 'Contenu du panier', 'duration' => '30 jours'],
+                    // Un cookie « cart_items » de 30 jours était annoncé ici : le
+                    // site ne le pose plus. La version qui l'écrivait est commentée
+                    // (CartManagement::addCartItemsToCookie, lignes 87-92) et le
+                    // panier est enregistré en base, sur le compte du client
+                    // (table cart_items), sans échéance. Annoncer un cookie qui
+                    // n'existe pas, et taire le stockage qui existe, c'est un
+                    // avis de consentement faux dans les deux sens.
                 ]
             ],
             'analytics' => [

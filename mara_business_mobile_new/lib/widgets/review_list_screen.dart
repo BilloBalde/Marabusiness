@@ -225,7 +225,7 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -250,7 +250,7 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -415,7 +415,7 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
                     label: Text('Filtre: ${_getFilterLabel(_selectedFilter)}'),
                     deleteIcon: const Icon(Icons.close, size: 16),
                     onDeleted: () => _applyFilter('recent'),
-                    backgroundColor: const Color(0xFFD4AF37).withOpacity(0.1),
+                    backgroundColor: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                     deleteIconColor: const Color(0xFFD4AF37),
                   ),
                 ],
@@ -521,7 +521,7 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
+            color: Colors.grey.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),

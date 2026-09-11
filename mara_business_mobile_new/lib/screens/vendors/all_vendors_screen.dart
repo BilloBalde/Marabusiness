@@ -1,9 +1,9 @@
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/providers/home_provider.dart';
 import '../../core/providers/vendor_provider.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/models/home_models.dart';
 import 'package:go_router/go_router.dart';
@@ -247,7 +247,7 @@ Widget _buildVendorCard(Vendor vendor) {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -266,16 +266,14 @@ Widget _buildVendorCard(Vendor vendor) {
               color: Colors.grey[100],
               child: vendor.logo != null && vendor.logo != 'logo' && vendor.logo!.isNotEmpty
                   ? CachedNetworkImage(
-                      imageUrl: vendor.logo!.startsWith('http')
-                          ? vendor.logo!
-                          : '${AppConstants.baseUrl}/uploads/${vendor.logo}',
+                      imageUrl: ImageUrl.resolve(vendor.logo),
                       fit: BoxFit.cover,
                       errorWidget: (context, error, stack) => Center(
                         child: Container(
                           width: 60,
                           height: 60,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFD4AF37).withOpacity(0.1),
+                            color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: Center(
@@ -296,7 +294,7 @@ Widget _buildVendorCard(Vendor vendor) {
                         width: 60,
                         height: 60,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFD4AF37).withOpacity(0.1),
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: Center(

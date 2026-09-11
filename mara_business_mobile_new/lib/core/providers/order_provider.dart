@@ -1,5 +1,6 @@
 // lib/core/providers/order_provider.dart
 
+import '../../utils/app_logger.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -76,7 +77,7 @@ class OrderProvider extends ChangeNotifier {
         }
       }
     } catch (e) {
-      print('Error getting status counts: $e');
+      logDebug('Error getting status counts: $e');
     }
     return {
       'all': 0,
@@ -115,11 +116,11 @@ class OrderProvider extends ChangeNotifier {
                 .toList();
           }
         }
-        print('✅ Loaded ${_orders.length} latest orders');
+        logDebug('✅ Loaded ${_orders.length} latest orders');
       }
     } catch (e) {
       _error = e.toString();
-      print('❌ Error loading latest orders: $e');
+      logDebug('❌ Error loading latest orders: $e');
     }
 
     _isLoadingOrders = false;
@@ -198,13 +199,13 @@ class OrderProvider extends ChangeNotifier {
           }
         }
         
-        print('✅ Loaded ${_orders.length} orders - Page $_currentPage of $_lastPage');
+        logDebug('✅ Loaded ${_orders.length} orders - Page $_currentPage of $_lastPage');
       } else {
         _error = response.message ?? 'Failed to load orders';
       }
     } catch (e) {
       _error = e.toString();
-      print('❌ Error loading orders: $e');
+      logDebug('❌ Error loading orders: $e');
     }
 
     _isLoadingOrders = false;
@@ -324,7 +325,7 @@ Future<void> loadOrders({
     final apiSearch = _searchQuery != null && _searchQuery!.isNotEmpty ? _searchQuery : null;
     final apiStatus = _statusFilter != 'all' ? _statusFilter : null;
     
-    print('🔍 API Request - Page: $_currentPage, Search: $apiSearch, Status: $apiStatus');
+    logDebug('🔍 API Request - Page: $_currentPage, Search: $apiSearch, Status: $apiStatus');
     
     final response = await _apiService.getOrders(
       page: _currentPage,
@@ -363,18 +364,18 @@ Future<void> loadOrders({
           _orders.addAll(newOrders);
         }
         
-        print('✅ Loaded ${_orders.length} orders - Page $_currentPage of $_lastPage');
+        logDebug('✅ Loaded ${_orders.length} orders - Page $_currentPage of $_lastPage');
         if (_searchQuery != null && _searchQuery!.isNotEmpty) {
-          print('🔍 Search results for "$_searchQuery": ${_orders.length} orders found');
+          logDebug('🔍 Search results for "$_searchQuery": ${_orders.length} orders found');
         }
       }
     } else {
       _error = response.message ?? 'Failed to load orders';
-      print('❌ Error loading orders: $_error');
+      logDebug('❌ Error loading orders: $_error');
     }
   } catch (e) {
     _error = e.toString();
-    print('❌ Exception loading orders: $e');
+    logDebug('❌ Exception loading orders: $e');
   } finally {
     _ordersRequest = null;
     if (!request.isCompleted) request.complete();

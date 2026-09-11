@@ -1,3 +1,5 @@
+import '../../utils/image_url.dart';
+import '../../utils/app_logger.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +14,6 @@ import '../../widgets/product_card.dart';
 import '../../widgets/category_card.dart';
 import '../../widgets/service_card.dart';
 import '../../widgets/unified_search_bar.dart';
-import '../../core/constants/app_constants.dart';
 import 'package:go_router/go_router.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -162,7 +163,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                       'Recommandé pour vous',
                                       onSeeAll: () => context.go('/products?featured=true'),
                                     ),
-                                    _buildProductsHorizontal(provider.featuredProducts),
+                                    // The main product feed is the staggered grid
+                                    // from the brief, not a carousel. "En Promo"
+                                    // and "Nos Vendeurs" below stay horizontal:
+                                    // they are short curated strips, and turning
+                                    // every section into a grid would leave
+                                    // nothing but grids down the page.
+                                    _buildProductsStaggered(provider.featuredProducts),
                                   ],
                                 ),
                               );
@@ -245,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
               if (context.watch<HomeProvider>().isLoading && 
                   context.watch<HomeProvider>().homeData == null)
                 Container(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   child: const Center(
                     child: CircularProgressIndicator(
                       color: Color(0xFFD4AF37),
@@ -266,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: const Color(0xFFD4AF37).withOpacity(0.1),
+            color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -299,7 +306,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'assets/images/logo.png',
               height: 40,
               errorBuilder: (context, error, stackTrace) {
-                print('🔴 Logo error: $error');
+                logDebug('🔴 Logo error: $error');
                 return _buildDefaultLogo();
               },
             ),
@@ -527,7 +534,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               begin: Alignment.bottomCenter,
                               end: Alignment.topCenter,
                               colors: [
-                                Colors.black.withOpacity(0.6),
+                                Colors.black.withValues(alpha: 0.6),
                                 Colors.transparent,
                               ],
                             ),
@@ -580,7 +587,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
@@ -600,7 +607,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
@@ -634,7 +641,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     shape: BoxShape.circle,
                     color: _currentBannerIndex == index
                         ? const Color(0xFFD4AF37)
-                        : Colors.white.withOpacity(0.5),
+                        : Colors.white.withValues(alpha: 0.5),
                   ),
                 );
               }),
@@ -645,13 +652,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _getFullImageUrl(String path) {
-    if (path.startsWith('http')) {
-      return path;
-    }
-    final cleanPath = path.replaceAll(RegExp(r'^[/\\]+'), '');
-    return '${AppConstants.baseUrl}/uploads/$cleanPath';
-  }
+  /// This copy was the only one that stripped leading slashes and backslashes.
+  /// ImageUrl keeps that behaviour for every screen.
+  String _getFullImageUrl(String path) => ImageUrl.resolve(path);
 
   Widget _buildPromoBanners() {
     return Padding(
@@ -674,7 +677,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -689,7 +692,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: 80,
                         height: 80,
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -702,7 +705,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.2),
+                              color: Colors.black.withValues(alpha: 0.2),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -753,7 +756,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -769,7 +772,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         height: 100,
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: const Color(0xFFD4AF37).withOpacity(0.2),
+                            color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
                             width: 2,
                           ),
                           shape: BoxShape.circle,
@@ -784,7 +787,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFD4AF37).withOpacity(0.2),
+                              color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -850,6 +853,59 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Two columns fed alternately, with the card image height varying by index so
+  /// the columns fall out of step — the offset, uneven look of the layout in the
+  /// brief, where one column runs ahead of the other instead of both sitting in
+  /// lockstep rows.
+  ///
+  /// Built by hand rather than with a staggered-grid package: adding a
+  /// dependency here means a `pub get`, and a Row of two Columns is all a
+  /// two-column masonry actually needs.
+  ///
+  /// The tall/short pattern comes from the index, never from a random number. A
+  /// random height would redraw differently on every rebuild and make the page
+  /// twitch as the user scrolls.
+  Widget _buildProductsStaggered(List<Product> products) {
+    final left = <Widget>[];
+    final right = <Widget>[];
+
+    for (var i = 0; i < products.length; i++) {
+      final product = products[i];
+
+      // 0 and 3 tall, 1 and 2 short, repeating: the left column (even indices)
+      // opens tall while the right opens short, so the two never line up.
+      final isTall = i % 4 == 0 || i % 4 == 3;
+
+      final card = Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: ProductCard(
+          product: UnifiedProduct.fromHomeProduct(product),
+          inGrid: true,
+          imageHeight: isTall ? 180 : 125,
+          onTap: () {
+            if (product.vendorProductId != null) {
+              context.go('/product/${product.slug}/${product.vendorProductId}');
+            }
+          },
+        ),
+      );
+
+      (i.isEven ? left : right).add(card);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Column(children: left)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(children: right)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProductsHorizontal(List<Product> products) {
     return SizedBox(
       height: 280,
@@ -891,7 +947,7 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -910,9 +966,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     image: vendor.logo != null && vendor.logo != 'logo'
                         ? DecorationImage(
                             image: CachedNetworkImageProvider(
-                              vendor.logo!.startsWith('http')
-                                  ? vendor.logo!
-                                  : '${AppConstants.baseUrl}/uploads/${vendor.logo}',
+                              ImageUrl.resolve(vendor.logo),
                             ),
                             fit: BoxFit.cover,
                           )
@@ -924,7 +978,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             width: 50,
                             height: 50,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFD4AF37).withOpacity(0.1),
+                              color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: Center(
@@ -1051,7 +1105,7 @@ class _HomeScreenState extends State<HomeScreen> {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),

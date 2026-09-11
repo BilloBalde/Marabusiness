@@ -1,3 +1,4 @@
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/home_models.dart';
@@ -56,7 +57,7 @@ class VendorProvider extends ChangeNotifier {
     try {
       final response = await _apiService.getVendors();
       
-      //print('Vendors API Response: ${response.data}'); // Debug print
+      //logDebug('Vendors API Response: ${response.data}'); // Debug print
       
       if (response.success && response.data != null) {
         // Check the structure of the response
@@ -89,22 +90,22 @@ class VendorProvider extends ChangeNotifier {
           }
         }
         
-        //print('Vendors list length: ${vendorsList.length}');
+        //logDebug('Vendors list length: ${vendorsList.length}');
         
         _vendors = vendorsList.map((e) {
-          //print('Processing vendor: $e');
+          //logDebug('Processing vendor: $e');
           return Vendor.fromJson(e);
         }).toList();
         
         _filteredVendors = _vendors;
-        //print('Vendors loaded: ${_vendors.length}');
+        //logDebug('Vendors loaded: ${_vendors.length}');
       } else {
         _error = response.message ?? 'Failed to load vendors';
       }
     } catch (e) {
       _error = e.toString();
-      //print('Error loading vendors: $e');
-      //print('Stack trace: ${StackTrace.current}');
+      //logDebug('Error loading vendors: $e');
+      //logDebug('Stack trace: ${StackTrace.current}');
     }
 
     _isLoading = false;
@@ -140,7 +141,7 @@ class VendorProvider extends ChangeNotifier {
         // ... handle response similar to loadAllProducts
       }
     } catch (e) {
-      print('Error searching products: $e');
+      logDebug('Error searching products: $e');
     }
 
     _isLoadingProducts = false;
@@ -212,24 +213,24 @@ Future<void> loadAllProducts({bool refresh = false}) async {
       params['max_price'] = _maxPrice;
     }
 
-    print('🔵 Loading products with params: $params');
+    logDebug('🔵 Loading products with params: $params');
     final response = await _apiService.getProductsWithParams(params);
     
-    print('🔵 Response success: ${response.success}');
-    print('🔵 Response data type: ${response.data.runtimeType}');
+    logDebug('🔵 Response success: ${response.success}');
+    logDebug('🔵 Response data type: ${response.data.runtimeType}');
     
     if (response.success && response.data != null) {
       VendorProductResponse productResponse;
       
       // Handle different response structures
       if (response.data is List) {
-        print('🔵 Response is a List, using fromJsonList');
+        logDebug('🔵 Response is a List, using fromJsonList');
         productResponse = VendorProductResponse.fromJsonList(response.data);
       } else if (response.data is Map<String, dynamic>) {
-        print('🔵 Response is a Map, using fromJson');
+        logDebug('🔵 Response is a Map, using fromJson');
         productResponse = VendorProductResponse.fromJson(response.data);
       } else {
-        print('🔵 Unexpected response type');
+        logDebug('🔵 Unexpected response type');
         productResponse = VendorProductResponse(
           items: [],
           currentPage: 1,
@@ -249,15 +250,15 @@ Future<void> loadAllProducts({bool refresh = false}) async {
       _lastPage = productResponse.lastPage;
       _hasMorePages = _currentPage <= _lastPage;
       
-      print('✅ Loaded ${_products.length} products');
+      logDebug('✅ Loaded ${_products.length} products');
     } else {
       _error = response.message ?? 'Failed to load products';
-      print('❌ Error: $_error');
+      logDebug('❌ Error: $_error');
     }
   } catch (e) {
     _error = e.toString();
-    print('🔴 Error loading products: $e');
-    print('🔴 Stack trace: ${StackTrace.current}');
+    logDebug('🔴 Error loading products: $e');
+    logDebug('🔴 Stack trace: ${StackTrace.current}');
   }
 
   _isLoadingProducts = false;
@@ -289,11 +290,11 @@ Future<void> loadAllProducts({bool refresh = false}) async {
       params['max_price'] = _maxPrice;
     }
 
-    print('🔵 Loading vendor products for vendor $vendorId with params: $params');
+    logDebug('🔵 Loading vendor products for vendor $vendorId with params: $params');
     final response = await _apiService.getVendorProducts(vendorId, params);
     
-    print('🔵 Response success: ${response.success}');
-    print('🔵 Response data type: ${response.data.runtimeType}');
+    logDebug('🔵 Response success: ${response.success}');
+    logDebug('🔵 Response data type: ${response.data.runtimeType}');
     
     if (response.success && response.data != null) {
       VendorProductResponse productResponse;
@@ -314,14 +315,14 @@ Future<void> loadAllProducts({bool refresh = false}) async {
       _lastPage = productResponse.lastPage;
       _hasMorePages = _currentPage <= _lastPage;
       
-      print('✅ Loaded ${_products.length} vendor products');
+      logDebug('✅ Loaded ${_products.length} vendor products');
     } else {
       _error = response.message ?? 'Failed to load vendor products';
-      print('❌ Error: $_error');
+      logDebug('❌ Error: $_error');
     }
   } catch (e) {
     _error = e.toString();
-    print('🔴 Error loading vendor products: $e');
+    logDebug('🔴 Error loading vendor products: $e');
   }
 
   _isLoadingProducts = false;

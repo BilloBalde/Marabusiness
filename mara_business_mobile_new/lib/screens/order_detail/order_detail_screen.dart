@@ -1,5 +1,6 @@
 // lib/screens/order_detail/order_detail_screen.dart
 
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +10,6 @@ import '../../widgets/common/loading_widget.dart';
 import '../../utils/currency_formatter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'payment_modal.dart';
-import '../../core/constants/app_constants.dart'; 
 import 'package:cached_network_image/cached_network_image.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -31,14 +31,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final TextEditingController _cancelReasonController = TextEditingController();
   bool _isCancelling = false;
 
-  String _getFullImageUrl(String? path) {
-    if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http')) return path;
-    if (path.startsWith('/')) {
-      return '${AppConstants.baseUrl}$path';
-    }
-    return '${AppConstants.baseUrl}/uploads/$path';
-  }
+  /// One of five near-identical helpers, each handling a case the others got
+  /// wrong. ImageUrl owns the rule now. An empty path yields the placeholder
+  /// rather than '', which rendered as a broken image.
+  String _getFullImageUrl(String? path) => ImageUrl.resolve(path);
 
   @override
   void initState() {
@@ -472,7 +468,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -498,7 +494,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: order.paymentStatusColor.withOpacity(0.1),
+                        color: order.paymentStatusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -550,7 +546,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: order.statusColor.withOpacity(0.1),
+                        color: order.statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -602,7 +598,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -764,7 +760,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -877,8 +873,100 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
 
-          // Payment Button for unpaid orders (unchanged)
-          if ((order.paymentStatus == 'pending' || order.paymentStatus == 'partial') && !isCancelled)
+          // A payment the buyer has declared and the vendor has not confirmed
+          // leaves the order at payment_status 'pending' — unconfirmed money
+          // deliberately does not count towards the balance. That is correct
+          // accounting but it made the screen below offer "payer" to someone who
+          // had already handed cash to the courier, and tapping it declared the
+          // same money twice. The server refuses the second declaration now (409);
+          // this says why before they tap.
+          if (order.hasPaymentAwaitingConfirmation && !isCancelled)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.hourglass_top, color: Colors.orange[800]),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Paiement en attente de validation',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange[900],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Vous avez déclaré ${CurrencyFormatter.format(order.declaredAwaitingConfirmation, order.currency)}. '
+                          'Le vendeur doit confirmer la réception avant que la commande soit soldée.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange[900],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Une commande en négociation renvoie vers la discussion, pas vers le
+          // paiement : il n'y a pas encore de prix à régler.
+          if (order.isNegotiating)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD4AF37)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Négociation en cours',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Cette commande ne peut pas être réglée tant que le prix '
+                    "n'est pas convenu avec la boutique.",
+                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => context.push('/negotiations/${order.id}'),
+                      icon: const Icon(Icons.forum_outlined, size: 18),
+                      label: const Text('Ouvrir la discussion'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD4AF37),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Payment Button for unpaid orders — hidden while a declaration is
+          // still awaiting the vendor, so it cannot be submitted twice.
+          if (!order.isNegotiating &&
+              (order.paymentStatus == 'pending' || order.paymentStatus == 'partial') &&
+              !order.hasPaymentAwaitingConfirmation &&
+              !isCancelled)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -886,7 +974,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),

@@ -29,6 +29,17 @@ class Order {
   // Additional fields needed for profile
   bool? _hasReview; // Cache for review status
 
+  /// Money the buyer has declared that the vendor has not confirmed collecting.
+  ///
+  /// An unconfirmed declaration deliberately does not count towards total_paid,
+  /// so such an order still reports payment_status 'pending' — identical to one
+  /// where nothing was ever paid. Without this field the app cannot tell those
+  /// apart, and offers the payment button again to someone who has already
+  /// handed cash to the courier.
+  final double declaredAwaitingConfirmation;
+
+  bool get hasPaymentAwaitingConfirmation => declaredAwaitingConfirmation > 0;
+
   double get grandTotalUsd {
     if (rateToUsd != null && rateToUsd! > 0) {
       return grandTotal * rateToUsd!;
@@ -48,6 +59,7 @@ class Order {
     this.cancellationReason,
     required this.totalPaid,
     required this.totalRemaining,
+    this.declaredAwaitingConfirmation = 0,
     required this.shippingAmount,
     required this.currency,
     required this.paymentMethod,
@@ -96,6 +108,10 @@ class Order {
       rateToUsd: (json['rate_to_usd'] as num?)?.toDouble(),
       totalPaid: (json['total_paid'] ?? 0).toDouble(),
       totalRemaining: (json['total_remaining'] ?? 0).toDouble(),
+      // Defaults to 0 so an older API build, which does not send this, simply
+      // behaves as it did before rather than throwing.
+      declaredAwaitingConfirmation:
+          (json['declared_awaiting_confirmation'] ?? 0).toDouble(),
       shippingAmount: (json['shipping_amount'] ?? 0).toDouble(),
       paymentMethod: json['payment_method'] ?? '',
       currency: json['currency'] ?? 'USD',
@@ -134,9 +150,19 @@ class Order {
   bool get isProcessing => status == 'processing';
   bool get isShipped => trackingNumber != null && trackingNumber!.isNotEmpty;
   bool get isCancellable => status == 'new' || status == 'pending';
-  
+
+  /// Une commande dont le prix est encore en discussion.
+  ///
+  /// Elle a payment_status 'pending' comme une commande impayée ordinaire, ce qui
+  /// suffisait à faire apparaître « Payer maintenant » : le serveur répond 409,
+  /// mais un bouton qui ne peut que échouer n'a rien à faire là. On sort par le
+  /// prix accepté, refusé ou annulé, pas par le paiement.
+  bool get isNegotiating => status == 'negotiating';
+
   String get statusLabel {
     switch (status) {
+      case 'negotiating':
+        return 'En négociation';
       case 'new':
         return 'Nouvelle';
       case 'pending':
@@ -154,6 +180,8 @@ class Order {
 
   Color get statusColor {
     switch (status) {
+      case 'negotiating':
+        return const Color(0xFFD4AF37);
       case 'new':
       case 'pending':
         return Colors.amber;

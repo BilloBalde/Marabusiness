@@ -239,7 +239,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFD4AF37).withOpacity(0.1),
+                    color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                     border: Border.all(color: const Color(0xFFD4AF37)),
                     borderRadius: BorderRadius.circular(12),
                   ),

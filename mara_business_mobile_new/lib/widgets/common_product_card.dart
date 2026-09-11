@@ -1,10 +1,10 @@
 // lib/widgets/common_product_card.dart - WISHLIST REMOVED
 
+import '../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../core/models/home_models.dart';
 import '../core/models/products_page_models.dart';
-import '../core/constants/app_constants.dart';
 
 class CommonProductCard extends StatelessWidget {
   final dynamic product;
@@ -120,11 +120,9 @@ class CommonProductCard extends StatelessWidget {
     return '';
   }
 
-  String _getFullImageUrl(String? path) {
-    if (path == null || path.isEmpty) return 'https://via.placeholder.com/400x400?text=No+Image';
-    if (path.startsWith('http')) return path;
-    return '${AppConstants.baseUrl}/uploads/$path';
-  }
+  /// This copy was the only one that fell back to the placeholder instead of an
+  /// empty string. ImageUrl makes that the default everywhere.
+  String _getFullImageUrl(String? path) => ImageUrl.resolve(path);
 
   String _getCurrencySymbol(String currencyCode) {
     switch (currencyCode) {
@@ -147,7 +145,7 @@ class CommonProductCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),

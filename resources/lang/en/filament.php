@@ -31,4 +31,18 @@ return [
         'catalog' => 'Catalog',
         'configuration' => 'Configuration',
     ],
+
+    // Tabs on the orders list. 'negotiating' was missing along with the status
+    // itself: an order being haggled over appeared under "All" and nowhere else,
+    // so the navigation badge counted buyers waiting on a price with no list to
+    // click through to.
+    'order_tabs' => [
+        'all' => 'All',
+        'negotiating' => 'Negotiations',
+        'new' => 'New',
+        'processing' => 'Processing',
+        'shipped' => 'Shipped',
+        'delivered' => 'Delivered',
+        'cancelled' => 'Cancelled',
+    ],
 ];

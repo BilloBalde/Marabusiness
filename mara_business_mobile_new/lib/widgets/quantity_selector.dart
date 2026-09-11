@@ -43,7 +43,7 @@ class QuantitySelector extends StatelessWidget {
           _buildButton(
             icon: Icons.remove,
             onPressed: canDecrease ? () => onChanged(value - 1) : null,
-            backgroundColor: canDecrease ? activeColor.withOpacity(0.1) : Colors.transparent,
+            backgroundColor: canDecrease ? activeColor.withValues(alpha: 0.1) : Colors.transparent,
             foregroundColor: canDecrease ? activeColor : effectiveDisabledColor,
           ),
 
@@ -65,7 +65,7 @@ class QuantitySelector extends StatelessWidget {
           _buildButton(
             icon: Icons.add,
             onPressed: canIncrease ? () => onChanged(value + 1) : null,
-            backgroundColor: canIncrease ? activeColor.withOpacity(0.1) : Colors.transparent,
+            backgroundColor: canIncrease ? activeColor.withValues(alpha: 0.1) : Colors.transparent,
             foregroundColor: canIncrease ? activeColor : effectiveDisabledColor,
           ),
         ],
@@ -176,7 +176,7 @@ class CartQuantitySelector extends StatelessWidget {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: onPressed != null ? color.withOpacity(0.1) : Colors.transparent,
+        color: onPressed != null ? color.withValues(alpha: 0.1) : Colors.transparent,
         borderRadius: BorderRadius.circular(6),
       ),
       child: IconButton(
@@ -281,7 +281,7 @@ class CounterWidget extends StatelessWidget {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: onPressed != null ? const Color(0xFFD4AF37).withOpacity(0.1) : Colors.transparent,
+        color: onPressed != null ? const Color(0xFFD4AF37).withValues(alpha: 0.1) : Colors.transparent,
         borderRadius: BorderRadius.circular(6),
       ),
       child: IconButton(

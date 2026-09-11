@@ -1,7 +1,7 @@
+import '../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../core/models/home_models.dart';
-import '../core/constants/app_constants.dart';
 
 class VendorCard extends StatelessWidget {
   final Vendor vendor; // Change from Map<String, dynamic> to Vendor
@@ -25,7 +25,7 @@ class VendorCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               spreadRadius: 1,
               blurRadius: 4,
             ),
@@ -45,7 +45,10 @@ class VendorCard extends StatelessWidget {
               ),
               child: vendor.logo != null && vendor.logo!.isNotEmpty && vendor.logo != 'logo'
                   ? CachedNetworkImage(
-                      imageUrl: '${AppConstants.baseUrl}/uploads/${vendor.logo}',
+                      // VendorPresenter returns an absolute url for a logo while
+                      // products and categories come back relative; this site
+                      // prefixed both alike, doubling the host on the absolute one.
+                      imageUrl: ImageUrl.resolve(vendor.logo),
                       fit: BoxFit.cover,
                       placeholder: (_, __) => const Center(
                         child: CircularProgressIndicator(strokeWidth: 2),

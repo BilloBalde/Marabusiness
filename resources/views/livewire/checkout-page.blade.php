@@ -486,6 +486,65 @@
                                 <span>Total {{ $group['currency'] }}:</span>
                                 <span>{{ number_format($group['total'], 2) }} {{ $group['currency'] }}</span>
                             </div>
+
+                            {{-- Négociation, par boutique. Le prix se discute sur le panier
+                                 d'un vendeur, pas sur une ligne : c'est lui qui consent la
+                                 remise, et order_items ne permet pas de repricer une ligne
+                                 depuis son annonce d'origine. --}}
+                            @if($negotiatingVendorId === $vendorId)
+                                <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <p class="text-xs text-gray-600 mb-2">
+                                        Proposez votre prix pour ce panier. Le vendeur répondra,
+                                        et vous paierez seulement si vous êtes d'accord.
+                                    </p>
+
+                                    <label class="block text-xs font-medium text-gray-700">
+                                        Votre prix souhaité ({{ $group['currency'] }})
+                                    </label>
+                                    {{-- « border-gray-300 » sans « border » ne pose aucune bordure :
+                                         Tailwind y règle la couleur, pas l'épaisseur. Ces deux champs
+                                         sortaient donc sans bordure ni marge intérieure, au milieu
+                                         d'une page où tous les autres portent « p-3 border rounded-lg ».
+                                         Mêmes classes qu'eux désormais. --}}
+                                    <input type="number" step="0.01" min="0"
+                                           wire:model="negotiationTargetPrice"
+                                           placeholder="{{ number_format($group['total'], 2, '.', '') }}"
+                                           class="w-full mt-1 p-3 text-sm bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none">
+                                    @error('negotiationTargetPrice')
+                                        <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                                    @enderror
+
+                                    <label class="block text-xs font-medium text-gray-700 mt-2">
+                                        Votre message
+                                    </label>
+                                    <textarea wire:model="negotiationMessage" rows="3"
+                                              placeholder="Bonjour, seriez-vous d'accord pour…"
+                                              class="w-full mt-1 p-3 text-sm bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none"></textarea>
+                                    @error('negotiationMessage')
+                                        <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                                    @enderror
+
+                                    <div class="flex gap-2 mt-3">
+                                        <button type="button"
+                                                wire:click="startNegotiation"
+                                                wire:loading.attr="disabled"
+                                                wire:target="startNegotiation"
+                                                class="flex-1 bg-[#D4AF37] text-white text-sm font-medium py-2 rounded-lg disabled:opacity-50">
+                                            <span wire:loading.remove wire:target="startNegotiation">Envoyer au vendeur</span>
+                                            <span wire:loading wire:target="startNegotiation">Envoi…</span>
+                                        </button>
+                                        <button type="button" wire:click="cancelNegotiation"
+                                                class="px-3 text-sm text-gray-600 border border-gray-300 rounded-lg">
+                                            Annuler
+                                        </button>
+                                    </div>
+                                </div>
+                            @else
+                                <button type="button" wire:click="openNegotiation({{ $vendorId }})"
+                                        class="w-full mt-3 text-sm text-[#D4AF37] border border-[#D4AF37] rounded-lg py-2 hover:bg-amber-50 transition">
+                                    Discuter le prix
+                                </button>
+                            @endif
                         </div>
                     </div>
                 @endforeach

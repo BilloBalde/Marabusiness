@@ -1,5 +1,6 @@
 // lib/screens/payment/success_page.dart
 
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -9,7 +10,6 @@ import '../../core/providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../core/models/api_response.dart';
 import '../../utils/currency_formatter.dart';
-import '../../core/constants/app_constants.dart';
 import '../../widgets/common/loading_widget.dart';
 
 class SuccessPage extends StatefulWidget {
@@ -33,7 +33,16 @@ class _SuccessPageState extends State<SuccessPage> {
   double _totalAmount = 0;
   int _orderCount = 0;
   String? _sessionId;
-  final bool _stripePaymentCompleted = false;
+
+  /// Was `final bool _stripePaymentCompleted = false;` — a final field, so it
+  /// could never become true and the "payment confirmed" half of this screen
+  /// (green panel, check icon, confirmation wording) was unreachable code: every
+  /// buyer saw the blue "awaiting" variant, including after a payment that went
+  /// through. Derived from the orders this screen has just loaded instead, so it
+  /// reflects what the server actually says.
+  bool get _paymentCompleted =>
+      _orders.isNotEmpty &&
+      _orders.every((order) => order['payment_status'] == 'paid');
 
   @override
   void initState() {
@@ -126,14 +135,8 @@ class _SuccessPageState extends State<SuccessPage> {
     return carriers[carrier] ?? carrier;
   }
 
-  String _getFullImageUrl(String? path) {
-    if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http')) return path;
-    if (path.startsWith('/')) {
-      return '${AppConstants.baseUrl}$path';
-    }
-    return '${AppConstants.baseUrl}/uploads/$path';
-  }
+  /// See ImageUrl: this was one of five copies that disagreed with each other.
+  String _getFullImageUrl(String? path) => ImageUrl.resolve(path);
 
   String _formatDate(String? dateStr) {
     if (dateStr == null) return 'N/A';
@@ -269,7 +272,7 @@ class _SuccessPageState extends State<SuccessPage> {
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -294,17 +297,17 @@ class _SuccessPageState extends State<SuccessPage> {
                 margin: const EdgeInsets.all(16),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _stripePaymentCompleted ? Colors.green[50] : Colors.blue[50],
+                  color: _paymentCompleted ? Colors.green[50] : Colors.blue[50],
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _stripePaymentCompleted ? Colors.green[200]! : Colors.blue[200]!,
+                    color: _paymentCompleted ? Colors.green[200]! : Colors.blue[200]!,
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      _stripePaymentCompleted ? Icons.check_circle : Icons.info,
-                      color: _stripePaymentCompleted ? Colors.green : Colors.blue,
+                      _paymentCompleted ? Icons.check_circle : Icons.info,
+                      color: _paymentCompleted ? Colors.green : Colors.blue,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -312,22 +315,22 @@ class _SuccessPageState extends State<SuccessPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _stripePaymentCompleted
+                            _paymentCompleted
                                 ? '✅ Paiement Stripe confirmé !'
                                 : '⏳ Vérification du paiement...',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: _stripePaymentCompleted ? Colors.green[800] : Colors.blue[800],
+                              color: _paymentCompleted ? Colors.green[800] : Colors.blue[800],
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _stripePaymentCompleted
+                            _paymentCompleted
                                 ? 'Votre paiement a été traité avec succès.'
                                 : 'Nous vérifions votre paiement Stripe.',
                             style: TextStyle(
                               fontSize: 12,
-                              color: _stripePaymentCompleted ? Colors.green[600] : Colors.blue[600],
+                              color: _paymentCompleted ? Colors.green[600] : Colors.blue[600],
                             ),
                           ),
                         ],
@@ -348,7 +351,7 @@ class _SuccessPageState extends State<SuccessPage> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -418,7 +421,7 @@ class _SuccessPageState extends State<SuccessPage> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
+                      color: Colors.grey.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -456,7 +459,7 @@ class _SuccessPageState extends State<SuccessPage> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: _getPaymentStatusColor(order['payment_status'] ?? 'pending')
-                                          .withOpacity(0.1),
+                                          .withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
@@ -472,7 +475,7 @@ class _SuccessPageState extends State<SuccessPage> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.withOpacity(0.1),
+                                        color: Colors.blue.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: const Text(
@@ -809,7 +812,7 @@ class _SuccessPageState extends State<SuccessPage> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
+                      color: Colors.grey.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),

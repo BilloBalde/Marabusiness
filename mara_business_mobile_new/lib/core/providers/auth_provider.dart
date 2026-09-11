@@ -1,3 +1,4 @@
+import '../../utils/app_logger.dart';
 import 'dart:convert';  // Add this import for json
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
@@ -29,8 +30,13 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
   bool get isAuthenticated => _user != null && _token != null;
 
+  /// The token now lives in flutter_secure_storage (Keystore / Keychain) rather
+  /// than SharedPreferences, which is a plain XML file on Android and was
+  /// included in device backups. getAuthToken() still reads the old location as
+  /// a fallback, so anyone already signed in stays signed in and simply migrates
+  /// on their next login rather than being kicked out by this change.
   Future<void> _loadStoredUser() async {
-    _token = _prefs.getString('auth_token');
+    _token = await _prefs.getAuthToken();
     final userJson = _prefs.getString('user');
     
     if (_token != null && userJson != null) {
@@ -57,7 +63,7 @@ class AuthProvider extends ChangeNotifier {
     // userData contains: id, name, email, phone, avatar, roles, token
     _user = User.fromJson(userData);
     _token = userData['token'];
-    await _prefs.setString('auth_token', _token!);
+    await _prefs.saveAuthToken(_token!);
     await _prefs.setString('user', json.encode(_user!.toJson()));
     _apiService.setToken(_token!);
 
@@ -84,7 +90,7 @@ class AuthProvider extends ChangeNotifier {
         _user = User.fromJson(data['user']);
         _token = data['token'];
         
-        await _prefs.setString('auth_token', _token!);
+        await _prefs.saveAuthToken(_token!);
         await _prefs.setString('user', json.encode(_user!.toJson()));
         
         _apiService.setToken(_token!);
@@ -118,7 +124,7 @@ class AuthProvider extends ChangeNotifier {
         _user = User.fromJson(data['user']);
         _token = data['token'];
         
-        await _prefs.setString('auth_token', _token!);
+        await _prefs.saveAuthToken(_token!);
         await _prefs.setString('user', json.encode(_user!.toJson()));
         
         _apiService.setToken(_token!);
@@ -147,11 +153,11 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('🔵 Updating profile with data: $data');
+      logDebug('🔵 Updating profile with data: $data');
       final response = await _apiService.updateProfile(data);
       
-      print('🔵 Response success: ${response.success}');
-      print('🔵 Response data: ${response.data}');
+      logDebug('🔵 Response success: ${response.success}');
+      logDebug('🔵 Response data: ${response.data}');
       
       if (response.success) {
         // The API returns user data in the 'data' field
@@ -178,7 +184,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      print('🔴 Error updating profile: $e');
+      logDebug('🔴 Error updating profile: $e');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
@@ -189,9 +195,9 @@ class AuthProvider extends ChangeNotifier {
   Future<void> refreshUser() async {
     if (_user != null) {
       try {
-        print('🔵 Refreshing user data');
+        logDebug('🔵 Refreshing user data');
         final response = await _apiService.getUserProfile();
-        print('🔵 Refresh response: ${response.data}');
+        logDebug('🔵 Refresh response: ${response.data}');
         
         if (response.success) {
           final Map<String, dynamic> userData;
@@ -206,7 +212,7 @@ class AuthProvider extends ChangeNotifier {
           notifyListeners();
         }
       } catch (e) {
-        print('Error refreshing user: $e');
+        logDebug('Error refreshing user: $e');
       }
     }
   }
@@ -221,9 +227,11 @@ class AuthProvider extends ChangeNotifier {
       debugPrint('Logout error: $e');
     }
 
-    await _prefs.remove('auth_token');
-    await _prefs.remove('user');
-    
+    // clearAuth() wipes the token from both the secure store and
+    // SharedPreferences, plus the cached user — it replaces the two separate
+    // remove() calls that used to live here.
+    await _prefs.clearAuth();
+
     _user = null;
     _token = null;
     _apiService.clearToken();

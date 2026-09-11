@@ -1,5 +1,6 @@
 // lib/core/providers/address_provider.dart
 
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/order.dart';
@@ -25,39 +26,39 @@ class AddressProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('🔵 Loading addresses...');
+      logDebug('🔵 Loading addresses...');
       final response = await _apiService.getAddresses();
       
       if (response.success) {
         final data = response.data;
-        print('🔵 Response data type: ${data.runtimeType}');
+        logDebug('🔵 Response data type: ${data.runtimeType}');
         
         if (data is Map && data.containsKey('data')) {
           _addresses = (data['data'] as List)
               .map((item) => Address.fromJson(item))
               .toList();
-          print('✅ Loaded ${_addresses.length} addresses from paginated response');
+          logDebug('✅ Loaded ${_addresses.length} addresses from paginated response');
         } else if (data is List) {
           _addresses = data
               .map((item) => Address.fromJson(item))
               .toList();
-          print('✅ Loaded ${_addresses.length} addresses from list response');
+          logDebug('✅ Loaded ${_addresses.length} addresses from list response');
         } else if (data is Map && data.containsKey('addresses')) {
           _addresses = (data['addresses'] as List)
               .map((item) => Address.fromJson(item))
               .toList();
-          print('✅ Loaded ${_addresses.length} addresses from addresses field');
+          logDebug('✅ Loaded ${_addresses.length} addresses from addresses field');
         } else {
-          print('⚠️ Unexpected response format: $data');
+          logDebug('⚠️ Unexpected response format: $data');
           _addresses = [];
         }
       } else {
         _error = response.message ?? 'Failed to load addresses';
-        print('❌ Error: $_error');
+        logDebug('❌ Error: $_error');
       }
     } catch (e) {
       _error = e.toString();
-      print('❌ Exception: $_error');
+      logDebug('❌ Exception: $_error');
     }
 
     _isLoading = false;
@@ -70,25 +71,25 @@ class AddressProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('🔵 Creating address with data: $addressData');
+      logDebug('🔵 Creating address with data: $addressData');
       final response = await _apiService.createAddress(addressData);
       
       if (response.success) {
-        print('✅ Address created successfully');
+        logDebug('✅ Address created successfully');
         await loadAddresses(); // Reload addresses
         _isProcessing = false;
         notifyListeners();
         return true;
       } else {
         _error = response.message ?? 'Failed to create address';
-        print('❌ Error: $_error');
+        logDebug('❌ Error: $_error');
         _isProcessing = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
       _error = e.toString();
-      print('❌ Exception: $_error');
+      logDebug('❌ Exception: $_error');
       _isProcessing = false;
       notifyListeners();
       return false;
@@ -101,25 +102,25 @@ class AddressProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('🔵 Updating address ID: $id with data: $addressData');
+      logDebug('🔵 Updating address ID: $id with data: $addressData');
       final response = await _apiService.updateAddress(id, addressData);
       
       if (response.success) {
-        print('✅ Address updated successfully');
+        logDebug('✅ Address updated successfully');
         await loadAddresses(); // Reload addresses
         _isProcessing = false;
         notifyListeners();
         return true;
       } else {
         _error = response.message ?? 'Failed to update address';
-        print('❌ Error: $_error');
+        logDebug('❌ Error: $_error');
         _isProcessing = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
       _error = e.toString();
-      print('❌ Exception: $_error');
+      logDebug('❌ Exception: $_error');
       _isProcessing = false;
       notifyListeners();
       return false;
@@ -132,25 +133,25 @@ class AddressProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('🔵 Deleting address ID: $id');
+      logDebug('🔵 Deleting address ID: $id');
       final response = await _apiService.deleteAddress(id);
       
       if (response.success) {
-        print('✅ Address deleted successfully');
+        logDebug('✅ Address deleted successfully');
         await loadAddresses(); // Reload addresses
         _isProcessing = false;
         notifyListeners();
         return true;
       } else {
         _error = response.message ?? 'Failed to delete address';
-        print('❌ Error: $_error');
+        logDebug('❌ Error: $_error');
         _isProcessing = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
       _error = e.toString();
-      print('❌ Exception: $_error');
+      logDebug('❌ Exception: $_error');
       _isProcessing = false;
       notifyListeners();
       return false;
@@ -163,25 +164,25 @@ class AddressProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('🔵 Setting address ID: $id as default');
+      logDebug('🔵 Setting address ID: $id as default');
       final response = await _apiService.setDefaultAddress(id);
       
       if (response.success) {
-        print('✅ Default address set successfully');
+        logDebug('✅ Default address set successfully');
         await loadAddresses(); // Reload addresses
         _isProcessing = false;
         notifyListeners();
         return true;
       } else {
         _error = response.message ?? 'Failed to set default address';
-        print('❌ Error: $_error');
+        logDebug('❌ Error: $_error');
         _isProcessing = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
       _error = e.toString();
-      print('❌ Exception: $_error');
+      logDebug('❌ Exception: $_error');
       _isProcessing = false;
       notifyListeners();
       return false;

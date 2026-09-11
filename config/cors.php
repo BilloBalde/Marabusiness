@@ -1,6 +1,18 @@
 <?php
 
 return [
+    /*
+    | Deliberately no 'uploads/*' here. Images under public/uploads are static
+    | files: the web server hands them back without ever entering PHP, so this
+    | package never sees the request and adding the path would be a line that
+    | looks like it does something and does not. Verified against the running
+    | server — an image returns no Access-Control-Allow-Origin at all while an
+    | api/* response beside it does. A browser client that needs those images
+    | cross-origin needs a header rule in Apache/Nginx, not here.
+    |
+    | The native mobile app is unaffected: native HTTP clients perform no CORS
+    | preflight.
+    */
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
 
     'allowed_methods' => ['*'],

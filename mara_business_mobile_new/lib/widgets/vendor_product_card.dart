@@ -1,9 +1,9 @@
 // vendor_product_card.dart - WISHLIST REMOVED
 
+import '../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../core/models/product_models.dart';
-import '../core/constants/app_constants.dart';
 
 class VendorProductCard extends StatelessWidget {
   final VendorProduct product;
@@ -29,7 +29,7 @@ class VendorProductCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               spreadRadius: 1,
               blurRadius: 4,
               offset: const Offset(0, 2),
@@ -49,9 +49,7 @@ class VendorProductCard extends StatelessWidget {
                   ),
                   child: product.imageUrl != null
                       ? CachedNetworkImage(
-                          imageUrl: product.imageUrl!.startsWith('http')
-                              ? product.imageUrl!
-                              : '${AppConstants.baseUrl}/uploads/${product.imageUrl}',
+                          imageUrl: ImageUrl.resolve(product.imageUrl),
                           height: 130,
                           width: double.infinity,
                           fit: BoxFit.cover,

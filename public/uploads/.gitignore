@@ -1,2 +1,13 @@
 *
 !.gitignore
+
+# Placeholder images shipped with the application, not user uploads.
+#
+# Six Blade views fall back to uploads/default.png or uploads/no.jpg when a
+# product has no image (order-detail-page, cart-page, home-page, global-search,
+# product-detail-page). Neither file had ever existed, so those products rendered
+# a broken-image icon. They live here because that is where the views look for
+# them, but they are part of the application and have to reach every deployment —
+# hence the exceptions to the blanket ignore above.
+!default.png
+!no.jpg

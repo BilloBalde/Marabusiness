@@ -279,7 +279,16 @@
 
                                     {{-- Payer button --}}
                                     <td class="px-6 py-4 text-sm font-medium whitespace-nowrap text-end">
-                                        @if (($order->total_remaining ?? 0) > 0.00 && $order->status !== 'cancelled')
+                                        {{-- A price still under discussion is not a price to
+                                             collect. The link goes to the thread, where the
+                                             buyer accepts or refuses. --}}
+                                        @if ($order->isNegotiating())
+                                            <a href="{{ $order->negotiation ? route('rfq.chat', $order->negotiation) : '#' }}"
+                                               class="inline-flex items-center px-4 py-2 text-xs font-semibold tracking-wide rounded-full shadow-sm
+                                                      {{ $order->hasLiveOffer() ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                                                {{ $order->hasLiveOffer() ? 'Voir le prix proposé' : 'En négociation' }}
+                                            </a>
+                                        @elseif (($order->total_remaining ?? 0) > 0.00 && $order->status !== 'cancelled')
                                             <button
                                                 wire:click="$dispatch('open-paiement-modal', { orderId: {{ $order->id }} })"
                                                 class="inline-flex items-center px-4 py-2 text-xs font-semibold tracking-wide text-white rounded-full bg-emerald-600 hover:bg-emerald-700 shadow-sm"

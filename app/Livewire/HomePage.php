@@ -8,10 +8,12 @@ use App\Models\Category;
 use App\Models\Vendor;
 use App\Models\Service;
 use App\Models\SiteSetting;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use App\Helpers\WishlistManagement;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\On;
+use App\Support\Money;
 
 class HomePage extends Component
 {
@@ -57,12 +59,13 @@ class HomePage extends Component
             'new_rate' => $this->currencyRate,
         ]);
 
-        // Force Livewire to re-render the component
+        // This block said "force a re-render" and did the exact opposite.
+        // skipRender() tells Livewire not to render this request at all, and the
+        // render() called after it returns a View that Livewire then discards —
+        // so switching currency updated the component's state and left every
+        // price on the screen exactly as it was. Livewire re-renders after a
+        // public method by default; the correct code here is no code.
         $this->currencyChanged = !$this->currencyChanged;
-        // Force a re-render
-        // This forces Livewire to see the component as "dirty" and re-render
-        $this->skipRender(); // Skip current render
-        $this->render(); // Force new render
     }
 
     /**
@@ -75,11 +78,19 @@ class HomePage extends Component
             return 0;
         }
 
-        // Convert vendor price → USD
-        $usd = $price * ($vendorRate ?: 1);
-
-        // Convert USD → selected currency
-        return $usd * $this->currencyRate;
+        // The second step multiplied where it had to divide.
+        //
+        // rate_to_usd is what one unit of a currency is worth in dollars, so
+        // going *into* dollars multiplies and coming back out divides. Writing
+        // `$usd * $this->currencyRate` did the first step twice: a $100 product
+        // shown to a shopper who picked GNF (rate 0.00012) came out as 0.012 GNF
+        // instead of 833,333 — wrong by a factor of 69 million, and wrong in the
+        // direction that makes everything look free.
+        //
+        // Invisible by default, because the default currency is USD at a rate of
+        // 1 and multiplying by 1 hides it. It appears the moment anyone uses the
+        // currency switcher in the navbar.
+        return Money::convert((float) $price, (float) ($vendorRate ?: 1), (float) $this->currencyRate);
     }
 
     /**
@@ -213,6 +224,49 @@ class HomePage extends Component
             ->map(fn($p) => $this->mapProductForHomepage($p))
             ->filter(fn($p) => $p->has_vendor);
 
+        // Real ratings and sales figures for the product cards.
+        //
+        // The view generated these with rand(): a star rating between 4.0 and 4.9
+        // and a "vendus" count between 50 and 8000, recomputed on every render, so
+        // the same product showed a different rating and a different sales figure
+        // on each reload. They were presented to customers as fact — a product
+        // with no reviews and no sales still displayed 4.7 stars and "3,412
+        // vendus". Both now come from the tables that actually hold them, and the
+        // view hides each one when there is nothing real to show.
+        //
+        // Two grouped queries for the whole page, in the spirit of the vendor
+        // aggregates below, rather than two per card.
+        $productIds = $featuredProducts->pluck('id')->merge($saleProducts->pluck('id'))->unique();
+        $vendorProductIds = $featuredProducts->pluck('vendor_product_id')
+            ->merge($saleProducts->pluck('vendor_product_id'))
+            ->filter()
+            ->unique();
+
+        $soldCounts = DB::table('order_items')
+            ->selectRaw('product_id, SUM(quantity) as sold')
+            ->whereIn('product_id', $productIds)
+            ->groupBy('product_id')
+            ->pluck('sold', 'product_id');
+
+        $productRatings = DB::table('vendor_product_reviews')
+            ->selectRaw('vendor_product_id, AVG(rating) as avg_rating, COUNT(*) as reviews_count')
+            ->whereIn('vendor_product_id', $vendorProductIds)
+            ->groupBy('vendor_product_id')
+            ->get()
+            ->keyBy('vendor_product_id');
+
+        $attachRealFigures = function ($product) use ($soldCounts, $productRatings) {
+            $rating = $productRatings->get($product->vendor_product_id);
+            $product->rating = $rating ? round((float) $rating->avg_rating, 1) : null;
+            $product->reviews_count = $rating ? (int) $rating->reviews_count : 0;
+            $product->sold_count = (int) ($soldCounts[$product->id] ?? 0);
+
+            return $product;
+        };
+
+        $featuredProducts = $featuredProducts->map($attachRealFigures);
+        $saleProducts = $saleProducts->map($attachRealFigures);
+
         // Get categories with their first product (if any)
         //
         // 'translations' eager-loaded for $category->name below — otherwise
@@ -238,6 +292,11 @@ class HomePage extends Component
             ->withCount([
                 'approvedVendorReviews as vendor_reviews_count',
                 'followers as followers_count',
+                // The card printed "{{ $vendor->products_count ?? rand(20, 200) }}
+                // products", and products_count was never loaded — so every vendor
+                // advertised a catalogue size between 20 and 200 that was drawn
+                // fresh on each page load. Counting it here makes the number true.
+                'products as products_count',
             ])
             ->where('is_active', 1)
             ->orderBy('created_at', 'desc')

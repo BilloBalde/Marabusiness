@@ -14,6 +14,7 @@ use Livewire\Attributes\Url;
 use Livewire\Attributes\On;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
+use App\Support\Money;
 
 #[Layout('components.layouts.app')]
 class ProductsPage extends Component
@@ -81,14 +82,21 @@ class ProductsPage extends Component
     }
 
     /**
-     * Convert vendor price → USD → selected currency
+     * Convert vendor price → USD → selected currency.
+     *
+     * Nothing on this page calls it, which is why the catalogue lists raw vendor
+     * prices and ignores the currency switcher entirely while the home page
+     * converts. Kept rather than deleted because the listing arguably should
+     * honour the switcher — but corrected first: this carried the same inverted
+     * second step as HomePage's copy, multiplying by rate_to_usd where it had to
+     * divide, so wiring it up as it stood would have shown a $100 product as
+     * 0.012 GNF.
      */
     private function convertPrice($price, $vendorRate)
     {
         if (!$price || $price <= 0) return 0;
 
-        $usd = $price * ($vendorRate ?: 1);
-        return $usd * $this->currencyRate;
+        return Money::convert((float) $price, (float) ($vendorRate ?: 1), (float) $this->currencyRate);
     }
 
     public function render()
@@ -98,7 +106,25 @@ class ProductsPage extends Component
         // filter, so a product carried by three shops used to appear three times.
         $query = VendorProduct::with(['product', 'vendor.currency'])
             ->whereHas('product', fn($q) => $q->where('is_active', 1))
-            ->cheapestPerProduct();
+            ->cheapestPerProduct()
+            // vendor_product.price is in the vendor's own currency, and the price
+            // filter and the price sort below both compared it as a bare number.
+            // Sorted "cheapest first", the catalogue's actual cheapest item
+            // (50,000 GNF = $6) came fourth, behind an 11,000 CNY phone ($1,540),
+            // because 50,000 > 11,000. The filter had the same fault plus a label
+            // that read "USD" over a threshold compared against GNF.
+            //
+            // Joining the vendor's currency gives a comparable figure. leftJoin
+            // with a COALESCE fallback so a vendor whose currency row ever went
+            // missing drops out of the ordering, not out of the catalogue.
+            ->select('vendor_product.*')
+            ->leftJoin('vendors', 'vendors.id', '=', 'vendor_product.vendor_id')
+            ->leftJoin('currencies', 'currencies.id', '=', 'vendors.currency_id');
+
+        // The price actually charged, expressed in USD — sale price when there is
+        // one, list price otherwise, matching cheapestPerProduct()'s definition.
+        $priceUsd = 'COALESCE(NULLIF(vendor_product.sale_price, 0), vendor_product.price)'
+            . ' * COALESCE(currencies.rate_to_usd, 1)';
 
         /** SEARCH */
         if ($this->search) {
@@ -130,19 +156,22 @@ class ProductsPage extends Component
 
         /** ON SALE */
         if ($this->on_sale) {
-            $query->whereNotNull('sale_price');
+            $query->whereNotNull('vendor_product.sale_price');
         }
 
         /** PRICE FILTER */
         if ($this->price_range > 0) {
-            $query->where('price', '<=', $this->price_range);
+            $query->whereRaw("({$priceUsd}) <= ?", [$this->price_range]);
         }
 
         /** SORT */
+        // Qualified column names throughout: vendor_product, vendors and
+        // currencies all carry created_at, so an unqualified latest() is
+        // ambiguous once those tables are joined.
         if ($this->sort === 'price') {
-            $query->orderBy('price', 'ASC');
+            $query->orderByRaw("({$priceUsd}) ASC");
         } else {
-            $query->latest();
+            $query->latest('vendor_product.created_at');
         }
 
         $vendorProducts = $query->paginate(12);

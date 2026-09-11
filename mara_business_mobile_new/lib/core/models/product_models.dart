@@ -1,4 +1,5 @@
 // product_models.dart - COMPLETE FIXED VERSION
+import '../../utils/app_logger.dart';
 
 
 class VendorProduct {
@@ -43,12 +44,12 @@ class VendorProduct {
   });
 
   factory VendorProduct.fromJson(Map<String, dynamic> json) {
-    print('🔵 VENDOR PRODUCT PARSING: ${json['name']}');
-    print('🔵 VENDOR PRODUCT KEYS: ${json.keys}');
-    print('🔵 VENDOR PRODUCT - price: ${json['price']}');
-    print('🔵 VENDOR PRODUCT - display_price: ${json['display_price']}');
-    print('🔵 VENDOR PRODUCT - original_price: ${json['original_price']}');
-    print('🔵 VENDOR PRODUCT - sale_price: ${json['sale_price']}');
+    logDebug('🔵 VENDOR PRODUCT PARSING: ${json['name']}');
+    logDebug('🔵 VENDOR PRODUCT KEYS: ${json.keys}');
+    logDebug('🔵 VENDOR PRODUCT - price: ${json['price']}');
+    logDebug('🔵 VENDOR PRODUCT - display_price: ${json['display_price']}');
+    logDebug('🔵 VENDOR PRODUCT - original_price: ${json['original_price']}');
+    logDebug('🔵 VENDOR PRODUCT - sale_price: ${json['sale_price']}');
     
     // Try to get price from various possible field names
     double productPrice = 0;
@@ -157,52 +158,52 @@ class VendorProductResponse {
   });
 
   factory VendorProductResponse.fromJson(Map<String, dynamic> json) {
-    print('🔵 PARSING RESPONSE - JSON keys: ${json.keys}');
+    logDebug('🔵 PARSING RESPONSE - JSON keys: ${json.keys}');
     
     List<VendorProduct> items = [];
     
     // Handle Laravel pagination structure
     if (json.containsKey('data')) {
-      print('🔵 Found "data" key, type: ${json['data'].runtimeType}');
+      logDebug('🔵 Found "data" key, type: ${json['data'].runtimeType}');
       final data = json['data'];
       
       if (data is List) {
-        print('🔵 Data is List with ${data.length} items');
+        logDebug('🔵 Data is List with ${data.length} items');
         items = data.map((e) => VendorProduct.fromJson(e as Map<String, dynamic>)).toList();
       } else if (data is Map<String, dynamic>) {
         // Check if it's a paginated response with nested data
         if (data.containsKey('data')) {
-          print('🔵 Nested data found');
+          logDebug('🔵 Nested data found');
           final nestedData = data['data'];
           if (nestedData is List) {
             items = nestedData.map((e) => VendorProduct.fromJson(e as Map<String, dynamic>)).toList();
           }
         } else {
-          print('🔵 Data is single product');
+          logDebug('🔵 Data is single product');
           items = [VendorProduct.fromJson(data)];
         }
       }
     } else if (json.containsKey('items')) {
-      print('🔵 Found "items" key');
+      logDebug('🔵 Found "items" key');
       final dataList = json['items'];
       if (dataList is List) {
         items = dataList.map((e) => VendorProduct.fromJson(e as Map<String, dynamic>)).toList();
       }
     } else if (json.containsKey('products')) {
-      print('🔵 Found "products" key');
+      logDebug('🔵 Found "products" key');
       final dataList = json['products'];
       if (dataList is List) {
         items = dataList.map((e) => VendorProduct.fromJson(e as Map<String, dynamic>)).toList();
       }
     }
 
-    print('🔵 PARSED ${items.length} products');
+    logDebug('🔵 PARSED ${items.length} products');
     
     // Debug first product if exists
     if (items.isNotEmpty) {
-      print('🔵 First product name: ${items.first.name}');
-      print('🔵 First product price: ${items.first.price}');
-      print('🔵 First product currency: ${items.first.currency}');
+      logDebug('🔵 First product name: ${items.first.name}');
+      logDebug('🔵 First product price: ${items.first.price}');
+      logDebug('🔵 First product currency: ${items.first.currency}');
     }
     
     // Get pagination data

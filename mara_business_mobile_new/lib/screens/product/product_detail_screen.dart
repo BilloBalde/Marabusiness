@@ -1,5 +1,7 @@
 // lib/screens/product/product_detail_screen.dart - WISHLIST REMOVED
 
+import '../../utils/image_url.dart';
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -121,14 +123,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  String _getFullImageUrl(String? path) {
-    if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http')) return path;
-    if (path.startsWith('uploads/')) {
-      return '${AppConstants.baseUrl}/$path';
-    }
-    return '${AppConstants.baseUrl}/uploads/$path';
-  }
+  /// This copy was the only one that noticed a path already starting with
+  /// 'uploads/'. ImageUrl keeps that behaviour for every screen.
+  String _getFullImageUrl(String? path) => ImageUrl.resolve(path);
 
   String? _getYoutubeId(String? url) {
     if (url == null) return null;
@@ -405,7 +402,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             end: Alignment.bottomCenter,
                             colors: [
                               Colors.transparent,
-                              Colors.black.withOpacity(0.3),
+                              Colors.black.withValues(alpha: 0.3),
                             ],
                           ),
                         ),
@@ -435,7 +432,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
+                                    color: Colors.black.withValues(alpha: 0.2),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -460,7 +457,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -487,7 +484,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -599,7 +596,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
+                        color: Colors.grey.withValues(alpha: 0.1),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -736,7 +733,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 borderRadius: BorderRadius.circular(8),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.grey.withOpacity(0.1),
+                                    color: Colors.grey.withValues(alpha: 0.1),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   ),
@@ -814,7 +811,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
+                          color: Colors.grey.withValues(alpha: 0.1),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -863,7 +860,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
+                          color: Colors.grey.withValues(alpha: 0.1),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -920,7 +917,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
+                          color: Colors.grey.withValues(alpha: 0.1),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -953,7 +950,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
+                        color: Colors.grey.withValues(alpha: 0.1),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -1001,7 +998,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
+                          color: Colors.grey.withValues(alpha: 0.1),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -1295,7 +1292,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void _initializeVideoPlayer(String videoUrl) {
   // Ensure the URL is properly formatted
   String fullUrl = _getFullImageUrl(videoUrl);
-  print('🎥 Initializing video from: $fullUrl');
+  logDebug('🎥 Initializing video from: $fullUrl');
   
   _videoController = VideoPlayerController.networkUrl(
     Uri.parse(fullUrl),
@@ -1306,9 +1303,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (_isPlayingVideo) {
         _videoController!.play();
       }
-      print('✅ Video initialized successfully');
+      logDebug('✅ Video initialized successfully');
     }).catchError((error) {
-      print('❌ Error initializing video: $error');
+      logDebug('❌ Error initializing video: $error');
       setState(() {
         _isVideoInitialized = true; // Still set to true to show error state
       });
@@ -1338,7 +1335,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.05),
+              color: Colors.grey.withValues(alpha: 0.05),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -1684,7 +1681,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       }
                     }
                   },
-                  selectedColor: const Color(0xFFD4AF37).withOpacity(0.2),
+                  selectedColor: const Color(0xFFD4AF37).withValues(alpha: 0.2),
                   checkmarkColor: const Color(0xFFD4AF37),
                 );
               }).toList(),
@@ -2008,10 +2005,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final isLoggedIn = authProvider.isAuthenticated;
   final hasReviewed = product.userReview != null;
   // In _buildReviewForm, add this at the beginning:
-  print('🔍 Building review form - isLoggedIn: $isLoggedIn');
-  print('🔍 userReview: ${product.userReview}');
-  print('🔍 hasReviewed: $hasReviewed');
-  print('🔍 isEditingReview: $_isEditingReview');
+  logDebug('🔍 Building review form - isLoggedIn: $isLoggedIn');
+  logDebug('🔍 userReview: ${product.userReview}');
+  logDebug('🔍 hasReviewed: $hasReviewed');
+  logDebug('🔍 isEditingReview: $_isEditingReview');
 
   if (!isLoggedIn) {
     return Container(

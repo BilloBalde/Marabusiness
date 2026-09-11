@@ -339,12 +339,29 @@ static public function addItemToCart($vendor_product_id, $quantity = 1, $variati
         // Generate cart key for the new item
         $newCartKey = self::generateCartKey($vendor_product_id, $variation_id, $selectedAttributes);
 
-        // Check stock availability
-        $availableStock = $productData['stock'];
-        if ($availableStock > 0) {
-            if ($quantity > $availableStock) {
-                $quantity = $availableStock;
-            }
+        // Check stock availability.
+        //
+        // Every quantity cap below is written `if ($availableStock > 0 && ...)`,
+        // which reads as "cap it when we know the stock" but means the cap is
+        // skipped at exactly one value: zero. Adding five units of something with
+        // none in the warehouse was accepted in full, and the order that followed
+        // wrote max(0, 0 - 5) = 0, so nothing downstream recorded a shortfall
+        // either. Both stock columns are NOT NULL, so there is no "unknown stock"
+        // case the > 0 was protecting.
+        $availableStock = (int) $productData['stock'];
+
+        if ($availableStock <= 0) {
+            return [
+                'success' => false,
+                'message' => 'Ce produit n\'est plus en stock.',
+                'stock' => 0,
+                'cart_count' => self::getCartCount(),
+                'items_count' => count(self::getCartItemsFromCookie()),
+            ];
+        }
+
+        if ($quantity > $availableStock) {
+            $quantity = $availableStock;
         }
 
         $cartItem = CartItem::where('user_id', Auth::id())

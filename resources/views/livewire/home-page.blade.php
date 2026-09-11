@@ -15,7 +15,7 @@
                                     <img src="{{ url('uploads/' . $category->products[0]->images[0]) }}" 
                                         alt="{{ $category->name }}"
                                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                        onerror="this.onerror=null; this.src='https://via.placeholder.com/48?text={{ urlencode($category->name) }}'">
+                                        onerror="this.onerror=null; this.src='{{ url('uploads/default.png') }}'">
                                 @else
                                     <div class="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
                                         <i class="fas fa-folder-open text-gray-400 text-xl"></i>
@@ -174,19 +174,18 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
             @foreach($featuredProducts as $product)
                 @php
+                    // Was via.placeholder.com, a service that no longer exists.
                     $img = !empty($product->images)
                         ? url('uploads/' . $product->images[0])
-                        : 'https://via.placeholder.com/400x400';
+                        : url('uploads/default.png');
 
                     $price = number_format($product->display_price, 2);
                     $oldPrice = $product->original_price ? number_format($product->original_price, 2) : null;
                     $currency = $product->vendor_currency ?? 'USD';
                     
-                    // Rating calculation
-                    $rating = rand(40,49) / 10;
-                    $fullStars = floor($rating);
-                    $hasHalf = $rating - $fullStars >= 0.5;
-                    
+                    // The rating is computed from the reviews in HomePage::render()
+                    // and read off $product below; it used to be rand(40,49)/10.
+
                     // Check if product is new (within 7 days)
                     /* $isNew = $product->created_at && $product->created_at->diffInDays(now()) < 7; */
                 @endphp
@@ -200,7 +199,7 @@
                     <a href="/products/{{ $product->slug }}/{{ $product->vendor_product_id }}" class="relative block overflow-hidden rounded-lg">
                         <img src="{{ $img }}" 
                              class="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
-                             onerror="this.onerror=null; this.src='https://via.placeholder.com/400x400?text=No+Image'">
+                             onerror="this.onerror=null; this.src='{{ url('uploads/default.png') }}'">
                         
                         {{-- Discount Badge --}}
                         @if($product->discount)
@@ -267,22 +266,44 @@
                     </div>
 
                     {{-- RATING --}}
-                    <div class="flex items-center text-xs text-gray-500 mt-1">
-                        <div class="flex text-yellow-400 mr-1">
-                            @for($i = 1; $i <= 5; $i++)
-                                @if($i <= $fullStars)
-                                    <i class="fas fa-star"></i>
-                                @elseif($hasHalf && $i == $fullStars + 1)
-                                    <i class="fas fa-star-half-alt"></i>
-                                @else
-                                    <i class="far fa-star"></i>
-                                @endif
-                            @endfor
+                    {{-- Both figures come from HomePage::render() now. The stars and
+                         the sales count each appear only when there is something real
+                         behind them; a product nobody has reviewed or bought simply
+                         shows neither, instead of inventing both. --}}
+                    @if($product->reviews_count > 0 || $product->sold_count > 0)
+                        {{-- flex-wrap: the rating and the sales count together are wider
+                             than a product card on a phone, and without it the "vendus"
+                             text ran outside the card's right edge. --}}
+                        <div class="flex flex-wrap items-center gap-x-1 text-xs text-gray-500 mt-1">
+                            @if($product->reviews_count > 0)
+                                @php
+                                    $fullStars = floor($product->rating);
+                                    $hasHalf = $product->rating - $fullStars >= 0.5;
+                                @endphp
+                                <div class="flex text-yellow-400">
+                                    @for($i = 1; $i <= 5; $i++)
+                                        @if($i <= $fullStars)
+                                            <i class="fas fa-star"></i>
+                                        @elseif($hasHalf && $i == $fullStars + 1)
+                                            <i class="fas fa-star-half-alt"></i>
+                                        @else
+                                            <i class="far fa-star"></i>
+                                        @endif
+                                    @endfor
+                                </div>
+                                <span>{{ number_format($product->rating, 1) }}</span>
+                                <span class="text-gray-400">({{ $product->reviews_count }})</span>
+                            @endif
+
+                            @if($product->reviews_count > 0 && $product->sold_count > 0)
+                                <span>•</span>
+                            @endif
+
+                            @if($product->sold_count > 0)
+                                <span>{{ number_format($product->sold_count) }} vendus</span>
+                            @endif
                         </div>
-                        <span>{{ number_format($rating, 1) }}</span>
-                        <span class="mx-1">•</span>
-                        <span>{{ rand(50, 8000) }} vendus</span>
-                    </div>
+                    @endif
 
                     {{-- VENDOR NAME WITH VERIFIED BADGE --}}
                     @if($product->vendor_name)
@@ -382,7 +403,7 @@
                                     {{-- Product Count --}}
                                     <div class="mt-2 text-sm text-gray-500 flex items-center">
                                         <i class="fas fa-box mr-1"></i>
-                                        {{ $vendor->products_count ?? rand(20, 200) }} products
+                                        {{ $vendor->products_count ?? 0 }} products
                                     </div>
                                 </div>
                             </a>

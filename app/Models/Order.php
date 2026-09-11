@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,97 @@ class Order extends Model
         'grand_total_usd',
         'shipping_amount_usd',
         'rate_to_usd',
+        'negotiation_status',
+        'negotiated_total',
+        'negotiated_expires_at',
+        'pre_negotiation_total',
+        // Both cancellation paths — OrderDetailPage::cancelOrder() on the web and
+        // OrderController::cancel() on the API — have always passed these to
+        // update(), and mass assignment has always dropped them: all nine
+        // cancelled orders in the database carry neither a date nor a reason.
+        'cancelled_at',
+        'cancellation_reason',
     ];
+
+    protected $casts = [
+        'negotiated_expires_at' => 'datetime',
+        'cancelled_at' => 'datetime',
+    ];
+
+    /** The order is waiting on a price, in one form or another. */
+    public const STATUS_NEGOTIATING = 'negotiating';
+
+    /** The buyer has asked; nobody has named a price yet. */
+    public const NEGOTIATION_OPEN = 'open';
+
+    /** The vendor has named a price and it is waiting on the buyer. */
+    public const NEGOTIATION_PRICED = 'priced';
+
+    /** The buyer took the price. The order is an ordinary payable order again. */
+    public const NEGOTIATION_AGREED = 'agreed';
+
+    /**
+     * Nothing about this order may be paid yet.
+     *
+     * Both payment paths only ever checked payment_status === 'paid', so without
+     * this an order under discussion would be payable at whatever provisional
+     * figure the basket happened to carry.
+     */
+    public function isNegotiating(): bool
+    {
+        return $this->status === self::STATUS_NEGOTIATING;
+    }
+
+    /** A price is on the table and has not run out. */
+    public function hasLiveOffer(): bool
+    {
+        return $this->negotiation_status === self::NEGOTIATION_PRICED
+            && $this->negotiated_total !== null
+            && ($this->negotiated_expires_at === null || $this->negotiated_expires_at->isFuture());
+    }
+
+    /** A price was named and the buyer let it lapse. */
+    public function offerHasExpired(): bool
+    {
+        return $this->negotiation_status === self::NEGOTIATION_PRICED
+            && $this->negotiated_expires_at !== null
+            && $this->negotiated_expires_at->isPast();
+    }
+
+    /**
+     * Negotiations that are waiting on the vendor to name a price.
+     *
+     * Two situations, not one: a request nobody has answered, and a price the
+     * buyer let lapse. The second is easy to miss because negotiations:expire
+     * would normally move it back to 'open' — but nothing runs the scheduler on
+     * this deployment (Render binds the sqlite disk to the single web service,
+     * as routes/console.php records), so a lapsed order stays at 'priced'
+     * indefinitely. Counting only 'open' would leave it invisible to the vendor
+     * while the buyer can no longer accept it: a deadlock with no signal.
+     *
+     * Written once here because the navigation badge and the "Négociations" tab
+     * both need it, and two copies of a rule are how the two
+     * convertUsdToVendorCurrency and the five image-URL helpers came about.
+     */
+    public function scopeAwaitingVendorPrice(Builder $query): Builder
+    {
+        return $query
+            ->where('status', self::STATUS_NEGOTIATING)
+            ->where(function (Builder $inner) {
+                $inner->where('negotiation_status', self::NEGOTIATION_OPEN)
+                    ->orWhere(function (Builder $expired) {
+                        $expired->where('negotiation_status', self::NEGOTIATION_PRICED)
+                            ->whereNotNull('negotiated_expires_at')
+                            ->where('negotiated_expires_at', '<', now());
+                    });
+            });
+    }
+
+    /** The negotiation thread, when this order came from one. */
+    public function negotiation()
+    {
+        return $this->hasOne(BulkRfq::class);
+    }
 
     protected static function booted()
     {
@@ -57,10 +148,20 @@ class Order extends Model
         });
         
         static::created(function ($order) {
+            // Une commande en négociation n'a pas d'écritures, et c'est voulu :
+            // aucune somme n'est convenue, il n'y a rien à porter aux comptes.
+            // OrderNegotiation::accept() les crée au moment où le client accepte
+            // le prix. Sans cette condition, chaque discussion ouverte laissait
+            // un avertissement dans le journal — un signal qui ne signale rien
+            // finit par masquer ceux qui comptent.
+            if ($order->status === self::STATUS_NEGOTIATING) {
+                return;
+            }
+
             // Create initial financial transactions for new order
             // (This will be handled by CheckoutPage, but added here as backup)
             $existingTransactions = FinancialTransaction::where('order_id', $order->id)->count();
-            
+
             if ($existingTransactions === 0) {
                 // These will be created by CheckoutPage, so we log if they're missing
                 \Log::warning('Order created without financial transactions', [

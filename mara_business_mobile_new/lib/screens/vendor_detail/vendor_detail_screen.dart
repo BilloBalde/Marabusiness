@@ -1,12 +1,13 @@
 // lib/screens/vendor_detail/vendor_detail_screen.dart - WISHLIST REMOVED
 
+import '../../utils/image_url.dart';
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/vendor_detail_provider.dart';
 import '../../core/providers/home_provider.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/models/vendor_models.dart';
 import '../../core/models/home_models.dart';
 import 'package:go_router/go_router.dart';
@@ -297,7 +298,7 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -313,13 +314,11 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
             decoration: BoxDecoration(
               color: Colors.grey[100],
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.3), width: 2),
+              border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3), width: 2),
               image: vendor.logo != null
                   ? DecorationImage(
                       image: CachedNetworkImageProvider(
-                        vendor.logo!.startsWith('http')
-                            ? vendor.logo!
-                            : '${AppConstants.baseUrl}/uploads/${vendor.logo}',
+                        ImageUrl.resolve(vendor.logo),
                       ),
                       fit: BoxFit.cover,
                     )
@@ -496,7 +495,7 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -628,7 +627,7 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -642,9 +641,7 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             child: product.imageUrl != null
                 ? CachedNetworkImage(
-                    imageUrl: product.imageUrl!.startsWith('http')
-                        ? product.imageUrl!
-                        : '${AppConstants.baseUrl}/uploads/${product.imageUrl}',
+                    imageUrl: ImageUrl.resolve(product.imageUrl),
                     height: 140,
                     width: double.infinity,
                     fit: BoxFit.cover,
@@ -766,7 +763,7 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
       borderRadius: BorderRadius.circular(12),
       boxShadow: [
         BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha: 0.1),
           blurRadius: 4,
           offset: const Offset(0, 2),
         ),
@@ -879,28 +876,28 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
   if (userReview == null && authProvider.user != null) {
     try {
       final currentUserId = authProvider.user!.id;
-      print('🔍 Looking for user review in list - Current user ID: $currentUserId');
-      print('🔍 Reviews count: ${provider.reviews.length}');
+      logDebug('🔍 Looking for user review in list - Current user ID: $currentUserId');
+      logDebug('🔍 Reviews count: ${provider.reviews.length}');
       
       // Search through reviews to find one matching current user
       for (var review in provider.reviews) {
-        print('🔍 Checking review - user_id: ${review.userId}, current user: $currentUserId');
+        logDebug('🔍 Checking review - user_id: ${review.userId}, current user: $currentUserId');
         if (review.userId == currentUserId) {
           userReview = review;
-          print('✅ Found matching review in list! ID: ${review.id}');
+          logDebug('✅ Found matching review in list! ID: ${review.id}');
           break;
         }
       }
       
       if (userReview == null) {
-        print('🔍 No matching review found in list');
+        logDebug('🔍 No matching review found in list');
       }
     } catch (e) {
-      print('🔍 Error searching reviews: $e');
+      logDebug('🔍 Error searching reviews: $e');
     }
   }
   
-  print('🔍 Final userReview: ${userReview != null ? 'Found (ID: ${userReview.id})' : 'Not found'}');
+  logDebug('🔍 Final userReview: ${userReview != null ? 'Found (ID: ${userReview.id})' : 'Not found'}');
 
   // If user has a review and is not editing
   if (userReview != null && !_isEditingReview) {

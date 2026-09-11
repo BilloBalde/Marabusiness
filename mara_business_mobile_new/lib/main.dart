@@ -55,6 +55,10 @@ import 'screens/privacy_screen.dart';
 import '../screens/contact/contact_screen.dart';
 import 'screens/payment/cancel_page.dart';
 import 'screens/payment/success_page.dart';
+import 'screens/chat/chat_list_screen.dart';
+import 'screens/chat/chat_screen.dart';
+import 'screens/negotiation/negotiation_list_screen.dart';
+import 'screens/negotiation/negotiation_screen.dart';
 
 // Widgets
 import 'widgets/bottom_nav_bar.dart';
@@ -63,9 +67,48 @@ import 'widgets/bottom_nav_bar.dart';
 // final AppLinks _appLinks = AppLinks();
 
 // Router configuration
+/// Routes that show or change something belonging to one account. Everything
+/// else stays open to a browsing guest.
+const List<String> _authenticatedOnlyPrefixes = [
+  '/orders',
+  '/addresses',
+  '/checkout',
+  '/edit-profile',
+  // Every chat route is behind auth:sanctum server-side and would 401; catching
+  // it here sends the user to the login screen instead of an empty list.
+  '/messages',
+  // Same reasoning: NegotiationController is entirely behind auth:sanctum, and a
+  // 401 would render as "aucune négociation" — telling someone their
+  // discussions are gone rather than asking them to sign in.
+  '/negotiations',
+];
+
 final GoRouter _router = GoRouter(
   initialLocation: '/',
   // Deep links are handled by app_links, not by router redirect.
+  //
+  // There was no guard here at all, and the screens did not compensate:
+  // orders_screen and the addresses screens never check whether anyone is signed
+  // in. A guest reaching /orders — through a deep link, or after a token expired
+  // — got an API 401, which nothing handled, rendered as the empty state:
+  // "you have no orders". Telling a customer their order history is empty is a
+  // worse failure than asking them to sign in.
+  //
+  // /profile is deliberately not listed: that screen already handles a signed-out
+  // visitor properly, showing a sign-in button rather than pretending to be empty.
+  redirect: (context, state) {
+    final location = state.matchedLocation;
+
+    final needsAuth = _authenticatedOnlyPrefixes.any(
+      (prefix) => location == prefix || location.startsWith('$prefix/'),
+    );
+
+    if (!needsAuth || context.read<AuthProvider>().isAuthenticated) {
+      return null;
+    }
+
+    return '/login?redirect=${Uri.encodeComponent(location)}';
+  },
   routes: [
     // ShellRoute for screens with bottom navigation
     ShellRoute(
@@ -312,6 +355,55 @@ final GoRouter _router = GoRouter(
       },
     ),
     GoRoute(
+      path: '/messages',
+      name: 'messages',
+      pageBuilder: (context, state) => const NoTransitionPage(
+        child: ChatListScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/messages/:userId',
+      name: 'chat',
+      pageBuilder: (context, state) {
+        // The contact's name rides in the query string so the conversation can
+        // title itself immediately, rather than showing a blank bar until the
+        // messages land. A malformed id falls back to the list instead of
+        // throwing inside a route builder.
+        final userId = int.tryParse(state.pathParameters['userId'] ?? '');
+        if (userId == null) {
+          return const NoTransitionPage(child: ChatListScreen());
+        }
+
+        return NoTransitionPage(
+          child: ChatScreen(
+            userId: userId,
+            contactName: state.uri.queryParameters['name'] ?? 'Conversation',
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/negotiations',
+      name: 'negotiations',
+      pageBuilder: (context, state) => const NoTransitionPage(
+        child: NegotiationListScreen(),
+      ),
+    ),
+    GoRoute(
+      // Adressée par order_id : le prix convenu vit sur la commande, pas sur le
+      // fil de discussion.
+      path: '/negotiations/:orderId',
+      name: 'negotiation',
+      pageBuilder: (context, state) {
+        final orderId = int.tryParse(state.pathParameters['orderId'] ?? '');
+        if (orderId == null) {
+          return const NoTransitionPage(child: NegotiationListScreen());
+        }
+
+        return NoTransitionPage(child: NegotiationScreen(orderId: orderId));
+      },
+    ),
+    GoRoute(
       path: '/services',
       name: 'services',
       pageBuilder: (context, state) => const NoTransitionPage(
@@ -374,6 +466,15 @@ void main() async {
     apiService.setToken(token);
   }
   apiService.setCurrency(storageService.getCurrency());
+
+  // A rejected token now ends the session instead of leaving the app in a state
+  // where every request fails silently. Tokens expire after 90 days server-side
+  // (config/sanctum.php), so this path is reachable in normal use, not only when
+  // a token is revoked.
+  apiService.onUnauthorized = () {
+    storageService.clearAuth();
+    _router.go('/login');
+  };
 
   // Set up deep link listeners before runApp
   _setupDeepLinkListeners();

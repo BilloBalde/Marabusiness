@@ -1,3 +1,4 @@
+import '../utils/app_logger.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -28,7 +29,7 @@ class GoogleLoginService {
       final Map<String, dynamic> userData = jsonDecode(jsonString);
       return userData;
     } catch (e) {
-      print('Google login error: $e');
+      logDebug('Google login error: $e');
       return null;
     }
   }

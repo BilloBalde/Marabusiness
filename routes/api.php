@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\VendorController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\NegotiationController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\ApiProductsPageController;
 use App\Http\Controllers\Api\HomeController;
@@ -159,6 +160,16 @@ Route::prefix('v1')->group(function () {
         Route::post('/addresses/{id}/default', [AddressController::class, 'setDefault']);
         Route::get('/addresses/default/get', [AddressController::class, 'getDefault']);
         
+        // Négociation de prix : le pendant mobile du bouton « Discuter le prix »
+        // du checkout web. Les deux passent par App\Services\OrderNegotiation.
+        Route::post('/negotiations', [NegotiationController::class, 'open']);
+        Route::get('/negotiations', [NegotiationController::class, 'index']);
+        Route::get('/negotiations/{orderId}', [NegotiationController::class, 'show']);
+        Route::post('/negotiations/{orderId}/messages', [NegotiationController::class, 'sendMessage']);
+        Route::post('/negotiations/{orderId}/accept', [NegotiationController::class, 'accept']);
+        Route::post('/negotiations/{orderId}/refuse', [NegotiationController::class, 'refuse']);
+        Route::post('/negotiations/{orderId}/cancel', [NegotiationController::class, 'cancel']);
+
         // Chat
         Route::get('/chats', [ChatController::class, 'index']);
         Route::get('/chats/{userId}', [ChatController::class, 'show']);

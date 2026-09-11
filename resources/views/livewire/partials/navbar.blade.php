@@ -193,21 +193,39 @@
                                     <i class="fa-solid fa-comments"></i> {{ __('ui.navbar.my_chats') }}
                                 </a>
                             @endif
-                            {{-- <a href="{{ route('user.rfqs') }}" 
+                            {{-- Commented out until now, which left a buyer with no way back
+                                 to a price discussion except the redirect they got when
+                                 opening it.
+
+                                 Le compteur ne montre que ce qui attend le client :
+                                 « quoted », c'est-à-dire un prix proposé à accepter ou
+                                 refuser. « pending » attend la boutique, le client n'y peut
+                                 rien, et un badge qui compte l'attente d'autrui ne redescend
+                                 jamais à zéro — on cesse alors de le lire. Un prix périmé est
+                                 exclu : rien ne fait tourner negotiations:expire sur cet
+                                 hébergement, donc le statut peut rester « quoted » après
+                                 l'échéance. --}}
+                            <a href="{{ route('user.rfqs') }}"
                                 class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100">
-                                <i class="fas fa-file-invoice-dollar mr-3 text-blue-600"></i>
-                                My RFQs
+                                <i class="fas fa-comments-dollar mr-3 text-[#D4AF37]"></i>
+                                Mes négociations
                                 @php
                                     $pendingCount = \App\Models\BulkRfq::where('user_id', auth()->id())
-                                        ->where('status', 'pending')
+                                        ->where('status', 'quoted')
+                                        ->where(function ($query) {
+                                            $query->whereDoesntHave('order')
+                                                ->orWhereHas('order', fn ($order) => $order
+                                                    ->whereNull('negotiated_expires_at')
+                                                    ->orWhere('negotiated_expires_at', '>', now()));
+                                        })
                                         ->count();
                                 @endphp
                                 @if($pendingCount > 0)
-                                    <span class="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1">
+                                    <span class="ml-auto bg-[#D4AF37] text-white text-xs rounded-full px-2 py-1">
                                         {{ $pendingCount }}
                                     </span>
                                 @endif
-                            </a> --}}
+                            </a>
                             @if ($role == 'vendor')
                                 <a href="/vendor" target="_blank"
                                 class="block px-4 py-2 text-gray-700 hover:bg-[#F5E6B3]">

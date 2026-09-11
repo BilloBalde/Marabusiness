@@ -65,7 +65,7 @@ class AccountPopupMenu extends StatelessWidget {
                     height: 32,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFFD4AF37).withOpacity(0.1),
+                      color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                     ),
                     child: const Center(
                       child: Icon(

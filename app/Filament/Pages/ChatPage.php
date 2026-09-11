@@ -17,7 +17,21 @@ class ChatPage extends Page
     protected static string $view = 'filament.pages.chat-page';
 
     public $chatWithId;
-    public $customers;
+
+    /**
+     * Starts empty rather than null.
+     *
+     * mount() and loadCustomers() branch on the manager, vendor and customer
+     * roles and have no else. A user holding only the 'admin' role — the platform
+     * owner, opening their own back office — fell through every branch, left this
+     * null, and the view's @forelse threw "foreach() argument must be of type
+     * array|object, null given". The page returned a 500 for every admin.
+     *
+     * An empty collection makes the page render its own empty state instead,
+     * which is the honest answer: an admin has no conversations of their own.
+     */
+    public $customers = [];
+
     public $searchTerm = '';
     
     // Add public property to store selected customer details

@@ -96,8 +96,15 @@ class StorageService {
     return null;
   }
 
+  /// Clears both stores. This used to delete only the secure copy of the token,
+  /// while AuthProvider writes the real one to SharedPreferences under the same
+  /// key — so a caller relying on this to sign someone out left the working token
+  /// in place, and getAuthToken() below happily returned it again. Nothing called
+  /// clearAuth() at the time, so nobody was affected; wiring it to the 401 handler
+  /// is exactly the kind of use that would have hit it.
   Future<void> clearAuth() async {
     await removeSecure(AppConstants.prefAuthToken);
+    await remove(AppConstants.prefAuthToken);
     await remove(AppConstants.prefUser);
   }
 

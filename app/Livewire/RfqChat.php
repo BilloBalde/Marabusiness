@@ -6,6 +6,7 @@ use App\Models\BulkRfq;
 use App\Models\BulkRfqMessage;
 use App\Models\BulkRfqOffer;
 use App\Models\Vendor;
+use App\Services\OrderNegotiation;
 use App\Services\RfqOfferConverter;
 use Livewire\Component;
 use Livewire\Attributes\Validate;
@@ -94,10 +95,15 @@ class RfqChat extends Component
     protected function getSenderName($message)
     {
         if ($this->isFromUser($message)) {
-            return $message->sender->name ?? 'Buyer';
-        } else {
-            return $message->sender->store_name ?? 'Vendor';
+            return $message->sender->name ?? 'Client';
         }
+
+        // Repli sur la boutique de la demande elle-même : une ligne écrite avant
+        // la correction de sender_id pointe sur un id d'utilisateur et ne résout
+        // donc rien. Le fil n'a qu'une boutique, autant la nommer.
+        return $message->sender->store_name
+            ?? $this->rfq->vendor?->store_name
+            ?? 'Boutique';
     }
     
     public function sendMessage()
@@ -109,13 +115,18 @@ class RfqChat extends Component
         }
         
         $user = auth()->user();
-        
-        // Use full namespace
-        $senderType = $user->vendor ? \App\Models\Vendor::class : \App\Models\User::class;
-        
+
+        // sender_id doit porter l'id de ce que sender_type désigne : un id de
+        // boutique pour Vendor, un id d'utilisateur pour User. C'était l'id de
+        // l'utilisateur dans les deux cas, si bien que getSenderName() résolvait
+        // Vendor::find($userId) — une autre boutique, ou rien du tout, auquel cas
+        // l'acheteur lisait le mot « Vendor » à la place du nom du magasin.
+        $vendor = $user->vendor;
+        $senderType = $vendor ? \App\Models\Vendor::class : \App\Models\User::class;
+
         $this->rfq->messages()->create([
             'sender_type' => $senderType,
-            'sender_id' => $user->id,
+            'sender_id' => $vendor?->id ?? $user->id,
             'message' => trim($this->newMessage),
         ]);
         
@@ -236,6 +247,96 @@ class RfqChat extends Component
         $this->redirectRoute('my-orders', navigate: false);
     }
 
+    /**
+     * The order this thread is about, when it came from checkout.
+     *
+     * Null for the original single-product request, where no order exists until
+     * an offer is accepted.
+     */
+    public function getNegotiatedOrderProperty()
+    {
+        return $this->rfq->order_id ? $this->rfq->order : null;
+    }
+
+    /** The buyer takes the price the vendor named. */
+    public function acceptNegotiatedPrice(): void
+    {
+        if (! $this->isBuyer()) {
+            abort(403, "Seul l'acheteur peut accepter un prix.");
+        }
+
+        $order = $this->negotiatedOrder;
+
+        if (! $order) {
+            return;
+        }
+
+        try {
+            $order = app(OrderNegotiation::class)->accept($order, auth()->user());
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+            $this->rfq->refresh();
+            $this->loadMessages();
+
+            return;
+        }
+
+        session()->flash('success', "Prix accepté. Votre commande {$order->order_number} peut être réglée.");
+
+        // The orders list, not the detail page: the "Payer" button that opens
+        // PaiementModal lives on the list. Same reasoning as acceptOffer above.
+        $this->redirectRoute('my-orders', navigate: false);
+    }
+
+    /** The buyer turns the price down; the discussion carries on. */
+    public function refuseNegotiatedPrice(): void
+    {
+        if (! $this->isBuyer()) {
+            abort(403, "Seul l'acheteur peut refuser un prix.");
+        }
+
+        if (! $order = $this->negotiatedOrder) {
+            return;
+        }
+
+        try {
+            app(OrderNegotiation::class)->refuse($order, auth()->user(), $this->rejectionReason ?: null);
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
+
+        $this->rejectionReason = '';
+        $this->rfq->refresh();
+        $this->loadMessages();
+
+        session()->flash('success', "Prix refusé. Vous pouvez poursuivre la discussion.");
+    }
+
+    /** The buyer gives up. Nothing was paid and nothing was booked. */
+    public function cancelNegotiation(): void
+    {
+        if (! $this->isBuyer()) {
+            abort(403, "Seul l'acheteur peut annuler cette commande.");
+        }
+
+        if (! $order = $this->negotiatedOrder) {
+            return;
+        }
+
+        try {
+            app(OrderNegotiation::class)->cancel($order, auth()->user());
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
+
+        session()->flash('success', "Négociation annulée.");
+        $this->redirectRoute('my-orders', navigate: false);
+    }
+
     public function render()
     {
         return view('livewire.rfq-chat', [
@@ -243,6 +344,7 @@ class RfqChat extends Component
             'user' => auth()->user(),
             'offers' => $this->offers,
             'isBuyer' => $this->isBuyer(),
+            'negotiatedOrder' => $this->negotiatedOrder,
         ]);
     }
 }

@@ -1,5 +1,6 @@
 // lib/screens/cart/cart_screen.dart - COMPLETE REDESIGN MATCHING LIVEWIRE
 
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +9,6 @@ import '../../core/models/cart.dart';
 import '../../core/providers/cart_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../widgets/empty_state.dart';
-import '../../core/constants/app_constants.dart';
 import '../../utils/currency_formatter.dart';
 
 class CartScreen extends StatefulWidget {
@@ -236,6 +236,52 @@ class _CartScreenState extends State<CartScreen> {
             );
           }
 
+          // CartProvider records an error on every failed load, and this screen
+          // never read it — so a dropped connection or a server fault fell
+          // through to the empty state and told the customer "votre panier est
+          // vide". Their cart may be full; only the request failed. Worse, the
+          // one way out offered was "Continuer Shopping", sending someone off to
+          // rebuild a basket that was never lost. This must be checked before
+          // isEmpty, since a failed load leaves the cart empty too.
+          if (cart.error != null && cart.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Impossible de charger votre panier',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      cart.error!,
+                      style: TextStyle(color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => cart.loadCart(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD4AF37),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Réessayer'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
           if (cart.isEmpty) {
             return EmptyState(
               icon: Icons.shopping_cart_outlined,
@@ -288,9 +334,7 @@ class _CartScreenState extends State<CartScreen> {
                                         backgroundColor: Colors.grey[200],
                                         backgroundImage: vendor.vendorLogo != null
                                             ? CachedNetworkImageProvider(
-                                                vendor.vendorLogo!.startsWith('http') 
-                                                    ? vendor.vendorLogo! 
-                                                    : '${AppConstants.baseUrl}/uploads/${vendor.vendorLogo!}',
+                                                ImageUrl.resolve(vendor.vendorLogo),
                                               )
                                             : null,
                                         child: vendor.vendorLogo == null
@@ -378,7 +422,7 @@ class _CartScreenState extends State<CartScreen> {
                         color: Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withOpacity(0.3),
+                            color: Colors.grey.withValues(alpha: 0.3),
                             offset: const Offset(0, -2),
                             blurRadius: 4,
                           ),
@@ -773,9 +817,7 @@ class _CartScreenState extends State<CartScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: CachedNetworkImage(
-                imageUrl: item.image.startsWith('http') 
-                    ? item.image 
-                    : '${AppConstants.baseUrl}/uploads/${item.image}',
+                imageUrl: ImageUrl.resolve(item.image),
                 width: 70,
                 height: 70,
                 fit: BoxFit.cover,

@@ -84,6 +84,16 @@ class PaymentController extends Controller
             ], 400);
         }
 
+        // A price still under discussion is not a price to collect. Only
+        // payment_status was ever checked here, so an order in negotiation would
+        // have been payable at whatever provisional figure the basket carried.
+        if ($order->isNegotiating()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le prix de cette commande est en cours de négociation. Acceptez le prix proposé avant de régler.',
+            ], 409);
+        }
+
         $vendor = $order->vendor;
         $currency = $vendor->currency->code ?? 'USD';
 
@@ -97,14 +107,36 @@ class PaymentController extends Controller
             
             case 'cod':
                 \Log::info('💰 Processing COD payment', ['order_id' => $order->id]);
+
+                // Nothing stopped a buyer tapping "pay on delivery" twice: each tap
+                // wrote another payment row for the same money, and the vendor saw
+                // two claims for one delivery. Same guard as submitOfflinePayment
+                // and PaiementModal on the web.
+                if ($order->declaredAwaitingConfirmation() > 0) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Un paiement est déjà déclaré pour cette commande et attend la validation du vendeur.',
+                    ], 409);
+                }
+
                 $payment = Paiement::create([
                     'order_id' => $order->id,
                     'amount' => $order->total_remaining,
-                    'image' => 'payments/default.png',
+                    // Cash has no receipt to photograph, so there is no proof image —
+                    // 'payments/default.png' was a file that never existed in storage,
+                    // and the back office rendered a broken image for every one of
+                    // these. Null is what submitOfflinePayment stores for cash, and
+                    // what the Filament image column already handles.
+                    'image' => null,
                     'payment_method' => 'cod',
                     'currency' => $currency,
+                    // Coverage of the order total, not proof of collection — the same
+                    // meaning this column carries at every other creation site.
+                    // confirmed_at, left null here, is what says the money arrived.
                     'payment_status' => 'paid',
                     'transaction_id' => Order::generateTransactionNumber(),
+                    'confirmed_at' => null,
+                    'confirmed_by' => null,
                 ]);
 
                 // Cash on delivery declared from the mobile app: recorded, but the order
@@ -113,13 +145,18 @@ class PaymentController extends Controller
 
                 // Update financial transactions
                 $this->updateFinancialTransactions($order, 'cod', $order->total_remaining, 'paid cash');
-                // COD doesn't need a session, just confirm
+
+                // COD doesn't need a session. The reply used to say "COD payment
+                // confirmed", which is exactly the confusion this whole flow exists to
+                // avoid: the buyer has declared it, the vendor has not confirmed it.
                 return response()->json([
                     'success' => true,
-                    'message' => 'COD payment confirmed',
+                    'message' => 'Paiement à la livraison enregistré, en attente de validation du vendeur.',
                     'data' => [
                         'order_id' => $order->id,
                         'payment_method' => 'cod',
+                        'payment_id' => $payment->id,
+                        'confirmed' => false,
                         'redirect_url' => null
                     ]
                 ]);
@@ -137,10 +174,17 @@ class PaymentController extends Controller
      */
     public function submitOfflinePayment(Request $request, $orderId)
     {
+        // Cash on delivery was rejected outright by this endpoint ('in:om'), and a
+        // proof image was always required — so a mobile buyer paying the courier in
+        // cash had no way at all to declare it, while the same buyer on the web
+        // could (PaiementModal). Proof is required for Orange Money, where money
+        // actually moves and there is a receipt to show, and optional for cash,
+        // where there is nothing to screenshot — the same rule as
+        // Paiement::METHODS_REQUIRING_PROOF.
         $validator = Validator::make($request->all(), [
-            'payment_method' => 'required|string|in:om',
+            'payment_method' => 'required|string|in:' . implode(',', Paiement::OFFLINE_METHODS),
             'amount' => 'required|numeric|min:1',
-            'image' => 'required|image|max:5120', // 5MB max
+            'image' => 'required_if:payment_method,om|image|max:5120', // 5MB max
         ]);
 
         if ($validator->fails()) {
@@ -155,6 +199,26 @@ class PaymentController extends Controller
             ->with('vendor.currency')
             ->findOrFail($orderId);
 
+        // Same reason as createPaymentSession: nothing is owed until a price is
+        // agreed, so nothing can be declared against it either.
+        if ($order->isNegotiating()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le prix de cette commande est en cours de négociation. Acceptez le prix proposé avant de régler.',
+            ], 409);
+        }
+
+        // A declaration already waiting on the vendor blocks a second one, exactly
+        // as PaiementModal does on the web — otherwise a buyer whose first
+        // declaration has not been confirmed yet can declare the same money again,
+        // and the vendor sees two claims for one payment.
+        if ($order->declaredAwaitingConfirmation() > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Un paiement est déjà déclaré pour cette commande et attend la validation du vendeur.',
+            ], 409);
+        }
+
         // Validate amount matches exactly
         if (abs($request->amount - $order->total_remaining) > 0.01) {
             return response()->json([
@@ -164,8 +228,10 @@ class PaymentController extends Controller
         }
 
         try {
-            // Store the image
-            $imagePath = $request->file('image')->store('payments', 'public');
+            // Optional for cash on delivery — see the validation rules above.
+            $imagePath = $request->hasFile('image')
+                ? $request->file('image')->store('payments', 'public')
+                : null;
 
             $vendor = $order->vendor;
             $currency = $vendor->currency->code ?? 'USD';
@@ -174,15 +240,21 @@ class PaymentController extends Controller
             $paidUsd = $request->amount / $rate;
             $totalUsd = $order->grand_total / $rate;
 
-            // Create payment record
+            // Create payment record. The method was hardcoded to 'om' while the
+            // financial transaction below was hardcoded to 'cod' — the two
+            // contradicted each other, and both ignored what the buyer actually
+            // chose. confirmed_at stays null on purpose: this is the buyer saying
+            // they paid, not the vendor confirming the money arrived.
             $payment = Paiement::create([
                 'order_id' => $order->id,
                 'amount' => $request->amount,
                 'image' => $imagePath,
-                'payment_method' => 'om',
+                'payment_method' => $request->payment_method,
                 'currency' => $currency,
                 'payment_status' => $paidUsd >= $totalUsd ? 'paid' : 'partial',
                 'transaction_id' => Order::generateTransactionNumber(),
+                'confirmed_at' => null,
+                'confirmed_by' => null,
             ]);
 
             // Offline payment declared from the mobile app; awaits the vendor's
@@ -190,7 +262,7 @@ class PaymentController extends Controller
             $order->syncPaymentTotals();
 
             // Update financial transactions
-            $this->updateFinancialTransactions($order, 'cod', $request->amount, 'paid cash');
+            $this->updateFinancialTransactions($order, $request->payment_method, $request->amount, 'payment declared by buyer');
 
             return response()->json([
                 'success' => true,

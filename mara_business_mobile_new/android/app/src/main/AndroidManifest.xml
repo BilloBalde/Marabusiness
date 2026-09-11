@@ -4,11 +4,22 @@
     <!-- ✅ Internet permission -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!--
+      allowBackup was true, which put SharedPreferences — where the auth token is
+      kept — into Android's backup: extractable with adb backup on many devices
+      without root, and synced to the user's Google Drive. Paired with tokens that
+      never expired server-side, one recovered backup meant permanent access to
+      that account. Tokens now expire after 90 days (config/sanctum.php) and this
+      app no longer offers its data for backup. Nothing here is worth restoring
+      across devices: the session is the only local state, and it is meant to be
+      re-established by signing in.
+    -->
     <application
         android:label="Mara Business"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
         android:supportsRtl="true"
         android:networkSecurityConfig="@xml/network_security_config">
 

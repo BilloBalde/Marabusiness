@@ -1,18 +1,31 @@
 // product_card.dart - WISHLIST REMOVED
 
+import '../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../core/models/product_unified.dart';
-import '../core/constants/app_constants.dart';
 
 class ProductCard extends StatelessWidget {
   final UnifiedProduct product;
   final VoidCallback onTap;
 
+  /// Fixed width, and the trailing gap that goes with it, suit the horizontal
+  /// carousels this card was written for. In a grid the cell decides the width,
+  /// and a card that insists on 160 either overflows a narrow column or leaves a
+  /// gap in a wide one — so [inGrid] hands sizing back to the parent.
+  final bool inGrid;
+
+  /// Lets the staggered home grid vary card heights so the two columns fall out
+  /// of step with each other, which is what gives that layout its shape. The
+  /// carousels leave it alone and keep the original 125.
+  final double imageHeight;
+
   const ProductCard({
     super.key,
     required this.product,
     required this.onTap,
+    this.inGrid = false,
+    this.imageHeight = 125,
   });
 
   @override
@@ -23,14 +36,14 @@ class ProductCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 160,
-        margin: const EdgeInsets.only(right: 12),
+        width: inGrid ? null : 160,
+        margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               spreadRadius: 1,
               blurRadius: 4,
               offset: const Offset(0, 2),
@@ -50,21 +63,19 @@ class ProductCard extends StatelessWidget {
                   ),
                   child: product.imageUrl != null && product.imageUrl!.isNotEmpty
                       ? CachedNetworkImage(
-                          imageUrl: product.imageUrl!.startsWith('http')
-                              ? product.imageUrl!
-                              : '${AppConstants.baseUrl}/uploads/${product.imageUrl}',
-                          height: 125,
+                          imageUrl: ImageUrl.resolve(product.imageUrl),
+                          height: imageHeight,
                           width: double.infinity,
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
-                            height: 125,
+                            height: imageHeight,
                             color: Colors.grey[300],
                             child: const Center(
                               child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                           ),
                           errorWidget: (context, url, error) => Container(
-                            height: 125,
+                            height: imageHeight,
                             color: Colors.grey[300],
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -79,7 +90,7 @@ class ProductCard extends StatelessWidget {
                           ),
                         )
                       : Container(
-                          height: 125,
+                          height: imageHeight,
                           color: Colors.grey[300],
                           child: const Center(
                             child: Icon(Icons.image_not_supported, color: Colors.grey),

@@ -45,4 +45,6 @@
   </div>
 </section>
 
-<script src="https://unpkg.com/alpinejs" defer></script>
+{{-- Même chose qu'à la page des négociations : cette section chargeait une
+     seconde copie d'Alpine depuis unpkg alors que Livewire 3 en embarque déjà
+     une. Deux instances et Alpine s'arrête, sur la page d'accueil cette fois. --}}

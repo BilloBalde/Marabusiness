@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Service;
 use App\Models\SiteSetting;
 use App\Models\Vendor;
+use App\Support\Money;
 use App\Support\VendorPresenter;
 use App\Support\ProductPricing;
 use Illuminate\Http\Request;
@@ -122,10 +123,12 @@ class HomeController extends Controller
         // display_price, original_price and sale_price were all the same number and no
         // discount ever appeared on the home feed.
         // rate_to_usd converts *into* USD, so the target currency divides rather than
-        // multiplies: 1416 USD / 0.00012 = 11.8M GNF, not 0.17.
+        // multiplies: 1416 USD / 0.00012 = 11.8M GNF, not 0.17. This endpoint got it
+        // right while HomePage's Livewire copy multiplied both ways; App\Support\Money
+        // holds the rule for both now.
         $toRequested = fn (?float $amount) => $amount === null
             ? null
-            : round($amount * $vendorRate / ($currencyRate > 0 ? $currencyRate : 1), 2);
+            : round(Money::convert($amount, $vendorRate, $currencyRate), 2);
 
         $displayPrice  = $toRequested($pricing['display_price']);
         $originalPrice = $toRequested($pricing['original_price']);

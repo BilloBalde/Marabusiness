@@ -1,10 +1,10 @@
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/vendor_provider.dart';
-import '../../core/constants/app_constants.dart';
 import '../../widgets/terms_modal.dart';
 import '../../services/api_service.dart';
 import 'package:go_router/go_router.dart';
@@ -38,7 +38,6 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
 
   int? _selectedCurrencyId;
   File? _logoFile;
-  String? _logoPath;
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -92,11 +91,11 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
 
   Future<void> _loadCurrencies() async {
     try {
-      print('🔵 Loading currencies...');
+      logDebug('🔵 Loading currencies...');
       // Use context.read since ApiService is now provided
       final apiService = context.read<ApiService>();
       final response = await apiService.getCurrencies();
-      print('🔵 Response success: ${response.success}');
+      logDebug('🔵 Response success: ${response.success}');
       
       if (response.success && response.data != null) {
         final responseData = response.data;
@@ -113,7 +112,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
           }
         }
         
-        print('🔵 Currencies loaded: ${currenciesList.length}');
+        logDebug('🔵 Currencies loaded: ${currenciesList.length}');
         
         setState(() {
           _currencies = currenciesList.map((e) => Map<String, dynamic>.from(e)).toList();
@@ -123,7 +122,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
         });
       }
     } catch (e) {
-      print('🔴 Error loading currencies: $e');
+      logDebug('🔴 Error loading currencies: $e');
     }
   }
 
@@ -139,7 +138,6 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
     if (pickedFile != null) {
       setState(() {
         _logoFile = File(pickedFile.path);
-        _logoPath = pickedFile.path;
       });
     }
   }
@@ -168,9 +166,9 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
       final apiService = context.read<ApiService>();
       
       // Debug: Check authentication status
-      print('🔐 Auth status - isAuthenticated: ${authProvider.isAuthenticated}');
-      print('🔐 Auth status - user: ${authProvider.user?.email}');
-      print('🔐 Auth status - token: ${authProvider.token != null ? 'Present' : 'Missing'}');
+      logDebug('🔐 Auth status - isAuthenticated: ${authProvider.isAuthenticated}');
+      logDebug('🔐 Auth status - user: ${authProvider.user?.email}');
+      logDebug('🔐 Auth status - token: ${authProvider.token != null ? 'Present' : 'Missing'}');
 
       Map<String, dynamic> applicationData = {
         'store_name': _storeNameController.text.trim(),
@@ -184,7 +182,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
       };
 
       if (!authProvider.isAuthenticated) {
-        print('👤 User is NOT authenticated - including user fields');
+        logDebug('👤 User is NOT authenticated - including user fields');
         applicationData.addAll({
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
@@ -192,17 +190,17 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
           'password_confirmation': _passwordConfirmationController.text,
         });
       } else {
-        print('👤 User IS authenticated - NOT including user fields');
+        logDebug('👤 User IS authenticated - NOT including user fields');
       }
 
-      print('📤 Sending application data: $applicationData');
+      logDebug('📤 Sending application data: $applicationData');
     
       final response = await apiService.submitVendorApplication(
         applicationData,
-        //logoFile: _logoFile,
+        logoFile: _logoFile,
       );
 
-      print('📥 Response: ${response.data}');
+      logDebug('📥 Response: ${response.data}');
 
 
       if (response.success) {
@@ -335,7 +333,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,7 +353,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -382,7 +380,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -467,7 +465,7 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,5 +1,6 @@
 // In products_screen.dart - COMPLETE REWRITE with bigger text
 
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/products_page_provider.dart';
@@ -33,7 +34,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   @override
   void initState() {
     super.initState();
-    print('🔵 ProductsScreen initState with categoryId: ${widget.categoryId}');
+    logDebug('🔵 ProductsScreen initState with categoryId: ${widget.categoryId}');
     _scrollController.addListener(_onScroll);
     
     // Force reset and load on every entry
@@ -48,14 +49,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
     // If the parameters changed, reload
     if (oldWidget.categoryId != widget.categoryId || 
         oldWidget.brandId != widget.brandId) {
-      print('🔵 Widget parameters changed, reloading');
+      logDebug('🔵 Widget parameters changed, reloading');
       _forceReload();
     }
   }
 
   @override
   void dispose() {
-    print('🔵 ProductsScreen disposing');
+    logDebug('🔵 ProductsScreen disposing');
      // Reset the provider when leaving the screen
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -70,7 +71,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
       final provider = context.read<ProductsPageProvider>();
       if (provider.hasMorePages && !provider.isLoading && !provider.isLoadingMore) {
-        print('🔵 Loading more products');
+        logDebug('🔵 Loading more products');
         provider.loadMoreProducts();
       }
     }
@@ -91,24 +92,24 @@ class _ProductsScreenState extends State<ProductsScreen> {
     
     // 3. Apply filters based on parameters
     if (widget.categoryId != null) {
-      print('🔵 Loading products for category: ${widget.categoryId}');
+      logDebug('🔵 Loading products for category: ${widget.categoryId}');
       provider.toggleCategory(widget.categoryId!);
     } else if (widget.brandId != null) {
-      print('🔵 Loading products for brand: ${widget.brandId}');
+      logDebug('🔵 Loading products for brand: ${widget.brandId}');
       provider.toggleBrand(widget.brandId!);
     } else if (widget.vendorId != null) {  // ADD THIS
-      print('🔵 Loading products for vendor: ${widget.vendorId}');
+      logDebug('🔵 Loading products for vendor: ${widget.vendorId}');
       // You'll need to add vendor filtering to your provider
       // For now, just load all products
       await provider.loadProducts(refresh: true);
     } else if (widget.featured) {
-      print('🔵 Loading featured products');
+      logDebug('🔵 Loading featured products');
       provider.applyFilters(featured: true);
     } else if (widget.sale) {
-      print('🔵 Loading sale products');
+      logDebug('🔵 Loading sale products');
       provider.applyFilters(onSale: true);
     } else {
-      print('🔵 Loading all products');
+      logDebug('🔵 Loading all products');
       await provider.loadProducts(refresh: true);
     }
     
@@ -147,10 +148,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
       body: Consumer<ProductsPageProvider>(
         builder: (context, provider, child) {
           // Debug prints
-          print('🔵 BUILD - Products count: ${provider.products.length}');
-          print('🔵 BUILD - Selected categories: ${provider.selectedCategories}');
-          print('🔵 BUILD - Selected brands: ${provider.selectedBrands}');
-          print('🔵 BUILD - Is loading: ${provider.isLoading}');
+          logDebug('🔵 BUILD - Products count: ${provider.products.length}');
+          logDebug('🔵 BUILD - Selected categories: ${provider.selectedCategories}');
+          logDebug('🔵 BUILD - Selected brands: ${provider.selectedBrands}');
+          logDebug('🔵 BUILD - Is loading: ${provider.isLoading}');
           
           if (provider.isLoading && provider.products.isEmpty) {
             return const Center(

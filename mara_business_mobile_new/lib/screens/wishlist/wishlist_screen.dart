@@ -1,9 +1,9 @@
+import '../../utils/image_url.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/providers/wishlist_provider.dart';
-import '../../core/constants/app_constants.dart';
 
 class WishlistScreen extends StatefulWidget {
   const WishlistScreen({super.key});
@@ -221,7 +221,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
               if (_isSelectionMode)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  color: const Color(0xFFD4AF37).withOpacity(0.1),
+                  color: const Color(0xFFD4AF37).withValues(alpha: 0.1),
                   child: Row(
                     children: [
                       Text(
@@ -301,9 +301,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
 
   Widget _buildWishlistItemCard(Map<String, dynamic> item, String variationText) {
     final imageUrl = item['image'] != null
-        ? (item['image'].startsWith('http')
-            ? item['image']
-            : '${AppConstants.baseUrl}/uploads/${item['image']}')
+        ? ImageUrl.resolve(item['image'] as String?)
         : null;
 
     return GestureDetector(
@@ -316,7 +314,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),

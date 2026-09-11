@@ -22,11 +22,21 @@ class PaymentGatewayFeeResource extends Resource
     {
         return $form
             ->schema([
+                // These keys are matched against orders.payment_method by
+                // FinanceCalculator::calculateGatewayFee(), so they have to be the
+                // values orders actually carry. 'bank_transfer' never appears on an
+                // order and a fee configured under it could never be charged;
+                // 'lengopay', 'cod' and 'cash' do appear and had no way of being
+                // configured at all.
                 Forms\Components\Select::make('gateway_name')
+                    ->label('Méthode de paiement')
+                    ->helperText('Doit correspondre à la méthode enregistrée sur la commande, sinon aucun frais n\'est appliqué.')
                     ->options([
                         'stripe' => 'Stripe',
+                        'lengopay' => 'LengoPay',
                         'om' => 'Orange Money (OM)',
-                        'bank_transfer' => 'Bank Transfer',
+                        'cod' => 'Paiement à la livraison (COD)',
+                        'cash' => 'Espèces',
                     ])
                     ->required()
                     ->unique(ignoreRecord: true),
@@ -94,9 +104,9 @@ class PaymentGatewayFeeResource extends Resource
                 Tables\Columns\TextColumn::make('gateway_name')
                     ->badge()
                     ->color(fn($record) => match($record->gateway_name) {
-                        'stripe' => 'success',
-                        'orange_money' => 'warning',
-                        'paypal' => 'primary',
+                        'stripe', 'lengopay' => 'success',
+                        'om' => 'warning',
+                        'cod', 'cash' => 'primary',
                         default => 'gray',
                     }),
                     
@@ -130,8 +140,10 @@ class PaymentGatewayFeeResource extends Resource
                 Tables\Filters\SelectFilter::make('gateway_name')
                     ->options([
                         'stripe' => 'Stripe',
-                        'orange_money' => 'Orange Money',
-                        'paypal' => 'PayPal',
+                        'lengopay' => 'LengoPay',
+                        'om' => 'Orange Money',
+                        'cod' => 'Paiement à la livraison',
+                        'cash' => 'Espèces',
                     ]),
                     
                 Tables\Filters\TernaryFilter::make('is_active'),

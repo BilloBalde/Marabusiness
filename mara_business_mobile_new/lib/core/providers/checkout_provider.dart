@@ -1,5 +1,6 @@
 // lib/core/providers/checkout_provider.dart
 
+import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/cart.dart';
@@ -225,10 +226,10 @@ void _generateSummaryWithoutShipping() {
           _shippingAddress = ShippingAddress.fromAddress(defaultAddress);
         }
         
-        print('✅ Loaded ${_savedAddresses.length} saved addresses');
+        logDebug('✅ Loaded ${_savedAddresses.length} saved addresses');
       }
     } catch (e) {
-      print('❌ Error loading saved addresses: $e');
+      logDebug('❌ Error loading saved addresses: $e');
     }
     
     notifyListeners();
@@ -347,7 +348,7 @@ void _generateSummaryWithoutShipping() {
         if (_selectedCarrier.isEmpty || !_shippingResult!.carriers.containsKey(_selectedCarrier)) {
           // Prendre le premier transporteur disponible
           _selectedCarrier = _shippingResult!.carriers.keys.first;
-          print('✅ Initialized selected carrier to: $_selectedCarrier');
+          logDebug('✅ Initialized selected carrier to: $_selectedCarrier');
         }
         
         _generateSummary();
@@ -365,7 +366,7 @@ void _generateSummaryWithoutShipping() {
   notifyListeners();
 }
   void selectCarrier(String carrierKey) {
-  print('🔄 selectCarrier called with: $carrierKey');
+  logDebug('🔄 selectCarrier called with: $carrierKey');
   _selectedCarrier = carrierKey;
   
   // 🔥 Mettre à jour le summary immédiatement
@@ -409,7 +410,7 @@ void _generateSummaryWithoutShipping() {
         // 🔥 Vérifier que _selectedCarrier est valide
         if (!_shippingResult!.carriers.containsKey(_selectedCarrier) && _shippingResult!.carriers.isNotEmpty) {
           _selectedCarrier = _shippingResult!.carriers.keys.first;
-          print('🔄 Carrier changed to: $_selectedCarrier');
+          logDebug('🔄 Carrier changed to: $_selectedCarrier');
         }
         
         _generateSummary();
@@ -484,7 +485,7 @@ void _generateSummaryWithoutShipping() {
         await _cartProvider.loadCart();
 
         notifyListeners();
-        print('✅ Redirect URL: ${_lastOrderResponse?.redirectUrl}');
+        logDebug('✅ Redirect URL: ${_lastOrderResponse?.redirectUrl}');
         return true;
       } else {
         _orderError = response.message ?? 'Failed to place order';
@@ -500,21 +501,94 @@ void _generateSummaryWithoutShipping() {
     }
   }
 
+  /// Ouvre une négociation de prix sur la part d'une boutique.
+  ///
+  /// Mêmes préalables que [placeOrder] — une adresse et un transporteur, parce
+  /// que la commande créée ici est une vraie commande — moins le moyen de
+  /// paiement : il n'y a rien à régler tant qu'aucun prix n'est convenu. Le
+  /// serveur recalcule lui-même les frais de port ; ce qui part d'ici, c'est
+  /// l'adresse et le transporteur choisis, pas un montant.
+  ///
+  /// Renvoie l'order_id de la négociation créée, ou null. En cas d'échec,
+  /// [orderError] porte le message du serveur.
+  Future<int?> openNegotiation({
+    required int vendorId,
+    required String message,
+    double? targetPrice,
+  }) async {
+    if (_shippingAddress == null) {
+      _orderError = 'Veuillez renseigner une adresse de livraison';
+      notifyListeners();
+      return null;
+    }
+
+    if (!_hasShippingCalculated || _shippingResult == null) {
+      _orderError = 'Veuillez d\'abord calculer la livraison';
+      notifyListeners();
+      return null;
+    }
+
+    _isPlacingOrder = true;
+    _orderError = null;
+    notifyListeners();
+
+    try {
+      final addressData = _shippingAddress!.toJson();
+      if (_latitude != null && _longitude != null) {
+        addressData['latitude'] = _latitude;
+        addressData['longitude'] = _longitude;
+      }
+
+      final response = await _apiService.openNegotiation({
+        'vendor_id': vendorId,
+        'selected_ids': _selectedIds,
+        'address': addressData,
+        'shipping_carrier': _selectedCarrier,
+        'message': message,
+        if (targetPrice != null) 'target_price': targetPrice,
+      });
+
+      _isPlacingOrder = false;
+
+      if (response.success && response.data != null) {
+        // Ces articles ont quitté le panier côté serveur : le recharger, sinon
+        // l'écran continue de les proposer au paiement.
+        await _cartProvider.loadCart();
+        notifyListeners();
+
+        final negotiation = response.data['negotiation'];
+        if (negotiation is Map && negotiation['order_id'] != null) {
+          final id = negotiation['order_id'];
+          return id is int ? id : int.tryParse('$id');
+        }
+        return null;
+      }
+
+      _orderError = response.message ?? "Impossible d'ouvrir la négociation";
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _orderError = e.toString();
+      _isPlacingOrder = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
   // Generate summary from cart items and shipping result
-// Generate summary from cart items and shipping result
 void _generateSummary() {
   final selectedItems = _cartProvider.items
       .where((item) => _selectedIds.contains(item.vendorProductId))
       .toList();
 
-  print('=== _generateSummary called ===');
-  print('Has shipping result: ${_shippingResult != null}');
-  print('_selectedCarrier: $_selectedCarrier');
+  logDebug('=== _generateSummary called ===');
+  logDebug('Has shipping result: ${_shippingResult != null}');
+  logDebug('_selectedCarrier: $_selectedCarrier');
   if (_shippingResult != null) {
-    print('Available carriers: ${_shippingResult!.carriers.keys}');
-    print('Has selected carrier in result: ${_shippingResult!.carriers.containsKey(_selectedCarrier)}');
+    logDebug('Available carriers: ${_shippingResult!.carriers.keys}');
+    logDebug('Has selected carrier in result: ${_shippingResult!.carriers.containsKey(_selectedCarrier)}');
   }
-  print('Selected items count: ${selectedItems.length}');
+  logDebug('Selected items count: ${selectedItems.length}');
 
   if (selectedItems.isEmpty) {
     _summary = null;
@@ -543,7 +617,7 @@ void _generateSummary() {
   // 🔥 Utiliser _selectedCarrier pour obtenir le transporteur
   if (_shippingResult != null && _selectedCarrier.isNotEmpty && _shippingResult!.carriers.containsKey(_selectedCarrier)) {
     final carrier = _shippingResult!.carriers[_selectedCarrier]!;
-    print('✅ Using carrier: ${carrier.name} (${carrier.key})');
+    logDebug('✅ Using carrier: ${carrier.name} (${carrier.key})');
     for (var vendorEntry in carrier.vendors.entries) {
       final vendorId = vendorEntry.key;
       final vendorData = vendorEntry.value;
@@ -553,22 +627,22 @@ void _generateSummary() {
       weightBreakdown[vendorId] = vendorData.totalWeight;
       cbmBreakdown[vendorId] = vendorData.totalCbm;
       itemsCountBreakdown[vendorId] = vendorData.totalItems;
-      print('📦 Vendor $vendorId: shipping cost = ${vendorData.cost} USD, zone = ${vendorData.zone}');
+      logDebug('📦 Vendor $vendorId: shipping cost = ${vendorData.cost} USD, zone = ${vendorData.zone}');
     }
   } else if (_shippingResult != null && _shippingResult!.carriers.isNotEmpty && _selectedCarrier.isEmpty) {
     // Si _selectedCarrier est vide mais qu'il y a des transporteurs, prendre le premier
     _selectedCarrier = _shippingResult!.carriers.keys.first;
-    print('🔄 Auto-selected carrier from empty: $_selectedCarrier');
+    logDebug('🔄 Auto-selected carrier from empty: $_selectedCarrier');
     _generateSummary();
     return;
   } else {
-    print('⚠️ No shipping data available for carrier: $_selectedCarrier');
+    logDebug('⚠️ No shipping data available for carrier: $_selectedCarrier');
     if (_shippingResult != null && _shippingResult!.carriers.isNotEmpty) {
-      print('Available carriers: ${_shippingResult!.carriers.keys}');
+      logDebug('Available carriers: ${_shippingResult!.carriers.keys}');
       // Si le transporteur sélectionné n'est pas disponible, prendre le premier
       if (!_shippingResult!.carriers.containsKey(_selectedCarrier)) {
         _selectedCarrier = _shippingResult!.carriers.keys.first;
-        print('🔄 Auto-selected carrier: $_selectedCarrier');
+        logDebug('🔄 Auto-selected carrier: $_selectedCarrier');
         _generateSummary();
         return;
       }
@@ -635,7 +709,7 @@ void _generateSummary() {
       deliveryDays: deliveryDays,
     ));
     
-    print('💰 Vendor $vendorId: Subtotal = $vendorSubtotal $currency, Shipping = $shippingLocal $currency, Total = $vendorTotal $currency');
+    logDebug('💰 Vendor $vendorId: Subtotal = $vendorSubtotal $currency, Shipping = $shippingLocal $currency, Total = $vendorTotal $currency');
   }
 
   _summary = CheckoutSummary(
@@ -646,7 +720,7 @@ void _generateSummary() {
     selectedCount: selectedItems.length,
   );
   
-  print('📊 Total USD: Subtotal = $subtotalUsd, Shipping = $totalShippingUsd, Grand Total = ${subtotalUsd + totalShippingUsd}');
+  logDebug('📊 Total USD: Subtotal = $subtotalUsd, Shipping = $totalShippingUsd, Grand Total = ${subtotalUsd + totalShippingUsd}');
   
   // 🔥 IMPORTANT: Notifier les listeners après avoir mis à jour le summary
   notifyListeners();

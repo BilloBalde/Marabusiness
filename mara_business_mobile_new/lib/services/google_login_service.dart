@@ -1,14 +1,18 @@
+import '../core/constants/app_constants.dart';
 import '../utils/app_logger.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'dart:convert';
-import 'dart:typed_data';
 
 class GoogleLoginService {
-  static const String authBaseUrl = 'https://afrobridgeinnov.com'; // change to your domain
-
   static Future<Map<String, dynamic>?> authenticate() async {
-    // The redirect URI must match the custom scheme + path
-    final authUrl = '$authBaseUrl/auth/google?platform=mobile';
+    // AppConstants.baseUrl, not a private hardcoded copy — that copy always
+    // pointed at production regardless of --dart-define=API_BASE_URL, so a
+    // build meant to test against a local Laravel server (10.0.2.2:8000,
+    // 127.0.0.1:8000) silently sent Google sign-in to production instead.
+    // AppConstants.baseUrl's own docblock already explains exactly why a
+    // second hardcoded copy is the wrong pattern — it used to be the api
+    // base itself, before that lesson was learned there.
+    final authUrl = '${AppConstants.baseUrl}/auth/google?platform=mobile';
 
     try {
       // Open the browser for OAuth

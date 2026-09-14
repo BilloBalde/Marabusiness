@@ -116,7 +116,10 @@ class SuccessPage extends Component
                         // residual under one cent's worth counts as settled, not owed.
                         // Confirmed money only: a buyer's own unconfirmed declaration
                         // on this same order must not count towards Stripe's balance.
-                        $totalPaid = $order->confirmedPaiements()->sum('amount');
+                        // Order::paidAmount() converts each payment into the order's own
+                        // currency first — a raw sum here would let a cash/OM payment in a
+                        // different currency dwarf or mask what Stripe actually collected.
+                        $totalPaid = $order->paidAmount();
                         $reconciled = PaymentReconciliation::resolve(
                             (float) $order->grand_total, (float) $totalPaid, $orderRate
                         );

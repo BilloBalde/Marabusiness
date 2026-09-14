@@ -297,13 +297,7 @@ class Order extends Model
      */
     public function syncPaymentTotals(): void
     {
-        $paid = (float) $this->confirmedPaiements()
-            ->get(['amount', 'currency'])
-            ->sum(fn (Paiement $payment) => \App\Support\Money::convert(
-                (float) $payment->amount,
-                $this->rateToUsdFor($payment->currency),
-                (float) $this->rate_to_usd,
-            ));
+        $paid = $this->paidAmount();
 
         $remaining = max(0, (float) $this->grand_total - $paid);
 
@@ -321,7 +315,52 @@ class Order extends Model
     }
 
     /**
-     * The rate to convert a payment's own currency into USD, for syncPaymentTotals().
+     * Money the shop has actually received, each payment converted into the
+     * order's own currency first — never a raw sum of `paiements.amount`.
+     *
+     * This loop used to live only inside syncPaymentTotals(), but an audit
+     * found seven OTHER places in the codebase independently writing
+     * `->sum('amount')` on `paiements`/`confirmedPaiements` — a "Total Paid"
+     * display in Filament, a buyer's already-declared amount in
+     * PaiementModal, the balance SuccessPage/SuccessPageStripe compute right
+     * after Stripe confirms a charge. Every one of them was exposed to the
+     * exact same currency-mixing bug this method exists to prevent, because
+     * none of them went through it. They now call this (or declaredAmount(),
+     * or declaredAwaitingConfirmation() below) instead of reimplementing the
+     * sum a ninth time.
+     */
+    public function paidAmount(): float
+    {
+        return $this->convertedSum($this->confirmedPaiements());
+    }
+
+    /**
+     * Every declaration on this order, confirmed or not — what a buyer has
+     * told the shop across every payment method, whether or not anyone has
+     * verified receiving it. Distinct from paidAmount(): a check like "has
+     * the buyer already declared enough" cares about intent, not receipt.
+     */
+    public function declaredAmount(): float
+    {
+        return $this->convertedSum($this->paiements());
+    }
+
+    /** Shared conversion step behind paidAmount(), declaredAmount() and
+     *  declaredAwaitingConfirmation() — never called with an unfiltered
+     *  relation directly, so it stays private. */
+    private function convertedSum($query): float
+    {
+        return (float) $query
+            ->get(['amount', 'currency'])
+            ->sum(fn (Paiement $payment) => \App\Support\Money::convert(
+                (float) $payment->amount,
+                $this->rateToUsdFor($payment->currency),
+                (float) $this->rate_to_usd,
+            ));
+    }
+
+    /**
+     * The rate to convert a payment's own currency into USD, for paidAmount().
      *
      * The common case — a payment in the order's own currency — never queries
      * `currencies`: it reuses the rate already frozen on the order, which is also
@@ -358,7 +397,7 @@ class Order extends Model
      */
     public function declaredAwaitingConfirmation(): float
     {
-        return (float) $this->paiements()->whereNull('confirmed_at')->sum('amount');
+        return $this->convertedSum($this->paiements()->whereNull('confirmed_at'));
     }
 
     public function financialTransactions()

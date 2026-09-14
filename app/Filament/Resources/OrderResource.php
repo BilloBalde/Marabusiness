@@ -276,7 +276,10 @@ class OrderResource extends Resource
                                     //$paid = $record->total_paid ?? 0;
                                     // Money the shop has actually received — not what a
                                     // buyer has merely declared and nobody confirmed yet.
-                                    $paid = $record->confirmedPaiements()->sum('amount') ?? 0;
+                                    // Order::paidAmount(), not a raw sum: a payment recorded in a
+                                    // currency other than the order's own must be converted first,
+                                    // or this display can read many times the real balance.
+                                    $paid = $record->paidAmount();
                                 } else {
                                     // For create: use amount field
                                     $paid = (float) ($get('amount') ?? 0);
@@ -308,7 +311,10 @@ class OrderResource extends Resource
                                     // For edit/view: use actual payments
                                     // Money the shop has actually received — not what a
                                     // buyer has merely declared and nobody confirmed yet.
-                                    $paid = $record->confirmedPaiements()->sum('amount') ?? 0;
+                                    // Order::paidAmount(), not a raw sum: a payment recorded in a
+                                    // currency other than the order's own must be converted first,
+                                    // or this display can read many times the real balance.
+                                    $paid = $record->paidAmount();
                                 } else {
                                     // For create: use amount field
                                     $paid = (float) ($get('amount') ?? 0);
@@ -337,7 +343,10 @@ class OrderResource extends Resource
                                 if ($record) {
                                     // Money the shop has actually received — not what a
                                     // buyer has merely declared and nobody confirmed yet.
-                                    $paid = $record->confirmedPaiements()->sum('amount') ?? 0;
+                                    // Order::paidAmount(), not a raw sum: a payment recorded in a
+                                    // currency other than the order's own must be converted first,
+                                    // or this display can read many times the real balance.
+                                    $paid = $record->paidAmount();
                                 } else {
                                     $paid = (float) ($get('amount') ?? 0);
                                 }

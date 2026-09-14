@@ -153,7 +153,10 @@ class SuccessPageStripe extends Component
             // on 'paid' silently dropped it — this is the divergence that left a
             // real order (INV2026090006) showing a balance due that was already
             // collected.
-            $totalPaid = $this->order->confirmedPaiements()->sum('amount');
+            // Order::paidAmount(), not a raw sum: converts each confirmed payment
+            // into the order's own currency first, on top of the confirmed-only
+            // filter the comment above already explains.
+            $totalPaid = $this->order->paidAmount();
             $reconciled = PaymentReconciliation::resolve(
                 (float) $this->order->grand_total, (float) $totalPaid, $rate
             );

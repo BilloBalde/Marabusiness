@@ -192,7 +192,10 @@ class PaiementModal extends Component
         // older orders where it was never filled in. Declarations awaiting the
         // vendor's confirmation count here too, so a buyer cannot declare the same
         // amount twice while the first one is still being checked.
-        $alreadyPaid  = (float) $order->paiements()->sum('amount');
+        // Order::declaredAmount(), not a raw sum: converts each declaration into
+        // the order's own currency first, the same rule paidAmount() applies to
+        // confirmed money.
+        $alreadyPaid  = $order->declaredAmount();
         $remainingDue = max(0, (float) $order->grand_total - $alreadyPaid);
 
         if ($remainingDue <= 0) {

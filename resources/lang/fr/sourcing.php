@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'none_yet' => 'Aucune spécialité de sourcing pour le moment.',
+    'gallery' => 'Galerie',
+    'download_catalog' => 'Télécharger le catalogue',
+    'related_products' => 'Produits liés',
+    'no_products_yet' => 'Aucun produit lié pour le moment.',
+    'select' => 'Sélectionner',
+    'request_quote' => 'Demander un devis',
+    'moq' => 'Quantité souhaitée (MOQ)',
+    'message' => 'Votre message',
+    'message_placeholder' => 'Logo, couleurs, tailles, délais souhaités…',
+    'attachments' => 'Pièces jointes (images, PDF)',
+    'uploading' => 'Envoi en cours…',
+    'send_request' => 'Envoyer la demande',
+    'my_quotes' => 'Mes devis',
+    'no_quotes_yet' => "Vous n'avez pas encore de demande de devis.",
+    'status_pending' => 'En attente',
+    'status_processing' => 'En cours',
+    'status_validated' => 'Validé',
+    'status_cancelled' => 'Annulé',
+    'conversation' => 'Conversation',
+    'reply' => 'Votre réponse',
+    'send_reply' => 'Envoyer',
+];

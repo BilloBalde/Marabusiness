@@ -8,14 +8,17 @@
             <div class="md:col-span-3 space-y-6">
                 @forelse ($grouped_cart as $vendor_id => $vendorGroup)
                     @php
-                        $vendor = App\Models\Vendor::find($vendor_id);
+                        // Each cart line already carries its own vendor_name
+                        // (CartManagement::getCartItemsFromCookie()) — no need
+                        // to re-query the vendor here for every group.
+                        $storeName = $vendorGroup['items'][0]['vendor_name'] ?? null;
                         $allVendorItemsSelected = isset($selected_vendor_totals[$vendor_id]);
                     @endphp
 
                     <div class="bg-white rounded-xl shadow p-4">
                         <!-- Vendor Header -->
                         <div class="flex justify-between items-center mb-3">
-                            <h2 class="font-semibold text-lg">🏬 {{ $vendor->store_name ?? 'Vendeur inconnu' }}</h2>
+                            <h2 class="font-semibold text-lg">🏬 {{ $storeName ?? 'Vendeur inconnu' }}</h2>
                             
                             <label class="flex items-center gap-2 text-sm cursor-pointer">
                                 <input 
@@ -145,7 +148,7 @@
                         
                         <!-- Vendor Subtotal -->
                         <div class="flex justify-between items-center mt-4 pt-4 border-t">
-                            <span class="text-gray-600">Sous-total {{ $vendor->store_name ?? 'Vendeur' }}:</span>
+                            <span class="text-gray-600">Sous-total {{ $storeName ?? 'Vendeur' }}:</span>
                             <div class="text-right">
                                 <p class="font-semibold">
                                     {{ Number::currency($vendorGroup['subtotal'] ?? 0, $vendorGroup['items'][0]['currency'] ?? 'USD') }}

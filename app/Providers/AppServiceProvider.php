@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Http\Livewire\CustomerSidebar as LivewireCustomerSidebar;
+use App\Livewire\CustomerSidebar as LivewireCustomerSidebar;
 use App\Support\UploadsStorage;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;

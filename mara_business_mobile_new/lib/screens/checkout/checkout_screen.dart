@@ -1227,6 +1227,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 ); */
                                 context.go('/payment/success');
                               }
+
+                              // redirectUrl (if any) has already been read and used
+                              // above — safe to clear now. Without this, shipping
+                              // calculated for this order stayed on the provider and
+                              // could be shown/submitted for the next one placed in
+                              // the same session, before it had been recalculated.
+                              checkoutProvider.reset();
                             }else if (!success && mounted) {
                               context.go('/payment/cancel?reason=${Uri.encodeComponent(checkoutProvider.orderError ?? "Unknown error")}');
                             }else if (checkoutProvider.orderError != null) {

@@ -2,6 +2,11 @@
 
 namespace App\Services;
 
+use App\Mail\NegotiationAccepted;
+use App\Mail\NegotiationCancelled;
+use App\Mail\NegotiationOpened;
+use App\Mail\NegotiationPriced;
+use App\Mail\NegotiationRefused;
 use App\Models\Address;
 use App\Models\BulkRfq;
 use App\Models\BulkRfqMessage;
@@ -11,8 +16,12 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorProduct;
 use App\Support\Money;
+use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use RuntimeException;
+use Throwable;
 
 /**
  * Price negotiation between a buyer and one vendor, on a whole basket.
@@ -75,7 +84,7 @@ class OrderNegotiation
 
         $total = $subtotal + $shippingLocal;
 
-        return DB::transaction(function () use (
+        $order = DB::transaction(function () use (
             $buyer, $vendor, $items, $subtotal, $shippingLocal, $shippingUsd,
             $total, $rate, $currency, $targetPrice, $message, $address, $shippingCarrier, $zone
         ) {
@@ -138,6 +147,14 @@ class OrderNegotiation
 
             return $order->fresh();
         });
+
+        $this->notify(
+            $vendor->user?->email,
+            new NegotiationOpened($order->load('negotiation.messages', 'vendor.currency', 'user')),
+            "ouverture #{$order->id}",
+        );
+
+        return $order;
     }
 
     /**
@@ -154,7 +171,7 @@ class OrderNegotiation
             throw new RuntimeException("Le prix convenu doit être supérieur à zéro.");
         }
 
-        return DB::transaction(function () use ($order, $vendor, $total, $validForDays, $note) {
+        $order = DB::transaction(function () use ($order, $vendor, $total, $validForDays, $note) {
             $order->update([
                 'negotiated_total' => $total,
                 'negotiated_expires_at' => now()->addDays(max(1, $validForDays)),
@@ -176,6 +193,14 @@ class OrderNegotiation
 
             return $order->fresh();
         });
+
+        $this->notify(
+            $order->user?->email,
+            new NegotiationPriced($order->load('vendor.currency', 'user')),
+            "prix proposé #{$order->id}",
+        );
+
+        return $order;
     }
 
     /**
@@ -196,7 +221,7 @@ class OrderNegotiation
 
         $total = (float) $order->negotiated_total;
 
-        return DB::transaction(function () use ($order, $buyer, $total) {
+        $order = DB::transaction(function () use ($order, $buyer, $total) {
             // Stock was deliberately not held during the discussion, so it may
             // have gone. An ordinary order decrements at placement; acceptance is
             // the equivalent moment for this one.
@@ -232,6 +257,14 @@ class OrderNegotiation
 
             return $order->fresh();
         });
+
+        $this->notify(
+            $order->vendor?->user?->email,
+            new NegotiationAccepted($order->load('vendor.currency', 'user')),
+            "acceptation #{$order->id}",
+        );
+
+        return $order;
     }
 
     /**
@@ -243,7 +276,7 @@ class OrderNegotiation
         $this->assertBuyerOwns($order, $buyer);
         $this->assertNegotiating($order);
 
-        return DB::transaction(function () use ($order, $buyer, $reason) {
+        $order = DB::transaction(function () use ($order, $buyer, $reason) {
             $order->update([
                 'negotiated_total' => null,
                 'negotiated_expires_at' => null,
@@ -259,6 +292,14 @@ class OrderNegotiation
 
             return $order->fresh();
         });
+
+        $this->notify(
+            $order->vendor?->user?->email,
+            new NegotiationRefused($order->load('vendor.currency', 'user'), $reason),
+            "refus #{$order->id}",
+        );
+
+        return $order;
     }
 
     /**
@@ -270,7 +311,7 @@ class OrderNegotiation
         $this->assertBuyerOwns($order, $buyer);
         $this->assertNegotiating($order);
 
-        return DB::transaction(function () use ($order, $buyer, $reason) {
+        $order = DB::transaction(function () use ($order, $buyer, $reason) {
             $order->update([
                 'status' => 'cancelled',
                 'cancelled_at' => now(),
@@ -285,6 +326,14 @@ class OrderNegotiation
 
             return $order->fresh();
         });
+
+        $this->notify(
+            $order->vendor?->user?->email,
+            new NegotiationCancelled($order->load('vendor.currency', 'user'), $reason),
+            "annulation #{$order->id}",
+        );
+
+        return $order;
     }
 
     /**
@@ -448,6 +497,28 @@ class OrderNegotiation
             'sender_id' => $sender->id,
             'message' => $message,
         ]);
+    }
+
+    /**
+     * Sent after the transaction that changed the order already committed: a
+     * mail failure must never roll back or block a step the other side already
+     * sees confirmed on screen.
+     */
+    private function notify(?string $email, Mailable $mailable, string $context): void
+    {
+        if (! $email) {
+            Log::warning("Négociation : destinataire sans e-mail, notification non envoyée ({$context}).");
+
+            return;
+        }
+
+        try {
+            Mail::to($email)->send($mailable);
+        } catch (Throwable $e) {
+            Log::error("Échec de la notification de négociation ({$context}).", [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function assertNegotiating(Order $order): void

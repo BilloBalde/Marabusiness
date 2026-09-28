@@ -49,6 +49,15 @@ Route::get('/', HomePage::class)->name('home');
 Route::get('/categories', CategoriesPage::class);
 Route::get('/products', ProductsPage::class)->name('products');
 Route::get('/vendors', \App\Livewire\VendorsPage::class)->name('vendors.list');
+
+Route::get('/sourcing', \App\Livewire\SourcingsPage::class)->name('sourcing.index');
+Route::get('/sourcing/{sourcing}', \App\Livewire\SourcingDetailPage::class)->name('sourcing.show');
+Route::middleware('auth')->get('/sourcing/{sourcing}/produit/{sourceProduct}/devis', \App\Livewire\SourcingQuotePage::class)->name('sourcing.quote');
+Route::middleware('auth')->get('/dashboard/devis', \App\Livewire\MyQuotesPage::class)->name('quotes.mine');
+Route::middleware('auth')->get('/dashboard/devis/{quote}', \App\Livewire\QuoteDetailPage::class)->name('quotes.show');
+
+Route::get('/blog', \App\Livewire\BlogPage::class)->name('blog.index');
+Route::get('/blog/{post}', \App\Livewire\BlogPostPage::class)->name('blog.show');
 use App\Livewire\VendorApplyPage;
 
 Route::get('/vendor/apply', VendorApplyPage::class)->name('vendor.apply');
@@ -96,7 +105,12 @@ Route::middleware('auth')->group(function (){
     // by anyone. Both are fixed now (this middleware + the check in mount()).
     Route::get('/my-orders/{order_id}', OrderDetailPage::class)->name('my-orders.show');
     Route::get('/orders', MyOrdersPage::class)->name('my-orders');
-    Route::get('/chats/{chatWithId}', CustomerChat::class)->name('chats');
+    // Optional: CustomerChat::mount() already auto-selects the most relevant
+    // contact when none is given. Every link to this route used to be forced
+    // to hardcode a value here, and the navbar's own link hardcoded the
+    // manager's id — so a vendor's messages, however many they sent, were
+    // never reachable from that link at all, only the manager's ever were.
+    Route::get('/chats/{chatWithId?}', CustomerChat::class)->name('chats');
     Route::get('/my-rfqs', \App\Livewire\UserRfqsPage::class)->name('user.rfqs');
     Route::get('/rfq/{rfq}/chat', \App\Livewire\RfqChat::class)->name('rfq.chat');
     Route::get('/api/rfq/{rfq}', function (App\Models\BulkRfq $rfq) {
@@ -138,6 +152,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders/{order}/invoice/pdf', [InvoiceController::class, 'download'])
         ->name('orders.invoice.pdf');
 });
+
+// Deliberately outside the auth group: this is what the invoice's own QR code
+// points to, so a phone scanning it must work without that phone being logged
+// in. The 'signed' middleware is what keeps it from becoming an open door —
+// it 403s unless the URL carries the exact signature InvoiceController@scan
+// generated for this one order, so knowing/guessing another order's id isn't
+// enough to read it.
+Route::get('/orders/{order}/invoice/scan', [InvoiceController::class, 'scan'])
+    ->name('orders.invoice.scan')
+    ->middleware('signed');
 
 // Removed: /filament/language and its view. It returned a 500 (a Filament 2 page
 // component rendered outside any page context) and its links used a ?lang= parameter

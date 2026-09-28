@@ -22,11 +22,30 @@ class CartManagement
         $userId = Auth::id();
         $items = CartItem::where('user_id', $userId)->get();
 
+        if ($items->isEmpty()) {
+            return [];
+        }
+
+        // One query for the whole basket instead of one per line. This used to
+        // call getVendorProductData() (its own find() plus ~6 eager-load
+        // queries) inside this loop — a 10-item cart meant 70+ queries here
+        // alone, and CheckoutPage re-runs this 2-3 times per render.
+        $vendorProducts = VendorProduct::with([
+            'product',
+            'vendor',
+            'vendor.currency',
+            'wholesaleTiers',
+            'variations',
+            'variations.wholesaleTiers',
+        ])->whereIn('id', $items->pluck('vendor_product_id')->unique())
+            ->get()
+            ->keyBy('id');
+
         foreach ($items as $item) {
-            $productData = self::getVendorProductData(
-                $item->vendor_product_id,
-                $item->variation_id
-            );
+            $vendorProduct = $vendorProducts->get($item->vendor_product_id);
+            $productData = $vendorProduct
+                ? self::buildProductData($vendorProduct, $item->variation_id)
+                : null;
 
             if (!$productData) {
                 continue;
@@ -57,6 +76,7 @@ class CartManagement
                 'vendor_product_id' => $productData['vendor_product_id'],
                 'product_id' => $productData['product_id'],
                 'vendor_id' => $productData['vendor_id'],
+                'vendor_name' => $productData['vendor']['store_name'] ?? null,
                 'product_name' => $productData['product_name'],
                 'image' => $productData['image'],
                 'quantity' => (int) $item->quantity,
@@ -132,11 +152,10 @@ class CartManagement
      */
     static private function getVendorProductData($vendor_product_id, $variation_id = null)
     {
-        $request_id = uniqid('req_', true);
         try {
             $vendorProduct = VendorProduct::with([
-                'product', 
-                'vendor', 
+                'product',
+                'vendor',
                 'vendor.currency',
                 'wholesaleTiers',
                 'variations',
@@ -148,93 +167,7 @@ class CartManagement
                 return null;
             }
 
-            // REMOVE THIS ERRONEOUS LINE:
-            // \Log::info('CartManagement addCartItemsToCookie: Completed', [
-            //     'request_id' => $request_id,
-            //     'final_item_count' => count($cart_items)
-            // ]);
-
-            // Or if you want to keep some logging, use correct variables:
-            \Log::info('CartManagement getVendorProductData: Retrieved product', [
-                'request_id' => $request_id,
-                'vendor_product_id' => $vendor_product_id,
-                'variation_id' => $variation_id,
-                'product_name' => $vendorProduct->product->name ?? 'Unknown'
-            ]);
-
-            // Initialize defaults
-            $price = $vendorProduct->sale_price ?: $vendorProduct->price;
-            $stock = $vendorProduct->stock;
-            $variation = null;
-
-            if ($variation_id) {
-                // Try to find the variation
-                $variation = $vendorProduct->variations
-                    ->where('id', $variation_id)
-                    ->first();
-                
-                if ($variation) {
-                    $price = $variation->price;
-                    $stock = $variation->stock;
-                    \Log::info('CartManagement: Found variation', [
-                        'variation_id' => $variation_id,
-                        'price' => $price,
-                        'stock' => $stock
-                    ]);
-                } else {
-                    \Log::warning('CartManagement: Variation not found', [
-                        'vendor_product_id' => $vendor_product_id,
-                        'variation_id' => $variation_id
-                    ]);
-                    // Variation not found, but we'll continue with base product
-                }
-            } elseif ($vendorProduct->has_variations) {
-                // Default to a first available variation when none is provided
-                $variation = $vendorProduct->variations
-                    ->firstWhere('stock', '>', 0) ?? $vendorProduct->variations->first();
-
-                if ($variation) {
-                    $variation_id = $variation->id;
-                    $price = $variation->price;
-                    $stock = $variation->stock;
-                    \Log::info('CartManagement: Defaulted variation', [
-                        'variation_id' => $variation_id,
-                        'price' => $price,
-                        'stock' => $stock
-                    ]);
-                }
-            }
-
-            // Get first product image
-            $image = null;
-            $productImages = $vendorProduct->product->images ?? [];
-            if (is_array($productImages) && count($productImages)) {
-                $image = $productImages[0];
-            }
-
-            return [
-                'vendor_product_id' => $vendorProduct->id,
-                'product_id' => $vendorProduct->product_id,
-                'vendor_id' => $vendorProduct->vendor_id,
-                'product_name' => $vendorProduct->product->name ?? 'Unknown Product',
-                'image' => $image,
-                'base_price' => (float) $price,
-                'stock' => $stock,
-                'currency' => $vendorProduct->vendor->currency->code ?? 'USD',
-                'rate_to_usd' => $vendorProduct->vendor->currency->rate_to_usd ?? 1,
-                'wholesale_tiers' => ($vendorProduct->has_variations && $variation)
-                    ? ($variation->wholesaleTiers ?? collect([]))     // ✅ variation tiers
-                    : ($vendorProduct->wholesaleTiers ?? collect([])) // ✅ simple product tiers
-                ,
-                'has_variations' => $vendorProduct->has_variations,
-                'variation_id' => $variation_id,
-                'variation' => $variation,
-                'vendor' => [
-                    'id' => $vendorProduct->vendor->id,
-                    'store_name' => $vendorProduct->vendor->store_name,
-                ]
-            ];
-
+            return self::buildProductData($vendorProduct, $variation_id);
         } catch (\Exception $e) {
             \Log::error('CartManagement: Error getting product data', [
                 'vendor_product_id' => $vendor_product_id,
@@ -244,6 +177,79 @@ class CartManagement
             ]);
             return null;
         }
+    }
+
+    /**
+     * Shapes an already-loaded VendorProduct (with its variations/wholesale
+     * tiers eager-loaded) into the array the rest of this class works with.
+     * Split out of getVendorProductData() so getCartItemsFromCookie() can
+     * batch-load the whole basket in one query and still reuse this logic
+     * per line, instead of one find() per line.
+     */
+    static private function buildProductData(VendorProduct $vendorProduct, $variation_id = null)
+    {
+        // Initialize defaults
+        $price = $vendorProduct->sale_price ?: $vendorProduct->price;
+        $stock = $vendorProduct->stock;
+        $variation = null;
+
+        if ($variation_id) {
+            // Try to find the variation
+            $variation = $vendorProduct->variations
+                ->where('id', $variation_id)
+                ->first();
+
+            if ($variation) {
+                $price = $variation->price;
+                $stock = $variation->stock;
+            } else {
+                \Log::warning('CartManagement: Variation not found', [
+                    'vendor_product_id' => $vendorProduct->id,
+                    'variation_id' => $variation_id
+                ]);
+                // Variation not found, but we'll continue with base product
+            }
+        } elseif ($vendorProduct->has_variations) {
+            // Default to a first available variation when none is provided
+            $variation = $vendorProduct->variations
+                ->firstWhere('stock', '>', 0) ?? $vendorProduct->variations->first();
+
+            if ($variation) {
+                $variation_id = $variation->id;
+                $price = $variation->price;
+                $stock = $variation->stock;
+            }
+        }
+
+        // Get first product image
+        $image = null;
+        $productImages = $vendorProduct->product->images ?? [];
+        if (is_array($productImages) && count($productImages)) {
+            $image = $productImages[0];
+        }
+
+        return [
+            'vendor_product_id' => $vendorProduct->id,
+            'product_id' => $vendorProduct->product_id,
+            'vendor_id' => $vendorProduct->vendor_id,
+            'product_name' => $vendorProduct->product->name ?? 'Unknown Product',
+            'image' => $image,
+            'base_price' => (float) $price,
+            'stock' => $stock,
+            'currency' => $vendorProduct->vendor->currency->code ?? 'USD',
+            'rate_to_usd' => $vendorProduct->vendor->currency->rate_to_usd ?? 1,
+            'wholesale_tiers' => ($vendorProduct->has_variations && $variation)
+                ? ($variation->wholesaleTiers ?? collect([]))     // ✅ variation tiers
+                : ($vendorProduct->wholesaleTiers ?? collect([])) // ✅ simple product tiers
+            ,
+            'has_variations' => $vendorProduct->has_variations,
+            'variation_id' => $variation_id,
+            'variation' => $variation,
+            'vendor' => [
+                'id' => $vendorProduct->vendor->id,
+                'store_name' => $vendorProduct->vendor->store_name,
+            ]
+        ];
     }
 
     /**

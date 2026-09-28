@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use Barryvdh\DomPDF\Facade\Pdf;
+use BaconQrCode\Common\ErrorCorrectionLevel;
+use BaconQrCode\Encoder\Encoder;
+use Illuminate\Support\Facades\URL;
 
 class InvoiceController extends Controller
 {
@@ -12,8 +15,8 @@ class InvoiceController extends Controller
      * signed-in user has a legitimate reason to see THIS order's invoice — its buyer,
      * the vendor who has to fulfill it, or an admin. Without it, any authenticated
      * account (or, before the route also gained ->middleware('auth'), literally
-     * anyone) could read another customer's name, address and phone by changing the
-     * order id in the URL.
+     * anyone) could read another customer's name, address, phone and full order
+     * total just by changing the id in the URL.
      */
     private function authorizeOrder(Order $order): void
     {
@@ -26,18 +29,73 @@ class InvoiceController extends Controller
         abort_unless($isOwner || $isVendor || $isAdmin, 403);
     }
 
+    /**
+     * simplesoftwareio/simple-qrcode's own PNG writer hard-requires the Imagick
+     * extension, which isn't installed here. Its SVG writer works fine in a
+     * browser, but the nested <g transform="scale(...)"><g transform="translate(...)">
+     * groups it emits render as a blank box in dompdf — confirmed by isolating
+     * the raw SVG in its own PDF; stripping the XML prolog alone didn't fix it
+     * either. Drawing straight from BaconQrCode's own module matrix with GD
+     * (already used elsewhere on this server) sidesteps both problems.
+     */
+    private function generateQrPngBase64(string $content): string
+    {
+        $matrix = Encoder::encode($content, ErrorCorrectionLevel::M())->getMatrix();
+        $moduleCount = $matrix->getWidth();
+
+        $margin = 2;
+        $pixelsPerModule = 10;
+        $canvasSize = ($moduleCount + $margin * 2) * $pixelsPerModule;
+
+        $image = imagecreatetruecolor($canvasSize, $canvasSize);
+        $white = imagecolorallocate($image, 255, 255, 255);
+        $black = imagecolorallocate($image, 0, 0, 0);
+        imagefill($image, 0, 0, $white);
+
+        for ($y = 0; $y < $moduleCount; $y++) {
+            for ($x = 0; $x < $moduleCount; $x++) {
+                if ($matrix->get($x, $y)) {
+                    imagefilledrectangle(
+                        $image,
+                        ($x + $margin) * $pixelsPerModule,
+                        ($y + $margin) * $pixelsPerModule,
+                        ($x + $margin + 1) * $pixelsPerModule - 1,
+                        ($y + $margin + 1) * $pixelsPerModule - 1,
+                        $black
+                    );
+                }
+            }
+        }
+
+        ob_start();
+        imagepng($image);
+        $png = ob_get_clean();
+        imagedestroy($image);
+
+        return 'data:image/png;base64,' . base64_encode($png);
+    }
+
+    /**
+     * The QR used to just encode the order number as plain text — scanning it
+     * showed a phone the string "INV2026090019" and nothing else. What makes a
+     * scan actually open the invoice is a URL, and since whoever scans it is
+     * almost never logged into the site on that phone, the link can't go
+     * through the normal auth+ownership-checked routes. A signed URL is the
+     * standard way to hand out a no-login, resource-specific link: it 403s for
+     * every id except the one it was minted for, without needing a session.
+     */
+    private function scanUrl(Order $order): string
+    {
+        return URL::signedRoute('orders.invoice.scan', ['order' => $order->id]);
+    }
+
     public function preview(Order $order)
     {
         $this->authorizeOrder($order);
 
-        $qrSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
-        ->size(120)
-        ->generate($order->order_number);
-
-        // Convert SVG → PNG → base64 (GD only)
         return view('invoices.order', [
             'order' => $order,
-            'qrBase64'   => $qrSvg,
+            'qrBase64' => $this->generateQrPngBase64($this->scanUrl($order)),
             'payments' => $order->paiements,
         ]);
     }
@@ -46,61 +104,28 @@ class InvoiceController extends Controller
     {
         $this->authorizeOrder($order);
 
-        // Generate QR SVG
-        $qrSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
-            ->size(200)
-            ->generate($order->order_number);
-
-        // Convert SVG → PNG → base64 (GD only)
-
         $pdf = Pdf::loadView('invoices.order', [
             'order' => $order,
-            'qrBase64'   => $qrSvg,
+            'qrBase64' => $this->generateQrPngBase64($this->scanUrl($order)),
             'payments' => $order->paiements,
-            'downloadMode' => true, 
+            'downloadMode' => true,
         ])->setPaper('a4');
 
-        return $pdf->download("Invoice-{$order->order_number}.pdf");
+        return $pdf->download("Facture-{$order->order_number}.pdf");
     }
 
-    function svgToPngBase64($svgContent, $scale = 4)
-{
-    // Extract viewBox width & height
-    preg_match('/viewBox="0 0 (\d+) (\d+)"/', $svgContent, $m);
-    $size = $m ? (int)$m[1] : 120;
-
-    $pngSize = $size * $scale;
-
-    // Create GD canvas
-    $img = imagecreatetruecolor($pngSize, $pngSize);
-    $white = imagecolorallocate($img, 255, 255, 255);
-    $black = imagecolorallocate($img, 0, 0, 0);
-    imagefill($img, 0, 0, $white);
-
-    // Load SVG as XML
-    $svg = simplexml_load_string($svgContent);
-
-    foreach ($svg->path as $path) {
-        $d = (string)$path['d']; // example: M0 0h1v1H0zM1 0h1v1H1z
-
-        preg_match_all('/M(\d+) (\d+)h(\d+)v(\d+)H(\d+)/', $d, $blocks, PREG_SET_ORDER);
-
-        foreach ($blocks as $b) {
-            $x = $b[1] * $scale;
-            $y = $b[2] * $scale;
-            $w = $b[3] * $scale;
-            $h = $b[4] * $scale;
-
-            imagefilledrectangle($img, $x, $y, $x + $w, $y + $h, $black);
-        }
+    /**
+     * What the QR code actually points to. The 'signed' middleware on this
+     * route has already done the access check by the time we get here — it
+     * either had the exact signature scanUrl() generated for this order, or
+     * the request never reached this method.
+     */
+    public function scan(Order $order)
+    {
+        return view('invoices.order', [
+            'order' => $order,
+            'qrBase64' => $this->generateQrPngBase64($this->scanUrl($order)),
+            'payments' => $order->paiements,
+        ]);
     }
-
-    ob_start();
-    imagepng($img);
-    $pngData = ob_get_clean();
-
-    return 'data:image/png;base64,' . base64_encode($pngData);
-}
-
-
 }

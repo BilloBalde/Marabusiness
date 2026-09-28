@@ -1,4 +1,3 @@
-import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../models/brand_models.dart';

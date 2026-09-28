@@ -7,7 +7,6 @@ import '../../core/providers/address_provider.dart';
 import '../../core/models/order.dart';
 import '../../widgets/common/loading_widget.dart';
 import '../../widgets/common/error_widget.dart' as custom_error;
-import '../../utils/currency_formatter.dart';
 
 class AddressesScreen extends StatefulWidget {
   const AddressesScreen({super.key});

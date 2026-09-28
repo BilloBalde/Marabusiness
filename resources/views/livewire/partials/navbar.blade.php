@@ -15,17 +15,6 @@
         }else{
             $role = 'Not logged in';
         }
-        // Runs unconditionally on every page load, logged in or not. Spatie's
-        // role() scope throws if the 'manager' role row itself doesn't exist (not
-        // just if nobody holds it) — normally harmless since that row exists today,
-        // but it means a database missing that one seeded row (a fresh deploy
-        // before seeders run, a migration rolled back) would 500 the entire site
-        // for every visitor. Degrades to a dead "contact us" link instead.
-        try {
-            $managerId = \App\Models\User::role('manager')->value('id');
-        } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist $e) {
-            $managerId = null;
-        }
     @endphp
 
     {{-- ============================== --}}
@@ -127,6 +116,35 @@
                     <strong>{{ __('ui.navbar.products') }}</strong>
                 </a>
 
+                {{-- SOURCING — hover reveals every active specialty, same pattern as the language dropdown below --}}
+                <div class="relative group">
+                    <a href="{{ route('sourcing.index') }}" wire:navigate
+                       class="{{ request()->routeIs('sourcing.*') ? 'text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]' }}">
+                        <strong>{{ __('ui.navbar.sourcing') }}</strong>
+                    </a>
+
+                    @if (!empty($sourcings))
+                        <div class="absolute left-0 mt-1 w-56 bg-white border rounded-md shadow-md opacity-0 invisible
+                                    group-hover:opacity-100 group-hover:visible transition duration-150 z-50">
+                            @foreach ($sourcings as $item)
+                                <a href="{{ route('sourcing.show', $item['slug']) }}" wire:navigate
+                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-[#F5E6B3] hover:text-[#D4AF37]">
+                                    {{ $item['title'] }}
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
+                <a href="{{ route('blog.index') }}" wire:navigate
+                   class="{{ request()->routeIs('blog.*') ? 'text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]' }}">
+                    <strong>{{ __('ui.navbar.blog') }}</strong>
+                </a>
+
+                <a href="/#testimonials" class="text-gray-700 hover:text-[#D4AF37]">
+                    <strong>{{ __('ui.navbar.testimonials') }}</strong>
+                </a>
+
             </div>
 
             <div class="hidden md:block flex-1 px-6">
@@ -187,9 +205,13 @@
                             class="block px-4 py-2 text-gray-700 hover:bg-[#F5E6B3]">
                                 <i class="fa-solid fa-location-dot"></i> My Addresses
                             </a>
+                            <a href="{{ route('quotes.mine') }}" wire:navigate
+                            class="block px-4 py-2 text-gray-700 hover:bg-[#F5E6B3]">
+                                <i class="fa-solid fa-file-invoice"></i> {{ __('sourcing.my_quotes') }}
+                            </a>
 
                             @if ($role == 'customer')
-                                <a class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" href="/chats/{{ $managerId }}">
+                                <a class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" href="{{ route('chats') }}">
                                     <i class="fa-solid fa-comments"></i> {{ __('ui.navbar.my_chats') }}
                                 </a>
                             @endif
@@ -293,6 +315,21 @@
                 <a href="/products" class="flex items-center px-4 py-3 text-gray-800 hover:bg-[#F5E6B3] hover:text-[#D4AF37] transition-colors {{ request()->is('products') ? 'bg-[#F5E6B3] text-[#D4AF37]' : '' }}">
                     <i class="fas fa-box-open w-6 text-center mr-3"></i>
                     {{ __('ui.navbar.products') }}
+                </a>
+
+                <a href="{{ route('sourcing.index') }}" wire:navigate class="flex items-center px-4 py-3 text-gray-800 hover:bg-[#F5E6B3] hover:text-[#D4AF37] transition-colors {{ request()->routeIs('sourcing.*') ? 'bg-[#F5E6B3] text-[#D4AF37]' : '' }}">
+                    <i class="fas fa-globe w-6 text-center mr-3"></i>
+                    {{ __('ui.navbar.sourcing') }}
+                </a>
+
+                <a href="{{ route('blog.index') }}" wire:navigate class="flex items-center px-4 py-3 text-gray-800 hover:bg-[#F5E6B3] hover:text-[#D4AF37] transition-colors {{ request()->routeIs('blog.*') ? 'bg-[#F5E6B3] text-[#D4AF37]' : '' }}">
+                    <i class="fas fa-newspaper w-6 text-center mr-3"></i>
+                    {{ __('ui.navbar.blog') }}
+                </a>
+
+                <a href="/#testimonials" class="flex items-center px-4 py-3 text-gray-800 hover:bg-[#F5E6B3] hover:text-[#D4AF37] transition-colors">
+                    <i class="fas fa-quote-left w-6 text-center mr-3"></i>
+                    {{ __('ui.navbar.testimonials') }}
                 </a>
             </div>
 
@@ -414,9 +451,13 @@
                         <a href="{{ route('my.addresses') }}" class="flex items-center px-4 py-2 text-gray-700 hover:bg-[#F5E6B3] rounded-lg transition-colors">
                             <i class="fa-solid fa-location-dot w-6 text-center mr-3"></i> My Addresses
                         </a>
+                        <a href="{{ route('quotes.mine') }}" wire:navigate class="flex items-center px-4 py-2 text-gray-700 hover:bg-[#F5E6B3] rounded-lg transition-colors">
+                            <i class="fa-solid fa-file-invoice w-6 text-center mr-3"></i>
+                            {{ __('sourcing.my_quotes') }}
+                        </a>
 
                         @if ($role == 'customer')
-                            <a href="/chats/{{ $managerId }}" class="flex items-center px-4 py-2 text-gray-700 hover:bg-[#F5E6B3] rounded-lg transition-colors">
+                            <a href="{{ route('chats') }}" class="flex items-center px-4 py-2 text-gray-700 hover:bg-[#F5E6B3] rounded-lg transition-colors">
                                 <i class="fas fa-comments w-6 text-center mr-3"></i>
                                 {{ __('ui.navbar.my_chats') }}
                             </a>

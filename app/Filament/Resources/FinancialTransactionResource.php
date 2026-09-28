@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\ManagerReadOnly;
 use App\Filament\Resources\FinancialTransactionResource\Pages;
 use App\Models\FinancialTransaction;
 use Filament\Forms;
@@ -13,7 +14,14 @@ use Illuminate\Database\Eloquent\Builder;
 
 class FinancialTransactionResource extends Resource
 {
+    use ManagerReadOnly;
+
     protected static ?string $model = FinancialTransaction::class;
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'manager']) ?? false;
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
     protected static ?string $navigationGroup = 'Finance';

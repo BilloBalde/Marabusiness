@@ -159,7 +159,7 @@ class HomePageQueryCountTest extends TestCase
         $response->assertSee('Real Vendor Name');
         // rating=4 from the one seeded review, formatted to one decimal by the view.
         $response->assertSee('4.0');
-        $response->assertSee('1 followers');
+        $response->assertSee('1 abonné(s)');
     }
 
     #[Test]

@@ -125,6 +125,12 @@ class DatabaseMaintenanceTest extends TestCase
         $name = '2099_01_01_000000_une_migration_de_test';
         $path = database_path("migrations/{$name}.php");
 
+        // Self-healing against a previous run of this exact test that got killed
+        // hard (Ctrl+C, a crash) between creating this file and the finally block
+        // below removing it again — a stray copy here would otherwise look like a
+        // real pending migration to every test that runs after it, forever.
+        @unlink($path);
+
         file_put_contents($path, <<<'PHP'
         <?php
 

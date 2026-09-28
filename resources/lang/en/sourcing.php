@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'none_yet' => 'No sourcing specialties yet.',
+    'gallery' => 'Gallery',
+    'download_catalog' => 'Download the catalog',
+    'related_products' => 'Related products',
+    'no_products_yet' => 'No related products yet.',
+    'select' => 'Select',
+    'request_quote' => 'Request a quote',
+    'moq' => 'Quantity wanted (MOQ)',
+    'message' => 'Your message',
+    'message_placeholder' => 'Logo, colors, sizes, desired timeline…',
+    'attachments' => 'Attachments (images, PDF)',
+    'uploading' => 'Uploading…',
+    'send_request' => 'Send the request',
+    'my_quotes' => 'My Quotes',
+    'no_quotes_yet' => "You don't have any quote requests yet.",
+    'status_pending' => 'Pending',
+    'status_processing' => 'Processing',
+    'status_validated' => 'Validated',
+    'status_cancelled' => 'Cancelled',
+    'conversation' => 'Conversation',
+    'reply' => 'Your reply',
+    'send_reply' => 'Send',
+];

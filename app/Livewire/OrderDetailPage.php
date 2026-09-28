@@ -110,15 +110,16 @@ class OrderDetailPage extends Component
             // 3. Reverse financial transactions
             $this->reverseFinancialTransactions();
 
-            // 4. Handle refund based on payment method
+            // 4. Handle refund and mark it, but only when money actually changed hands —
+            // an unpaid COD order has nothing to refund and must stay 'pending', not
+            // jump straight to 'refunded' with no Refund row behind it.
             if (in_array($this->order->payment_status, ['paid', 'partial'])) {
                 $this->handleRefund();
-            }
 
-            // 5. Update payment status
-            $this->order->update([
-                'payment_status' => 'refunded',
-            ]);
+                $this->order->update([
+                    'payment_status' => 'refunded',
+                ]);
+            }
 
             DB::commit();
 
@@ -143,41 +144,50 @@ class OrderDetailPage extends Component
     }
 
     /**
-     * Restore stock for a single order item
+     * Restore stock for a single order item.
+     *
+     * order_items has no vendor_product_id or variation_id column — CheckoutPage
+     * only ever writes the buyer's selected attributes (e.g. ['size' => 'M']) into
+     * variation_json, never a variation id. So the listing is resolved the same way
+     * checkout itself does (vendor_id + product_id), and if attributes were selected,
+     * the matching VendorProductVariation is found by comparing attribute sets —
+     * order-independent, since key order isn't guaranteed on either side.
      */
     private function restoreStock($item)
     {
-        // Check if this is a variation
-        if ($item->variation_json && isset($item->variation_json['variation_id'])) {
-            $variation = \App\Models\VendorProductVariation::where('vendor_product_id', $item->vendor_product_id)
-                ->where('id', $item->variation_json['variation_id'])
-                ->first();
-            
-            if ($variation) {
-                $variation->stock += $item->quantity;
-                $variation->save();
-                
-                // Update parent vendor product stock
-                $totalVariationStock = \App\Models\VendorProductVariation::where('vendor_product_id', $item->vendor_product_id)
-                    ->sum('stock');
-                
-                $vp = \App\Models\VendorProduct::find($item->vendor_product_id);
-                if ($vp) {
-                    $vp->stock = $totalVariationStock;
-                    $vp->save();
-                }
-            }
-        } else {
-            // Regular product
-            $vp = \App\Models\VendorProduct::where('vendor_id', $this->order->vendor_id)
-                ->where('product_id', $item->product_id)
-                ->first();
-            
-            if ($vp) {
-                $vp->stock += $item->quantity;
-                $vp->save();
-            }
+        $vp = \App\Models\VendorProduct::where('vendor_id', $this->order->vendor_id)
+            ->where('product_id', $item->product_id)
+            ->first();
+
+        if (! $vp) {
+            return;
         }
+
+        $selectedAttributes = collect($item->variation_json ?? [])->except('note')->all();
+        ksort($selectedAttributes);
+
+        $variation = $selectedAttributes
+            ? \App\Models\VendorProductVariation::where('vendor_product_id', $vp->id)
+                ->get()
+                ->first(function ($v) use ($selectedAttributes) {
+                    $attrs = (array) ($v->attributes ?? []);
+                    ksort($attrs);
+                    return $attrs === $selectedAttributes;
+                })
+            : null;
+
+        if ($variation) {
+            $variation->stock += $item->quantity;
+            $variation->save();
+
+            // Parent stock stays the sum of its variations, same as everywhere else.
+            $vp->stock = \App\Models\VendorProductVariation::where('vendor_product_id', $vp->id)->sum('stock');
+            $vp->save();
+            return;
+        }
+
+        $vp->stock += $item->quantity;
+        $vp->save();
     }
 
     /**
@@ -185,12 +195,18 @@ class OrderDetailPage extends Component
      */
     private function reverseFinancialTransactions()
     {
+        // Not a single DB::raw() UPDATE with CONCAT() — that's MySQL syntax, and this
+        // app runs on SQLite everywhere that matters (tests and production alike), where
+        // it throws "no such function: CONCAT" and rolls back the whole cancellation.
         FinancialTransaction::where('order_id', $this->order->id)
-            ->update([
-                'status' => 'cancelled',
-                'processed_at' => now(),
-                'description' => DB::raw("CONCAT(description, ' - CANCELLED')"),
-            ]);
+            ->get()
+            ->each(function (FinancialTransaction $transaction) {
+                $transaction->update([
+                    'status' => 'cancelled',
+                    'processed_at' => now(),
+                    'description' => $transaction->description . ' - CANCELLED',
+                ]);
+            });
     }
 
     /**

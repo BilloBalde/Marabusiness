@@ -489,7 +489,7 @@ void _setupDeepLinkListeners() {
 
   // Listen for links while the app is running (non-null Uri now)
   appLinks.uriLinkStream.listen((Uri uri) {
-    if (uri.host == 'afrobridgeinnov.com' && uri.path == '/payment/success') {
+    if (uri.host == Uri.parse(AppConstants.baseUrl).host && uri.path == '/payment/success') {
       final orderId = uri.queryParameters['order_id'];
       _router.go('/payment/success?order_id=$orderId');
     }
@@ -500,7 +500,7 @@ void _setupDeepLinkListeners() {
   // Handle the link that started the app (returns Future<Uri?>)
   appLinks.getInitialLink().then((Uri? initialUri) {
     if (initialUri == null) return;
-    if (initialUri.host == 'afrobridgeinnov.com' && initialUri.path == '/payment/success') {
+    if (initialUri.host == Uri.parse(AppConstants.baseUrl).host && initialUri.path == '/payment/success') {
       final orderId = initialUri.queryParameters['order_id'];
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _router.go('/payment/success?order_id=$orderId');

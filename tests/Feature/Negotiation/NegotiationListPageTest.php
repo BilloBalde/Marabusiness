@@ -98,9 +98,13 @@ class NegotiationListPageTest extends TestCase
     #[Test]
     public function the_page_renders_in_french(): void
     {
-        $this->negotiation();
+        $s = $this->negotiation();
 
-        Livewire::actingAs(User::first())
+        // Not User::first() — the vendor's own factory-created account is inserted
+        // before the buyer's (VendorFactory defaults user_id to User::factory()), so
+        // User::first() silently impersonated the vendor here, not the buyer whose
+        // page this test claims to render.
+        Livewire::actingAs($s['buyer'])
             ->test(UserRfqsPage::class)
             ->assertSee('Mes négociations')
             ->assertSee('En attente du vendeur')

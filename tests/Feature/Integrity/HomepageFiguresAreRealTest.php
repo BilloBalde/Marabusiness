@@ -164,6 +164,6 @@ class HomepageFiguresAreRealTest extends TestCase
 
         $this->get('/')
             ->assertOk()
-            ->assertSee('1 products');
+            ->assertSee('1 produit(s)');
     }
 }

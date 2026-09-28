@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\ManagerReadOnly;
 use App\Filament\Resources\CommissionSettingResource\Pages;
 use App\Filament\Resources\CommissionSettingResource\RelationManagers;
 use App\Models\CommissionSetting;
@@ -16,7 +17,14 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CommissionSettingResource extends Resource
 {
+    use ManagerReadOnly;
+
     protected static ?string $model = CommissionSetting::class;
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'manager']) ?? false;
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-percent-badge';
     protected static ?string $navigationGroup = 'Finance Settings';

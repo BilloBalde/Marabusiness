@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\ManagerReadOnly;
 use App\Filament\Resources\ShippingZoneResource\Pages;
 use App\Models\ShippingZone;
 use Filament\Forms;
@@ -14,7 +15,14 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ShippingZoneResource extends Resource
 {
+    use ManagerReadOnly;
+
     protected static ?string $model = ShippingZone::class;
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'manager']) ?? false;
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-map';
 

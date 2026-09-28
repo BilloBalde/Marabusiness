@@ -2,6 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../core/providers/checkout_provider.dart';
 
 // lib/screens/payment/cancel_page.dart
 class CancelPage extends StatelessWidget {
@@ -46,7 +49,15 @@ class CancelPage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   ElevatedButton(
-                    onPressed: () => context.go('/checkout'),
+                    onPressed: () {
+                      // The buyer's selection is still on checkoutProvider from the
+                      // attempt that just got cancelled — without it, /checkout
+                      // reads no query string and mounts with zero items selected.
+                      final selectedIds = context
+                          .read<CheckoutProvider>()
+                          .selectedIds;
+                      context.go('/checkout?selected_ids=${selectedIds.join(',')}');
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey[200],
                       foregroundColor: Colors.black,

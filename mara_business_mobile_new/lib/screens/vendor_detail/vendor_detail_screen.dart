@@ -9,7 +9,6 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/providers/vendor_detail_provider.dart';
 import '../../core/providers/home_provider.dart';
 import '../../core/models/vendor_models.dart';
-import '../../core/models/home_models.dart';
 import 'package:go_router/go_router.dart';
 
 class VendorDetailScreen extends StatefulWidget {

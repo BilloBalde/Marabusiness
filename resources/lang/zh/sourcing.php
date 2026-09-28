@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'none_yet' => '暂无采购专项。',
+    'gallery' => '图库',
+    'download_catalog' => '下载目录',
+    'related_products' => '相关产品',
+    'no_products_yet' => '暂无相关产品。',
+    'select' => '选择',
+    'request_quote' => '申请报价',
+    'moq' => '所需数量（最低起订量）',
+    'message' => '您的留言',
+    'message_placeholder' => 'Logo、颜色、尺寸、期望交期…',
+    'attachments' => '附件（图片、PDF）',
+    'uploading' => '正在上传…',
+    'send_request' => '发送申请',
+    'my_quotes' => '我的报价请求',
+    'no_quotes_yet' => '您还没有任何报价请求。',
+    'status_pending' => '待处理',
+    'status_processing' => '处理中',
+    'status_validated' => '已确认',
+    'status_cancelled' => '已取消',
+    'conversation' => '对话',
+    'reply' => '您的回复',
+    'send_reply' => '发送',
+];

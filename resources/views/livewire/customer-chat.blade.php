@@ -25,6 +25,7 @@
                         $contactName = $contact['name'] ?? '';
                         $contactVendor = $contact['vendor'] ?? null;
                         $contactRoles = $contact['roles'] ?? [];
+                        $contactUnread = $contact['unread_messages'] ?? 0;
                     @endphp
                     
                     @if($contactId)
@@ -59,6 +60,11 @@
                                         @endif
                                     </div>
                                 </div>
+                                @if($contactUnread > 0)
+                                    <span class="flex-shrink-0 ml-2 min-w-[1.5rem] h-6 px-2 rounded-full bg-blue-600 text-white text-xs font-semibold flex items-center justify-center">
+                                        {{ $contactUnread }}
+                                    </span>
+                                @endif
                             </div>
                         </button>
                     @endif

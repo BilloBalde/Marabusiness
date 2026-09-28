@@ -68,7 +68,7 @@ Future<void> loadHomeData() async {
     }
 
     // Now it's safe to parse
-    final data = rawData as Map<String, dynamic>;
+    final data = rawData;
 
     // Parse brands if present
     if (data['brands'] != null) {

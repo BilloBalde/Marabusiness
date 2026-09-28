@@ -31,20 +31,25 @@ class CustomerChat extends Component
             // Customer can chat with:
             // 1. Managers
             // 2. Vendors they've ordered from
-            
-            // Get managers
-            $managers = User::role('manager')
-                ->where(function($query) use ($user) {
-                    $query->whereHas('sentMessages', fn ($q) => $q->where('receiver_id', $user->id))
-                          ->orWhereHas('receivedMessages', fn ($q) => $q->where('sender_id', $user->id));
-                })
-                ->orWhere(function($query) {
-                    // Include all managers for customers to contact
-                    // or you can limit to managers who handle customer support
-                    $query->role('manager');
-                })
-                ->get();
-            
+
+            // Get managers. Spatie's role() scope throws if the 'manager' role
+            // row itself doesn't exist, not just if nobody holds it — a
+            // database missing that one seeded row would 500 this page for
+            // every customer instead of just showing vendors as contacts.
+            $managers = $this->managerRoleExists()
+                ? User::role('manager')
+                    ->where(function($query) use ($user) {
+                        $query->whereHas('sentMessages', fn ($q) => $q->where('receiver_id', $user->id))
+                              ->orWhereHas('receivedMessages', fn ($q) => $q->where('sender_id', $user->id));
+                    })
+                    ->orWhere(function($query) {
+                        // Include all managers for customers to contact
+                        // or you can limit to managers who handle customer support
+                        $query->role('manager');
+                    })
+                    ->get()
+                : collect();
+
             // Get vendors from customer's orders
             $vendorIds = Order::where('user_id', $user->id)
                 ->whereNotNull('vendor_id')
@@ -59,12 +64,12 @@ class CustomerChat extends Component
                 ->with(['vendor'])
                 ->get();
             
-            // Convert to array for Livewire serialization
-            $this->contacts = $managers->merge($vendors)
-                ->sortBy('name')
-                ->values()
-                ->toArray();
-                
+            // Sorted unread-first (see withUnreadCounts()) rather than by name:
+            // the auto-select just below used to land a customer on whichever
+            // contact's name sorted first alphabetically, which was almost
+            // never the vendor who had actually just written to them.
+            $this->contacts = $this->withUnreadCounts($managers->merge($vendors), $user->id);
+
             // Auto-select first contact if none selected
             if (!$this->chatWithId && !empty($this->contacts)) {
                 $this->chatWithId = $this->contacts[0]['id'] ?? null;
@@ -94,6 +99,34 @@ class CustomerChat extends Component
                 $this->contacts = [];
             }
         }
+    }
+
+    private function managerRoleExists(): bool
+    {
+        return \Spatie\Permission\Models\Role::where('name', 'manager')
+            ->where('guard_name', 'web')
+            ->exists();
+    }
+
+    /**
+     * Attaches each contact's unread count and sorts unread-first (ties
+     * broken by name) — an array, not a Collection, since $this->contacts
+     * is always stored and read back as one for Livewire serialization.
+     */
+    private function withUnreadCounts($contacts, int $userId): array
+    {
+        return $contacts
+            ->map(function ($contact) use ($userId) {
+                $contact->unread_messages = Message::where('sender_id', $contact->id)
+                    ->where('receiver_id', $userId)
+                    ->where('is_read', false)
+                    ->count();
+
+                return $contact;
+            })
+            ->sort(fn ($a, $b) => $b->unread_messages <=> $a->unread_messages ?: strcasecmp($a->name, $b->name))
+            ->values()
+            ->toArray();
     }
 
     public function loadMessages()
@@ -216,15 +249,18 @@ class CustomerChat extends Component
             // Re-fetch managers and vendors based on search
             $searchTerm = strtolower($this->searchTerm);
             
-            $managers = User::role('manager')
-                ->where(function($query) use ($user) {
-                    $query->whereHas('sentMessages', fn ($q) => $q->where('receiver_id', $user->id))
-                          ->orWhereHas('receivedMessages', fn ($q) => $q->where('sender_id', $user->id));
-                })
-                ->orWhere(function($query) {
-                    $query->role('manager');
-                });
-            
+            // See loadContacts() — same guard against a missing 'manager' role row.
+            $managers = $this->managerRoleExists()
+                ? User::role('manager')
+                    ->where(function($query) use ($user) {
+                        $query->whereHas('sentMessages', fn ($q) => $q->where('receiver_id', $user->id))
+                              ->orWhereHas('receivedMessages', fn ($q) => $q->where('sender_id', $user->id));
+                    })
+                    ->orWhere(function($query) {
+                        $query->role('manager');
+                    })
+                : User::whereRaw('1 = 0');
+
             $vendorIds = Order::where('user_id', $user->id)
                 ->whereNotNull('vendor_id')
                 ->pluck('vendor_id')
@@ -253,12 +289,8 @@ class CustomerChat extends Component
                 });
             }
             
-            $this->contacts = $managers->get()
-                ->merge($vendors->get())
-                ->sortBy('name')
-                ->values()
-                ->toArray();
-                
+            $this->contacts = $this->withUnreadCounts($managers->get()->merge($vendors->get()), $user->id);
+
         } elseif ($user->hasRole('manager')) {
             $query = User::role('customer');
             

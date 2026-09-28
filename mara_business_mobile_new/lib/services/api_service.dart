@@ -1,6 +1,5 @@
 import '../utils/app_logger.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import '../core/models/api_response.dart';
 import '../core/constants/api_endpoints.dart';
 import 'dart:io';

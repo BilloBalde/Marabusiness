@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\ManagerReadOnly;
 use App\Filament\Resources\PaymentGatewayFeeResource\Pages;
 use App\Models\PaymentGatewayFee;
 use Filament\Forms;
@@ -12,7 +13,14 @@ use Filament\Tables\Table;
 
 class PaymentGatewayFeeResource extends Resource
 {
+    use ManagerReadOnly;
+
     protected static ?string $model = PaymentGatewayFee::class;
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'manager']) ?? false;
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-credit-card';
     protected static ?string $navigationGroup = 'Finance Settings';

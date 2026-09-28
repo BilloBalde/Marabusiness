@@ -51,6 +51,20 @@ class Order extends Model
     /** The order is waiting on a price, in one form or another. */
     public const STATUS_NEGOTIATING = 'negotiating';
 
+    /**
+     * Every value `status` may actually hold.
+     *
+     * The migration that created this column declared it as a SQLite
+     * enum-via-CHECK — and a later, unrelated `->change()` on a different
+     * column (rate_to_usd) forced Laravel to rebuild the whole table, which
+     * silently drops any CHECK constraint SQLite can't read back through
+     * `pragma_table_xinfo` (confirmed: OrdersStatusCheckConstraintTest). The
+     * database has accepted any string ever since. This list, enforced below,
+     * is the only guarantee left — and unlike the schema, a future migration
+     * can't quietly lose it.
+     */
+    public const STATUSES = ['new', 'processing', 'shipped', 'delivered', 'cancelled', self::STATUS_NEGOTIATING];
+
     /** The buyer has asked; nobody has named a price yet. */
     public const NEGOTIATION_OPEN = 'open';
 
@@ -70,6 +84,16 @@ class Order extends Model
     public function isNegotiating(): bool
     {
         return $this->status === self::STATUS_NEGOTIATING;
+    }
+
+    /** @throws \InvalidArgumentException if $value isn't one of self::STATUSES. */
+    public function setStatusAttribute(string $value): void
+    {
+        if (! in_array($value, self::STATUSES, true)) {
+            throw new \InvalidArgumentException("Statut de commande invalide : \"{$value}\".");
+        }
+
+        $this->attributes['status'] = $value;
     }
 
     /** A price is on the table and has not run out. */

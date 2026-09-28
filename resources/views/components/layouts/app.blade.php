@@ -16,6 +16,30 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
+    <script>
+        {{--
+            Registered here, not inside a Livewire component's own template:
+            Livewire intercepts <script> tags found in a component's rendered
+            HTML and re-runs them itself, later than Alpine's own boot — a
+            listener added that way registers after alpine:init already fired
+            once, globally, and never catches it. This plain inline script is
+            parsed and run immediately, ahead of app.js's deferred module
+            script, so it's in place before Alpine dispatches the event.
+        --}}
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('quickView', {
+                visible: false,
+                product: null,
+                open(product) {
+                    this.product = product;
+                    this.visible = true;
+                },
+                close() {
+                    this.visible = false;
+                },
+            });
+        });
+    </script>
     <style>
         /* Carousel dots */
         .dot {
@@ -30,7 +54,6 @@
         background-color: #2563eb; /* Tailwind blue-600 */
         }
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons/css/flag-icons.min.css">
 </head>
 <body class="flex flex-col min-h-screen font-sans text-gray-900 bg-gray-50">

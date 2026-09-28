@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\ManagerReadOnly;
 use App\Filament\Resources\WireTransferFeeResource\Pages;
 use App\Models\WireTransferFee;
 use Filament\Forms;
@@ -12,7 +13,14 @@ use Filament\Tables\Table;
 
 class WireTransferFeeResource extends Resource
 {
+    use ManagerReadOnly;
+
     protected static ?string $model = WireTransferFee::class;
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'manager']) ?? false;
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
     protected static ?string $navigationGroup = 'Finance Settings';

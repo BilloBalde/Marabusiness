@@ -16,6 +16,7 @@ use App\Support\ShippingCarrierFilter;
 use App\Services\FinanceCalculator; // Add this
 use App\Services\OrderNegotiation;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
@@ -564,38 +565,87 @@ class CheckoutPage extends Component
              * cart_items rows keyed on user_id — the cookie in its name is a
              * leftover from an older implementation — and nothing ever prunes
              * them, so the gap between the check and here has no upper bound.
-             * The decrement further down writes max(0, stock - quantity), so
-             * ordering five of something with one left stored 0 rather than -2 and
-             * the oversell left no trace at all. Refused here, before a single
-             * order row exists.
              *
-             * Unlike the API endpoint this method runs outside a transaction, so
-             * the rows cannot be locked and two simultaneous checkouts can still
-             * both pass. That window is far narrower than a months-old cart, but
-             * it is not closed: closing it needs placeOrder() wrapped in a
-             * transaction, which is a separate change.
+             * Checked AND reserved (decremented) together, inside one transaction
+             * with the rows locked — mirroring CheckoutController::findStockShortfalls()
+             * / updateStock() on the API side, which this web path never had. Doing
+             * both here, before a single order/payment/Stripe call exists, closes the
+             * window where two simultaneous checkouts for the same last unit could
+             * both pass: the second one now blocks on the lock until the first
+             * transaction commits, then sees the already-decremented value.
              */
             $shortfalls = [];
-            foreach ($groups as $group) {
-                foreach ($group['items'] as $item) {
-                    $available = !empty($item['variation_id'])
-                        ? VendorProductVariation::where('vendor_product_id', $item['vendor_product_id'])
-                            ->where('id', $item['variation_id'])->value('stock')
-                        : VendorProduct::where('vendor_id', $item['vendor_id'])
-                            ->where('product_id', $item['product_id'])->value('stock');
 
-                    if ($available !== null && (int) $item['quantity'] > (int) $available) {
-                        $shortfalls[] = ($item['product_name'] ?? 'Article')
-                            . " (demandé {$item['quantity']}, disponible {$available})";
+            DB::beginTransaction();
+
+            try {
+                foreach ($groups as $group) {
+                    foreach ($group['items'] as $item) {
+                        if (!empty($item['variation_id'])) {
+                            $available = VendorProductVariation::where('vendor_product_id', $item['vendor_product_id'])
+                                ->where('id', $item['variation_id'])
+                                ->lockForUpdate()
+                                ->value('stock');
+                        } else {
+                            $available = VendorProduct::where('vendor_id', $item['vendor_id'])
+                                ->where('product_id', $item['product_id'])
+                                ->lockForUpdate()
+                                ->value('stock');
+                        }
+
+                        if ($available !== null && (int) $item['quantity'] > (int) $available) {
+                            $shortfalls[] = ($item['product_name'] ?? 'Article')
+                                . " (demandé {$item['quantity']}, disponible {$available})";
+                        }
                     }
                 }
-            }
 
-            if ($shortfalls !== []) {
-                session()->flash('error', 'Stock insuffisant : ' . implode(', ', $shortfalls)
-                    . '. Ajustez votre panier avant de commander.');
+                if ($shortfalls !== []) {
+                    DB::rollBack();
 
-                return null;
+                    session()->flash('error', 'Stock insuffisant : ' . implode(', ', $shortfalls)
+                        . '. Ajustez votre panier avant de commander.');
+
+                    return null;
+                }
+
+                foreach ($groups as $group) {
+                    foreach ($group['items'] as $item) {
+                        if (!empty($item['variation_id'])) {
+                            $variation = VendorProductVariation::where('vendor_product_id', $item['vendor_product_id'])
+                                ->where('id', $item['variation_id'])
+                                ->first();
+
+                            if ($variation) {
+                                $variation->stock = max(0, $variation->stock - $item['quantity']);
+                                $variation->save();
+
+                                $totalVariationStock = VendorProductVariation::where('vendor_product_id', $item['vendor_product_id'])
+                                    ->sum('stock');
+
+                                $vp = VendorProduct::find($item['vendor_product_id']);
+                                if ($vp) {
+                                    $vp->stock = $totalVariationStock;
+                                    $vp->save();
+                                }
+                            }
+                        } else {
+                            $vp = VendorProduct::where('vendor_id', $item['vendor_id'])
+                                ->where('product_id', $item['product_id'])
+                                ->first();
+
+                            if ($vp) {
+                                $vp->stock = max(0, $vp->stock - $item['quantity']);
+                                $vp->save();
+                            }
+                        }
+                    }
+                }
+
+                DB::commit();
+            } catch (\Throwable $e) {
+                DB::rollBack();
+                throw $e;
             }
 
             /** Create orders for each vendor */
@@ -833,41 +883,9 @@ class CheckoutPage extends Component
                     $this->updateFinancialTransactionStatus($order, 'pending', 'Cash/COD payment pending');
                     $redirect_url = route('success');
                 }
-                
-                /** UPDATE STOCK */
-                foreach ($group['items'] as $item) {
-                    // Check if this is a variation
-                    if (!empty($item['variation_id'])) {
-                        // Update variation stock
-                        $variation = \App\Models\VendorProductVariation::where('vendor_product_id', $item['vendor_product_id'])
-                            ->where('id', $item['variation_id'])
-                            ->first();
-                        
-                        if ($variation) {
-                            $variation->stock = max(0, $variation->stock - $item['quantity']);
-                            $variation->save();
-                            
-                            // Also update parent vendor product stock (sum of all variations)
-                            $totalVariationStock = \App\Models\VendorProductVariation::where('vendor_product_id', $item['vendor_product_id'])
-                                ->sum('stock');
-                            
-                            $vp = \App\Models\VendorProduct::find($item['vendor_product_id']);
-                            if ($vp) {
-                                $vp->stock = $totalVariationStock;
-                                $vp->save();
-                            }
-                        }
-                    } else {
-                        $vp = \App\Models\VendorProduct::where('vendor_id', $vendorId)
-                            ->where('product_id', $item['product_id'])
-                            ->first();
-                        
-                        if ($vp) {
-                            $vp->stock = max(0, $vp->stock - $item['quantity']);
-                            $vp->save();
-                        }
-                    }
-                }
+
+                // Stock was already checked and decremented, atomically and under
+                // lock, before this loop started — see the transaction above.
             }
             
             /** SEND ORDER CONFIRMATION EMAILS */
@@ -1169,17 +1187,28 @@ class CheckoutPage extends Component
      * cities seeded today — another country legitimately returns an empty list here,
      * handled by needsLocalityPicker() rather than treated as an error.
      */
+    /**
+     * localityOptions() itself is called directly by the view AND by
+     * hasLocalitiesForCountry() in the same render() — without this, its
+     * ~3-4 queries ran twice on every checkout render.
+     */
+    private ?array $localityOptionsCache = null;
+
     public function localityOptions(): array
     {
+        if ($this->localityOptionsCache !== null) {
+            return $this->localityOptionsCache;
+        }
+
         $country = \App\Models\Locality::where('type', \App\Models\Locality::TYPE_COUNTRY)
             ->where('country_code', $this->getCountryCode($this->country))
             ->first();
 
         if (! $country) {
-            return [];
+            return $this->localityOptionsCache = [];
         }
 
-        return \App\Models\Locality::selectable()
+        return $this->localityOptionsCache = \App\Models\Locality::selectable()
             ->where(function ($query) use ($country) {
                 // Two hops from the country covers Guinea's shape (country > region >
                 // commune/prefecture); a country with cities attached one level up is

@@ -13,11 +13,16 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // A test@example.com / "password" (UserFactory's default) account has no
+        // business existing outside local dev — guarded rather than deleted, since
+        // this seeder still runs to bootstrap fixtures on a real local install.
+        if (! app()->environment('local')) {
+            return;
+        }
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        User::firstOrCreate(
+            ['email' => 'test@example.com'],
+            ['name' => 'Test User'],
+        );
     }
 }

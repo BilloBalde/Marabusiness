@@ -916,6 +916,49 @@ Widget _buildOrdersTab() {
     return const LoadingWidget(message: 'Chargement des commandes...');
   }
 
+  // Mirrors orders_screen.dart's own fix for the same bug: a failed load (401,
+  // dropped connection, server fault) used to fall straight through to the
+  // empty state below and tell the buyer "Aucune commande" — worse than
+  // saying the load failed, especially for orders paid cash on delivery.
+  if (orderProvider.error != null && orderProvider.orders.isEmpty) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              'Impossible de charger vos commandes',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              orderProvider.error!,
+              style: TextStyle(color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => orderProvider.loadLatestOrders(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD4AF37),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   if (orderProvider.orders.isEmpty) {
     return Center(
       child: Column(

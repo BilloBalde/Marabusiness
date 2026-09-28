@@ -38,6 +38,7 @@ class ProductDetailPage extends Component
     public $customNote = '';
     public $similarProducts = [];
     public $reviews;
+    public $verifiedReviewerIds = [];
     public $rating = 0;
     public $comment = '';
     public $hasReviewed = false;
@@ -59,13 +60,22 @@ class ProductDetailPage extends Component
         }
 
         // ✅ eager load product tiers + variations + variation tiers
-        $this->vendorProduct = VendorProduct::with([
-            'vendor.currency',
-            'reviews.user',
-            'vendor',
-            'wholesaleTiers',
-            'variations.wholesaleTiers',
-        ])->findOrFail($vendor_product_id);
+        //
+        // Scoped through $this->product's own relation, not a bare
+        // VendorProduct::findOrFail() — that let /products/{any-slug}/{any-id}
+        // mount cleanly even when the listing belonged to a different product,
+        // showing this product's title/photos while quietly adding a mismatched
+        // (and possibly mispriced) vendor's listing to the cart. A listing that
+        // isn't really this product's now 404s instead.
+        $this->vendorProduct = $this->product->vendorProducts()
+            ->with([
+                'vendor.currency',
+                'reviews.user',
+                'vendor',
+                'wholesaleTiers',
+                'variations.wholesaleTiers',
+            ])
+            ->findOrFail($vendor_product_id);
 
         $this->vendor = $this->vendorProduct->vendor;
         $this->vendorProductId = $this->vendorProduct->id;
@@ -100,7 +110,7 @@ class ProductDetailPage extends Component
         $this->price = $this->getWholesaleUnitPrice($this->quantity);
 
         // Reviews
-        $this->reviews = $this->vendorProduct->reviews()->with('user')->latest()->get();
+        $this->refreshReviews();
 
         if (Auth::check()) {
             $existing = $this->vendorProduct->reviews()->where('user_id', Auth::id())->first();
@@ -116,8 +126,13 @@ class ProductDetailPage extends Component
                 ->exists();
         }
 
+        // vendorProducts eager-loaded here so the "similar products" block
+        // doesn't run its own ->vendorProducts()->with(...)->first() query per
+        // card — that was a fresh query for every one of up to 8 cards, on
+        // every single product page view.
         $this->similarProducts = Product::where('category_id', $this->product->category_id)
             ->where('id', '!=', $this->product->id)
+            ->with(['vendorProducts.vendor.currency', 'vendorProducts.variations'])
             ->limit(8)
             ->get();
     }
@@ -428,16 +443,33 @@ class ProductDetailPage extends Component
             'comment' => 'required|string|min:3',
         ]);
 
-        \App\Models\VendorProductReview::create([
-            'vendor_product_id' => $this->vendorProductId,
-            'user_id' => Auth::id(),
-            'rating' => $this->rating,
-            'comment' => $this->comment,
-        ]);
+        // A fresh DB check, not just $this->hasReviewed — a double click fires two
+        // requests off the same pre-update snapshot, so trusting component state
+        // alone still lets both through. vendor_product_reviews has no unique
+        // constraint to backstop this at the DB layer either.
+        $existing = \App\Models\VendorProductReview::where('vendor_product_id', $this->vendorProductId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if ($existing) {
+            $existing->update([
+                'rating' => $this->rating,
+                'comment' => $this->comment,
+            ]);
+            $this->userReviewId = $existing->id;
+        } else {
+            $review = \App\Models\VendorProductReview::create([
+                'vendor_product_id' => $this->vendorProductId,
+                'user_id' => Auth::id(),
+                'rating' => $this->rating,
+                'comment' => $this->comment,
+            ]);
+            $this->userReviewId = $review->id;
+        }
 
         $this->hasReviewed = true;
         $this->editingReview = false;
-        $this->reviews = $this->vendorProduct->reviews()->with('user')->latest()->get();
+        $this->refreshReviews();
     }
 
     public function editReview()
@@ -461,7 +493,26 @@ class ProductDetailPage extends Component
         }
 
         $this->editingReview = false;
+        $this->refreshReviews();
+    }
+
+    /**
+     * Loads the review list plus which of those reviewers have a verified
+     * purchase, in one query — the Blade used to run a fresh
+     * OrderItem::whereHas('order', ...)->exists() per review row, which is
+     * cheap at 5 reviews and a real N+1 once a product has hundreds.
+     */
+    private function refreshReviews(): void
+    {
         $this->reviews = $this->vendorProduct->reviews()->with('user')->latest()->get();
+
+        $this->verifiedReviewerIds = \App\Models\OrderItem::where('product_id', $this->product->id)
+            ->whereHas('order', fn ($q) => $q->whereIn('user_id', $this->reviews->pluck('user_id')->unique()))
+            ->with('order:id,user_id')
+            ->get()
+            ->pluck('order.user_id')
+            ->unique()
+            ->all();
     }
 
     public function render()

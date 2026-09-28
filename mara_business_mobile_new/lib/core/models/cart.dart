@@ -1,7 +1,6 @@
 // lib/core/models/cart.dart - UPDATED with CBM calculation
 
 import '../../utils/app_logger.dart';
-import 'package:flutter/material.dart';
 
 class CartItem {
   final String cartKey;

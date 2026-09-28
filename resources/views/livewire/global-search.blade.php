@@ -19,6 +19,7 @@
         <div class="absolute left-0 right-0 bg-white border rounded-lg shadow-lg mt-2 z-50">
 
             @foreach($results as $product)
+                @continue($product->vendorProducts->isEmpty())
                 @php
                     // Was via.placeholder.com, a service that no longer exists.
                     $img = isset($product->images[0])
@@ -26,7 +27,7 @@
                         : url('uploads/default.png');
                 @endphp
 
-                <a href="/products/{{ $product->slug }}/{{ $product->vendorProducts[0]->id }}"
+                <a href="/products/{{ $product->slug }}/{{ $product->vendorProducts->first()->id }}"
                    class="flex items-center gap-3 px-3 py-2 hover:bg-gray-100">
 
                     <img src="{{ $img }}" class="w-10 h-10 rounded object-cover">

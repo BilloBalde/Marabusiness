@@ -29,14 +29,28 @@
     @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.my-order', 'hasSub' => true, 'subContent' => 'ui.navbar.orders', 'subLink' => 'orders'])
 
     <!-- HEADER -->
-    <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center justify-between mb-8 flex-wrap gap-3">
         <h1 class="text-3xl font-bold text-gray-700">Détails de la commande</h1>
 
-        <a href="{{ route('my-orders') }}"
-           class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#D4AF37] 
-                  rounded-lg hover:bg-[#C9A227] shadow">
-            ← Retour à mes commandes
-        </a>
+        <div class="flex items-center gap-2 flex-wrap">
+            <a href="{{ route('orders.invoice.preview', $order) }}" target="_blank"
+               class="inline-flex items-center px-4 py-2 text-sm font-medium text-[#D4AF37] bg-white
+                      border border-[#D4AF37] rounded-lg hover:bg-[#FDF6E3] shadow-sm">
+                <i class="fa-solid fa-receipt mr-2"></i> Voir le reçu
+            </a>
+
+            <a href="{{ route('orders.invoice.pdf', $order) }}"
+               class="inline-flex items-center px-4 py-2 text-sm font-medium text-[#D4AF37] bg-white
+                      border border-[#D4AF37] rounded-lg hover:bg-[#FDF6E3] shadow-sm">
+                <i class="fa-solid fa-download mr-2"></i> Télécharger la facture (PDF)
+            </a>
+
+            <a href="{{ route('my-orders') }}"
+               class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#D4AF37]
+                      rounded-lg hover:bg-[#C9A227] shadow">
+                ← Retour à mes commandes
+            </a>
+        </div>
     </div>
 
     <!-- TOP CARDS -->

@@ -475,10 +475,9 @@
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 lg:gap-6">
                 @foreach ($similarProducts as $sim)
                     @php
-                        $relatedVendorProduct = $sim->vendorProducts()
-                            ->with(['vendor.currency', 'variations'])
-                            ->orderBy('price')
-                            ->first();
+                        // vendorProducts is eager-loaded in mount(); sorting the
+                        // already-loaded collection avoids a query per card.
+                        $relatedVendorProduct = $sim->vendorProducts->sortBy('price')->first();
                     @endphp
                     
                     @if($relatedVendorProduct)
@@ -664,9 +663,7 @@
                                 </div>
                             </div>
                             <p class="text-gray-700">{{ $rev->comment }}</p>
-                            @if(\App\Models\OrderItem::where('product_id', $product->id)
-                                ->whereHas('order', fn($q) => $q->where('user_id', $rev->user_id))
-                                ->exists())
+                            @if(in_array($rev->user_id, $verifiedReviewerIds))
                                 <p class="text-sm text-green-600 mt-2 flex items-center">
                                     <i class="fas fa-check-circle mr-1"></i>
                                     Achat vérifié

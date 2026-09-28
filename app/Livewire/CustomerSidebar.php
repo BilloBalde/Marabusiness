@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -38,7 +38,7 @@ class CustomerSidebar extends Component
     public function selectCustomer($id)
     {
         $this->customerId = $id;
-        $this->emitUp('customerSelected', $id); // Emit event to parent
+        $this->dispatch('customerSelected', $id); // Livewire 3: dispatch() already bubbles to a listening parent
     }
 
     public function render()

@@ -9,7 +9,8 @@ import '../models/user.dart';
 import 'order_provider.dart';      // Add this
 import 'address_provider.dart';    // Add this
 import 'cart_provider.dart';       // Add this
-import 'vendor_provider.dart';  
+import 'checkout_provider.dart';
+import 'vendor_provider.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _apiService;
@@ -247,6 +248,7 @@ class AuthProvider extends ChangeNotifier {
         context!.read<AddressProvider>().clearAddresses();
         context!.read<CartProvider>().resetCart();
         context!.read<VendorProvider>().reset();
+        context!.read<CheckoutProvider>().reset();
       }
     } catch (e) {
       debugPrint('Error resetting providers: $e');

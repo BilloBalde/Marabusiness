@@ -1,0 +1,32 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "laravel",
+      "url": "http://localhost:8000",
+      "port": 8000
+    },
+    {
+      "name": "flutter-web",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "-S",
+        "127.0.0.1:8090",
+        "-t",
+        "mara_business_mobile_new/build/web",
+        "mara_business_mobile_new/web_test_server.php"
+      ],
+      "port": 8090
+    },
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 5173,
+      "autoPort": true
+    }
+  ]
+}

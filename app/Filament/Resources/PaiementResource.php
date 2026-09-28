@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\ManagerReadOnly;
 use App\Filament\Resources\PaiementResource\Pages;
 use App\Models\Order;
 use App\Models\Paiement;
@@ -18,7 +19,14 @@ use Illuminate\Support\Facades\DB;
 
 class PaiementResource extends Resource
 {
+    use ManagerReadOnly;
+
     protected static ?string $model = Paiement::class;
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'manager']) ?? false;
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 

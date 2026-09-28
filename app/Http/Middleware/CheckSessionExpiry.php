@@ -67,10 +67,18 @@ class CheckSessionExpiry
         $request->session()->invalidate();
         $request->session()->regenerateToken();
         
-        // Determine login route
-        $loginRoute = $panel 
-            ? route("filament.{$panel}.auth.login") 
-            : route('login');
+        // Determine login route.
+        //
+        // The panel branch is left to Filament's own login, which already
+        // remembers where a panel user was headed. The plain site branch had
+        // no such memory: the session is invalidated a few lines up, so
+        // whatever page the visitor was trying to reach has to travel as an
+        // explicit query param instead of session('url.intended') — losing
+        // it here is exactly why logging back in after an expired session
+        // used to always land on the homepage instead of back where they were.
+        $loginRoute = $panel
+            ? route("filament.{$panel}.auth.login")
+            : route('login', ['redirect' => $request->fullUrl()]);
         
         // For API/JSON requests
         if ($request->expectsJson() || $request->header('X-Livewire')) {

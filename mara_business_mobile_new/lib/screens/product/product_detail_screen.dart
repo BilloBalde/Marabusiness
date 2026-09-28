@@ -206,6 +206,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _addToCart() async {
+    // Both the "Add to cart" and "Buy now" buttons call this; a double tap or a
+    // slow connection used to fire it twice before this flag ever flipped,
+    // doubling the quantity/price added — discovered only at checkout.
+    if (_isAddingToCart) return;
+
     if (!context.read<AuthProvider>().isAuthenticated) {
       _showMessage('Veuillez vous connecter pour ajouter au panier', Colors.orange);
       context.go('/login?redirect=/product/${widget.slug}/${widget.vendorProductId}');
@@ -1869,7 +1874,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           children: [
             Expanded(
               child: ElevatedButton(
-                onPressed: inStock ? _addToCart : null,
+                onPressed: (inStock && !_isAddingToCart) ? _addToCart : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD4AF37),
                   foregroundColor: Colors.white,
@@ -1907,7 +1912,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton(
-                onPressed: inStock
+                onPressed: (inStock && !_isAddingToCart)
                     ? () async {
                         await _addToCart();
                         context.go('/cart');

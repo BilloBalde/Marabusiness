@@ -8,6 +8,10 @@ use App\Models\Category;
 use App\Models\Vendor;
 use App\Models\Service;
 use App\Models\SiteSetting;
+use App\Models\HomeSlide;
+use App\Models\Sourcing;
+use App\Models\Testimonial;
+use App\Models\Partner;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use App\Helpers\WishlistManagement;
@@ -115,6 +119,7 @@ class HomePage extends Component
                 'sale_price' => null,
                 'sale_end' => null,
                 'discount' => null,
+                'vendor_is_verified' => false,
                 'has_vendor' => false, // Add flag to check if product has vendor
             ];
         }
@@ -142,6 +147,7 @@ class HomePage extends Component
                 'sale_price' => null,
                 'sale_end' => null,
                 'discount' => null,
+                'vendor_is_verified' => false,
                 'has_vendor' => false,
             ];
         }
@@ -172,6 +178,7 @@ class HomePage extends Component
             'vendor_product_id' => $vendor_product_id,
             'vendor_name' => $uniqueVendor->store_name,
             'vendor_slug' => $uniqueVendor->slug ?? null,
+            'short_description' => $product->short_description,
             'stock' => $uniqueVendor->pivot->stock ?? 0,
             'vendor_currency' => $this->currencyCode,
             'display_price' => $sale ?? $base,
@@ -181,6 +188,10 @@ class HomePage extends Component
             'discount' => $sale && $base > 0
                 ? round(100 - ($sale / $base * 100))
                 : null,
+            // The card's badge checked this via `?? false`, which silently
+            // hides undefined-property warnings on this stdClass instead of
+            // ever reading a real value — no vendor ever showed as verified.
+            'vendor_is_verified' => $uniqueVendor->is_verified ?? false,
             'has_vendor' => true, // Add flag to check if product has vendor
         ];
     }
@@ -315,6 +326,11 @@ class HomePage extends Component
 
         //dd($banners);
 
+        $heroSlides = HomeSlide::where('is_active', true)->orderBy('sort_order')->get();
+        $sourcings = Sourcing::where('is_active', true)->orderBy('sort_order')->withCount('sourceProducts')->get();
+        $testimonials = Testimonial::where('is_active', true)->orderBy('sort_order')->get();
+        $partners = Partner::where('is_active', true)->orderBy('sort_order')->get();
+
         return view('livewire.home-page', [
             'featuredProducts' => $featuredProducts,
             'saleProducts' => $saleProducts,
@@ -322,6 +338,10 @@ class HomePage extends Component
             'vendors' => $vendors,
             'services' => $services,
             'banners' => $banners,
+            'heroSlides' => $heroSlides,
+            'sourcings' => $sourcings,
+            'testimonials' => $testimonials,
+            'partners' => $partners,
         ]);
     }
 }

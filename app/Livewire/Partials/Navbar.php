@@ -6,6 +6,7 @@ use App\Helpers\CartManagement;
 use App\Helpers\WishlistManagement;
 use App\Models\Currency;
 use App\Models\Category;
+use App\Models\Sourcing;
 use Livewire\Component;
 use Livewire\Attributes\On;
 
@@ -18,6 +19,7 @@ class Navbar extends Component
 
     public $families = [];
     public $menuData = [];
+    public $sourcings = [];
 
     public function hydrate()
     {
@@ -38,8 +40,11 @@ class Navbar extends Component
         $this->total_count = CartManagement::getCartCount();
         $this->wishlist_count = WishlistManagement::getCount();
 
-        // 3. Handle currency from session (fallback to first currency)
-        $default = Currency::first()?->code ?? 'USD';
+        // 3. Handle currency from session (fallback to first currency).
+        // Reuses $this->currencies (already active-only, code-ordered) instead
+        // of a second query — this also happens to be a more correct fallback
+        // than the old Currency::first(), which ignored is_active entirely.
+        $default = $this->currencies[0]['code'] ?? 'USD';
         $this->currencyCode = session('currency_code', $default);
         session(['currency_code' => $this->currencyCode]);
 
@@ -63,6 +68,14 @@ class Navbar extends Component
 
         $this->families = $families->toArray();
         $this->menuData = $menuData;
+
+        // Small, changes rarely — plain array is enough, no need for the
+        // Sourcing model's json-cast fields inside a Blade @foreach.
+        $this->sourcings = Sourcing::where('is_active', true)
+            ->orderBy('sort_order')
+            ->get(['slug', 'title'])
+            ->map(fn ($s) => ['slug' => $s->slug, 'title' => $s->title_text])
+            ->toArray();
     }
 
     // Redirect after selecting currency

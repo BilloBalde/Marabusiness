@@ -6,9 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/providers/auth_provider.dart';
 import '../../services/api_service.dart';
-import '../../core/models/api_response.dart';
 import '../../utils/currency_formatter.dart';
 import '../../widgets/common/loading_widget.dart';
 

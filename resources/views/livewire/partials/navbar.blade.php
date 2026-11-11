@@ -1,4 +1,4 @@
-<header class="sticky top-0 z-50 w-full bg-white shadow-md">
+<header class="sticky top-0 z-50 w-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_-12px_rgba(0,0,0,0.15)]">
     @php
         $langLabels = ['en' => 'EN', 'fr' => 'FR', 'zh' => '中文'];
         $currentLocale = app()->getLocale();
@@ -20,33 +20,39 @@
     {{-- ============================== --}}
     {{-- TOP BAR --}}
     {{-- ============================== --}}
-    <div class="bg-[#D4AF37] text-white text-xs py-2">
-        <div class="max-w-7xl mx-auto px-4 flex justify-between">
+    <div class="bg-gradient-to-r from-[#C9A227] via-[#D4AF37] to-[#C9A227] text-white text-xs">
+        <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-9">
             <div class="flex space-x-4">
-                <a href="#" class="hover:underline">Télécharger l'app</a>
+                <a href="#" class="flex items-center gap-1.5 text-white/90 hover:text-white transition-colors">
+                    <i class="fa-solid fa-mobile-screen-button text-[11px]"></i>
+                    Télécharger l'app
+                </a>
             </div>
 
+            {{-- These live here too, not only in the main nav, so the count is
+                 reachable even when the wider desktop links are scrolled past —
+                 same items as the icons further down, just visible sooner. --}}
             <div class="flex space-x-4">
-                <a wire:navigate href="/wishlist" class="flex items-center gap-x-1 text-gray-700 hover:text-[#D4AF37] font-medium">
-                    <i class="fa-solid fa-heart"></i>
-                    <span class="px-2 py-0.5 text-xs bg-[#F5E6B3] border border-[#D4AF37] rounded text-[#D4AF37]">
+                <a wire:navigate href="/wishlist" class="flex items-center gap-x-1.5 text-white/90 hover:text-white font-medium transition-colors">
+                    <i class="fa-solid fa-heart text-[11px]"></i>
+                    <span class="min-w-[1.1rem] text-center px-1 py-0.5 text-[10px] font-bold bg-black/15 rounded-full">
                         {{ $wishlist_count }}
                     </span>
                 </a>
-                <a wire:navigate href="/cart" class="flex items-center gap-x-1 text-gray-700 hover:text-[#D4AF37] font-medium">
-                    <i class="fa-solid fa-shopping-cart"></i>
-                    <span class="px-2 py-0.5 text-xs bg-[#F5E6B3] border border-[#D4AF37] rounded text-[#D4AF37]">
+                <a wire:navigate href="/cart" class="flex items-center gap-x-1.5 text-white/90 hover:text-white font-medium transition-colors">
+                    <i class="fa-solid fa-shopping-cart text-[11px]"></i>
+                    <span class="min-w-[1.1rem] text-center px-1 py-0.5 text-[10px] font-bold bg-black/15 rounded-full">
                         {{ $total_count }}
                     </span>
                 </a>
             </div>
 
-            <div class="flex items-center space-x-3">
-                <a href="#" class="hover:text-gray-200"><i class="fa-brands fa-facebook-f"></i></a>
-                <a href="#" class="hover:text-gray-200"><i class="fa-brands fa-instagram"></i></a>
-                <a href="#" class="hover:text-gray-200"><i class="fa-brands fa-whatsapp"></i></a>
-                <a href="#" class="hover:text-gray-200"><i class="fa-brands fa-linkedin-in"></i></a>
-                <a href="#" class="hover:text-gray-200"><i class="fa-brands fa-snapchat-ghost"></i></a>
+            <div class="hidden sm:flex items-center space-x-3 text-white/80">
+                <a href="#" class="hover:text-white transition-colors"><i class="fa-brands fa-facebook-f"></i></a>
+                <a href="#" class="hover:text-white transition-colors"><i class="fa-brands fa-instagram"></i></a>
+                <a href="#" class="hover:text-white transition-colors"><i class="fa-brands fa-whatsapp"></i></a>
+                <a href="#" class="hover:text-white transition-colors"><i class="fa-brands fa-linkedin-in"></i></a>
+                <a href="#" class="hover:text-white transition-colors"><i class="fa-brands fa-snapchat-ghost"></i></a>
             </div>
         </div>
     </div>
@@ -57,92 +63,119 @@
             {{-- ============================== --}}
             {{-- LOGO --}}
             {{-- ============================== --}}
+            {{-- A fixed, non-square w/h risked stretching the mark whenever its
+                 own aspect ratio didn't match 110:80 exactly. h + w-auto keeps
+                 it true to the source file at any size. --}}
             <a href="/" class="flex-none">
-                <img src="{{ asset('assets/images/logo.png') }}" class="w-[110px] h-[80px]" alt="Logo">
+                <img src="{{ asset('assets/images/logo.png') }}" class="h-[64px] w-auto object-contain" alt="Logo">
             </a>
 
             {{-- ============================== --}}
             {{-- DESKTOP LINKS --}}
             {{-- ============================== --}}
-            <div class="hidden md:flex items-center space-x-6 ml-4">
+            <div class="hidden md:flex items-center space-x-1 ml-4">
 
-                <a href="/" class="{{ request()->is('/') ? 'text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]' }}">
-                    <strong>{{ __('ui.navbar.home') }}</strong>
+                @php
+                    // One consistent treatment for every top-level link: an
+                    // underline that's always on for the active route, and
+                    // grows in from the left on hover for the rest — rather
+                    // than a bare color swap with nothing to mark where you
+                    // are versus what you're pointing at.
+                    $navLink = fn (bool $active) => 'group relative px-3 py-2 text-[15px] font-medium transition-colors '
+                        . ($active ? 'text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]');
+                    $navUnderline = fn (bool $active) => 'pointer-events-none absolute left-3 right-3 -bottom-[1px] h-[2px] bg-[#D4AF37] rounded-full transition-transform duration-300 origin-left '
+                        . ($active ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100');
+                @endphp
+
+                <a href="/" class="{{ $navLink(request()->is('/')) }}">
+                    {{ __('ui.navbar.home') }}
+                    <span class="{{ $navUnderline(request()->is('/')) }}"></span>
                 </a>
 
-                <a href="/vendors" class="{{ request()->is('vendors') ? 'text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]' }}">
-                    <strong>{{ __('ui.navbar.vendors') }}</strong>
+                <a href="/vendors" class="{{ $navLink(request()->is('vendors')) }}">
+                    {{ __('ui.navbar.vendors') }}
+                    <span class="{{ $navUnderline(request()->is('vendors')) }}"></span>
                 </a>
 
-                <a href="/services" class="{{ request()->is('services') ? 'text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]' }}">
-                    <strong>{{ __('filament.nav.services') }}</strong>
+                <a href="/services" class="{{ $navLink(request()->is('services')) }}">
+                    {{ __('filament.nav.services') }}
+                    <span class="{{ $navUnderline(request()->is('services')) }}"></span>
                 </a>
 
                 {{-- CATEGORIES MENU --}}
                 <div class="relative group">
-                    <button class="font-medium text-gray-700 group-hover:text-[#D4AF37]">
-                        <strong>{{ __('ui.navbar.categories') }}</strong>
+                    <button class="{{ $navLink(false) }}">
+                        {{ __('ui.navbar.categories') }}
+                        <span class="{{ $navUnderline(false) }}"></span>
+                        <i class="fa-solid fa-chevron-down text-[9px] ml-1 align-middle opacity-60 group-hover:rotate-180 transition-transform duration-200"></i>
                     </button>
 
-                    <div class="absolute left-0 top-full w-[750px] bg-white border rounded-lg shadow-xl
-                                opacity-0 invisible group-hover:opacity-100 group-hover:visible transition duration-200 z-50">
+                    <div class="absolute left-0 top-full pt-2 w-[750px] opacity-0 invisible translate-y-1
+                                group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-200 z-50">
+                        <div class="bg-white border border-gray-100 rounded-xl shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] overflow-hidden">
+                            <div class="flex">
 
-                        <div class="flex">
+                                {{-- LEFT FAMILIES --}}
+                                <div class="w-1/3 border-r border-gray-100 bg-gray-50/70">
+                                    <ul class="divide-y divide-gray-100">
+                                        @foreach ($families as $family)
+                                            @php $key = \Str::slug($family); @endphp
+                                            <li class="px-4 py-3 hover:bg-[#F5E6B3]/60 cursor-pointer
+                                                    text-sm font-medium text-gray-700 hover:text-[#96731A] transition-colors"
+                                                onmouseover="showSub('{{ $key }}')">
+                                                {{ $family }}
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
 
-                            {{-- LEFT FAMILIES --}}
-                            <div class="w-1/3 border-r bg-gray-50 rounded-l-lg">
-                                <ul class="divide-y">
-                                    @foreach ($families as $family)
-                                        @php $key = \Str::slug($family); @endphp
-                                        <li class="px-4 py-3 hover:bg-[#F5E6B3] cursor-pointer 
-                                                text-sm font-medium text-gray-700 hover:text-[#D4AF37]"
-                                            onmouseover="showSub('{{ $key }}')">
-                                            {{ $family }}
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            </div>
-
-                            {{-- RIGHT SUB MENU --}}
-                            <div class="w-2/3 p-5" id="temu-submenu">
-                                <h3 class="font-semibold text-gray-800 mb-3">Sélection</h3>
-                                <p class="text-sm text-gray-600">Passez la souris sur une catégorie…</p>
+                                {{-- RIGHT SUB MENU --}}
+                                <div class="w-2/3 p-5" id="temu-submenu">
+                                    <h3 class="font-semibold text-gray-800 mb-3">Sélection</h3>
+                                    <p class="text-sm text-gray-600">Passez la souris sur une catégorie…</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <a href="/products" class="{{ request()->is('products') ? 'text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]' }}">
-                    <strong>{{ __('ui.navbar.products') }}</strong>
+                <a href="/products" class="{{ $navLink(request()->is('products')) }}">
+                    {{ __('ui.navbar.products') }}
+                    <span class="{{ $navUnderline(request()->is('products')) }}"></span>
                 </a>
 
                 {{-- SOURCING — hover reveals every active specialty, same pattern as the language dropdown below --}}
                 <div class="relative group">
                     <a href="{{ route('sourcing.index') }}" wire:navigate
-                       class="{{ request()->routeIs('sourcing.*') ? 'text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]' }}">
-                        <strong>{{ __('ui.navbar.sourcing') }}</strong>
+                       class="{{ $navLink(request()->routeIs('sourcing.*')) }}">
+                        {{ __('ui.navbar.sourcing') }}
+                        <span class="{{ $navUnderline(request()->routeIs('sourcing.*')) }}"></span>
                     </a>
 
                     @if (!empty($sourcings))
-                        <div class="absolute left-0 mt-1 w-56 bg-white border rounded-md shadow-md opacity-0 invisible
-                                    group-hover:opacity-100 group-hover:visible transition duration-150 z-50">
-                            @foreach ($sourcings as $item)
-                                <a href="{{ route('sourcing.show', $item['slug']) }}" wire:navigate
-                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-[#F5E6B3] hover:text-[#D4AF37]">
-                                    {{ $item['title'] }}
-                                </a>
-                            @endforeach
+                        <div class="absolute left-0 top-full pt-2 w-56 opacity-0 invisible translate-y-1
+                                    group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-200 z-50">
+                            <div class="bg-white border border-gray-100 rounded-xl shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] overflow-hidden py-1">
+                                @foreach ($sourcings as $item)
+                                    <a href="{{ route('sourcing.show', $item['slug']) }}" wire:navigate
+                                       class="block px-4 py-2 text-sm text-gray-700 hover:bg-[#F5E6B3]/60 hover:text-[#96731A] transition-colors">
+                                        {{ $item['title'] }}
+                                    </a>
+                                @endforeach
+                            </div>
                         </div>
                     @endif
                 </div>
 
                 <a href="{{ route('blog.index') }}" wire:navigate
-                   class="{{ request()->routeIs('blog.*') ? 'text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]' }}">
-                    <strong>{{ __('ui.navbar.blog') }}</strong>
+                   class="{{ $navLink(request()->routeIs('blog.*')) }}">
+                    {{ __('ui.navbar.blog') }}
+                    <span class="{{ $navUnderline(request()->routeIs('blog.*')) }}"></span>
                 </a>
 
-                <a href="/#testimonials" class="text-gray-700 hover:text-[#D4AF37]">
-                    <strong>{{ __('ui.navbar.testimonials') }}</strong>
+                <a href="/#testimonials" class="{{ $navLink(false) }}">
+                    {{ __('ui.navbar.testimonials') }}
+                    <span class="{{ $navUnderline(false) }}"></span>
                 </a>
 
             </div>
@@ -158,7 +191,7 @@
 
                 {{-- LANGUAGE DROPDOWN --}}
                 <div class="relative group">
-                    <button class="flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-md bg-gray-100 text-gray-700 hover:bg-[#F5E6B3]">
+                    <button class="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md bg-gray-100 text-gray-700 hover:bg-[#F5E6B3]/70 transition-colors">
                         @switch($currentLocale)
                             @case('en') <span class="fi fi-us"></span> @break
                             @case('fr') <span class="fi fi-fr"></span> @break
@@ -166,53 +199,58 @@
                         @endswitch
 
                         {{ $currentLangLabel }}
-                        <i class="fa-solid fa-chevron-down text-[0.6rem]"></i>
+                        <i class="fa-solid fa-chevron-down text-[0.6rem] opacity-60"></i>
                     </button>
 
-                    <div class="absolute right-0 w-28 bg-white border rounded-md shadow-md opacity-0 invisible
-                                group-hover:opacity-100 group-hover:visible transition duration-150">
-
-                        <a href="{{ route('lang.switch','en') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]" wire:navigate.hover>
-                            <span class="fi fi-us"></span> EN
-                        </a>
-                        <a href="{{ route('lang.switch','fr') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]" wire:navigate.hover>
-                            <span class="fi fi-fr"></span> FR
-                        </a>
-                        <a href="{{ route('lang.switch','zh') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]" wire:navigate.hover>
-                            <span class="fi fi-cn"></span> 中文
-                        </a>
-
+                    <div class="absolute right-0 top-full pt-2 w-28 opacity-0 invisible translate-y-1
+                                group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-200">
+                        <div class="bg-white border border-gray-100 rounded-xl shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] overflow-hidden py-1">
+                            <a href="{{ route('lang.switch','en') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]/60 transition-colors" wire:navigate.hover>
+                                <span class="fi fi-us"></span> EN
+                            </a>
+                            <a href="{{ route('lang.switch','fr') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]/60 transition-colors" wire:navigate.hover>
+                                <span class="fi fi-fr"></span> FR
+                            </a>
+                            <a href="{{ route('lang.switch','zh') }}" class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#F5E6B3]/60 transition-colors" wire:navigate.hover>
+                                <span class="fi fi-cn"></span> 中文
+                            </a>
+                        </div>
                     </div>
                 </div>
                 {{-- LOGIN --}}
                 @guest
-                    <a href="/login" class="py-2 px-4 bg-[#D4AF37] text-white rounded-lg hover:bg-[#C9A227]">
+                    <a href="/login" class="py-2 px-5 bg-[#D4AF37] text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-[#C9A227] hover:shadow-md transition-all">
                         {{ __('ui.navbar.login') }}
                     </a>
                 @endguest
 
                 @auth
                     <div class="relative group">
-                        <button class="flex items-center text-gray-600 hover:text-[#D4AF37]">
-                            <i class="fa-solid fa-user text-xl"></i> {{ auth()->user()->name }}
+                        <button class="flex items-center gap-2 text-gray-600 hover:text-[#D4AF37] transition-colors">
+                            <span class="w-8 h-8 rounded-full bg-[#F5E6B3] text-[#96731A] flex items-center justify-center font-semibold text-sm">
+                                {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                            </span>
+                            <span class="text-sm font-medium max-w-[9rem] truncate">{{ auth()->user()->name }}</span>
                         </button>
-                        <div class="absolute right-0 bg-white shadow-md rounded-lg w-40 hidden group-hover:block z-50">
+                        <div class="absolute right-0 top-full pt-2 w-48 opacity-0 invisible translate-y-1
+                                    group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-200 z-50">
+                        <div class="bg-white border border-gray-100 rounded-xl shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] overflow-hidden py-1">
                             <a href="/orders"
-                            class="block px-4 py-2 text-gray-700 hover:bg-[#F5E6B3]">
-                                <i class="fa-solid fa-box"></i> {{ __('ui.navbar.my_orders') }}
+                            class="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5E6B3]/60 transition-colors">
+                                <i class="fa-solid fa-box w-4 text-center mr-2.5 text-gray-400"></i> {{ __('ui.navbar.my_orders') }}
                             </a>
                             <a href="{{ route('my.addresses') }}"
-                            class="block px-4 py-2 text-gray-700 hover:bg-[#F5E6B3]">
-                                <i class="fa-solid fa-location-dot"></i> My Addresses
+                            class="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5E6B3]/60 transition-colors">
+                                <i class="fa-solid fa-location-dot w-4 text-center mr-2.5 text-gray-400"></i> Mes adresses
                             </a>
                             <a href="{{ route('quotes.mine') }}" wire:navigate
-                            class="block px-4 py-2 text-gray-700 hover:bg-[#F5E6B3]">
-                                <i class="fa-solid fa-file-invoice"></i> {{ __('sourcing.my_quotes') }}
+                            class="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5E6B3]/60 transition-colors">
+                                <i class="fa-solid fa-file-invoice w-4 text-center mr-2.5 text-gray-400"></i> {{ __('sourcing.my_quotes') }}
                             </a>
 
                             @if ($role == 'customer')
-                                <a class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" href="{{ route('chats') }}">
-                                    <i class="fa-solid fa-comments"></i> {{ __('ui.navbar.my_chats') }}
+                                <a class="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5E6B3]/60 transition-colors" href="{{ route('chats') }}">
+                                    <i class="fa-solid fa-comments w-4 text-center mr-2.5 text-gray-400"></i> {{ __('ui.navbar.my_chats') }}
                                 </a>
                             @endif
                             {{-- Commented out until now, which left a buyer with no way back
@@ -228,8 +266,8 @@
                                  hébergement, donc le statut peut rester « quoted » après
                                  l'échéance. --}}
                             <a href="{{ route('user.rfqs') }}"
-                                class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100">
-                                <i class="fas fa-comments-dollar mr-3 text-[#D4AF37]"></i>
+                                class="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5E6B3]/60 transition-colors">
+                                <i class="fas fa-comments-dollar w-4 text-center mr-2.5 text-gray-400"></i>
                                 Mes négociations
                                 @php
                                     $pendingCount = \App\Models\BulkRfq::where('user_id', auth()->id())
@@ -243,32 +281,34 @@
                                         ->count();
                                 @endphp
                                 @if($pendingCount > 0)
-                                    <span class="ml-auto bg-[#D4AF37] text-white text-xs rounded-full px-2 py-1">
+                                    <span class="ml-auto bg-[#D4AF37] text-white text-xs rounded-full px-2 py-0.5">
                                         {{ $pendingCount }}
                                     </span>
                                 @endif
                             </a>
                             @if ($role == 'vendor')
                                 <a href="/vendor" target="_blank"
-                                class="block px-4 py-2 text-gray-700 hover:bg-[#F5E6B3]">
-                                    <i class="fa-solid fa-gauge"></i>Dashboard
+                                class="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5E6B3]/60 transition-colors">
+                                    <i class="fa-solid fa-gauge w-4 text-center mr-2.5 text-gray-400"></i>Dashboard
                                 </a>
                             @elseif ($role == 'manager')
                                 <a href="/admin" target="_blank"
-                                class="block px-4 py-2 text-gray-700 hover:bg-[#F5E6B3]">
-                                    <i class="fa-solid fa-gauge"></i> Dashboard
+                                class="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5E6B3]/60 transition-colors">
+                                    <i class="fa-solid fa-gauge w-4 text-center mr-2.5 text-gray-400"></i> Dashboard
                                 </a>
                             @elseif ($role == 'admin')
                                 <a href="/admin" target="_blank"
-                                class="block px-4 py-2 text-gray-700 hover:bg-[#F5E6B3]">
-                                    <i class="fa-solid fa-gauge"></i> Dashboard
-                                </a> 
+                                class="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5E6B3]/60 transition-colors">
+                                    <i class="fa-solid fa-gauge w-4 text-center mr-2.5 text-gray-400"></i> Dashboard
+                                </a>
                             @endif
 
+                            <div class="border-t border-gray-100 my-1"></div>
+
                             <a href="/logout"
-                            class="block px-4 py-2 text-gray-700 hover:bg-[#F5E6B3]"
+                            class="flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                             onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                                <i class="fa-solid fa-right-from-bracket"></i> {{ __('ui.navbar.logout') }}
+                                <i class="fa-solid fa-right-from-bracket w-4 text-center mr-2.5"></i> {{ __('ui.navbar.logout') }}
                             </a>
                             <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">
                                 @csrf
@@ -449,7 +489,7 @@
                             {{ __('ui.navbar.my_orders') }}
                         </a>
                         <a href="{{ route('my.addresses') }}" class="flex items-center px-4 py-2 text-gray-700 hover:bg-[#F5E6B3] rounded-lg transition-colors">
-                            <i class="fa-solid fa-location-dot w-6 text-center mr-3"></i> My Addresses
+                            <i class="fa-solid fa-location-dot w-6 text-center mr-3"></i> Mes adresses
                         </a>
                         <a href="{{ route('quotes.mine') }}" wire:navigate class="flex items-center px-4 py-2 text-gray-700 hover:bg-[#F5E6B3] rounded-lg transition-colors">
                             <i class="fa-solid fa-file-invoice w-6 text-center mr-3"></i>

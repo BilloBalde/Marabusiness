@@ -7,7 +7,7 @@ use Livewire\Component;
 
 use Livewire\Attributes\Title;
 
-#[Title('Forgot Password Page - ECPG SA')]
+#[Title('Mot de passe oublié - MARA BUSINESS')]
 class ForgotPage extends Component
 {
     public $email;

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorProduct;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -95,6 +96,8 @@ class CheckoutOversellRaceTest extends TestCase
     #[Test]
     public function placing_an_order_succeeds_and_decrements_stock_exactly_once_when_stock_is_sufficient(): void
     {
+        Mail::fake();
+
         $currency = Currency::factory()->create(['code' => 'GNF', 'rate_to_usd' => 0.00012]);
         $vendor = Vendor::factory()->create(['currency_id' => $currency->id, 'is_active' => true]);
 
@@ -138,5 +141,9 @@ class CheckoutOversellRaceTest extends TestCase
 
         $this->assertSame(1, Order::count());
         $this->assertSame(3, $vendorProduct->fresh()->stock);
+
+        // Sent after the response now, not inline — it must still be sent.
+        $this->app->terminate();
+        Mail::assertSent(\App\Mail\OrderPlaced::class, fn ($mail) => $mail->hasTo($buyer->email));
     }
 }

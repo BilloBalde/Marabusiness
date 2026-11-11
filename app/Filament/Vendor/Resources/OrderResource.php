@@ -7,6 +7,7 @@ use App\Filament\Vendor\Resources\OrderResource\Pages;
 use App\Models\Order;
 use App\Models\Paiement;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class OrderResource extends BaseOrderResource
 {
@@ -22,7 +23,31 @@ class OrderResource extends BaseOrderResource
             ->when(!$vendorId, fn (Builder $query) => $query->whereRaw('1 = 0'));
     }
 
+    /**
+     * A vendor moves an order along; what the buyer agreed to stays as agreed.
+     * See BaseOrderResource::locksAgreedTerms().
+     */
+    protected static function locksAgreedTerms(): bool
+    {
+        return true;
+    }
+
     public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    /**
+     * An order is also the customer's and the platform's record — payments, invoices
+     * and the commission ledger hang off it. A vendor could delete their own orders,
+     * one by one or in bulk, whatever had been paid on them.
+     */
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
     {
         return false;
     }

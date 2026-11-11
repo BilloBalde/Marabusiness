@@ -254,29 +254,28 @@
                     <div>
                         <h3 class="font-semibold text-gray-900 mb-3">Identité du prestataire</h3>
                         <div class="bg-gray-50 p-4 rounded-xl space-y-2 text-sm">
-                            <p><span class="font-medium">Nom :</span> MARA BUSINESS SARL</p>
-                            <p><span class="font-medium">Forme juridique :</span> Société à responsabilité limitée</p>
-                            <p><span class="font-medium">Capital :</span> 5 000 000 FCFA</p>
-                            <p><span class="font-medium">RCCM :</span> SN-DKR-2020-B-12345</p>
-                            <p><span class="font-medium">NINEA :</span> 123456789</p>
+                            {{-- Every line below comes from config/company.php; an empty value is left out. --}}
+                            <p><span class="font-medium">Nom :</span> {{ \App\Support\Company::get('name') ?? config('app.name') }}</p>
+                            @foreach(['Forme juridique' => 'legal_form', 'Capital' => 'capital', 'RCCM' => 'registration', 'NIF' => 'tax_id'] as $label => $key)
+                                @if($value = \App\Support\Company::get($key))
+                                <p><span class="font-medium">{{ $label }} :</span> {{ $value }}</p>
+                                @endif
+                            @endforeach
                         </div>
                     </div>
                     
                     <div>
                         <h3 class="font-semibold text-gray-900 mb-3">Coordonnées</h3>
                         <div class="bg-gray-50 p-4 rounded-xl space-y-2 text-sm">
-                            <p><span class="font-medium">Adresse :</span> 123 Rue Principale, Dakar, Sénégal</p>
-                            <p><span class="font-medium">Email :</span> contact@marabusiness.com</p>
-                            <p><span class="font-medium">Téléphone :</span> +221 78 123 45 67</p>
-                            <p><span class="font-medium">Représentant légal :</span> M. Amadou Diallo</p>
+                            @foreach(['Adresse' => 'address', 'Email' => 'email', 'Téléphone' => 'phone', 'Représentant légal' => 'legal_representative'] as $label => $key)
+                                @if($value = \App\Support\Company::get($key))
+                                <p><span class="font-medium">{{ $label }} :</span> {{ $value }}</p>
+                                @endif
+                            @endforeach
                         </div>
                     </div>
                 </div>
                 
-                <div class="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
-                    <i class="fas fa-info-circle mr-2"></i>
-                    <span class="font-semibold">Représentant DSA dans l'UE :</span> Conformément à l'article 13 du DSA, notre représentant désigné est DSArep SARL, 15 Rue de la Loi, 75008 Paris, France - dsa@marabusiness.eu
-                </div>
             </div>
 
             <!-- Section 2: Signalement de contenus illicites -->
@@ -590,13 +589,9 @@
                         <div class="space-y-3">
                             <div class="flex items-center gap-3">
                                 <i class="fas fa-envelope text-[#D4AF37] w-5"></i>
-                                <a href="mailto:dsa@marabusiness.com" class="text-gray-700 hover:text-[#D4AF37]">dsa@marabusiness.com</a>
+                                <x-company-contact type="email" class="text-gray-700 hover:text-[#D4AF37]" />
                             </div>
                             
-                            <div class="flex items-center gap-3">
-                                <i class="fas fa-phone-alt text-[#D4AF37] w-5"></i>
-                                <a href="tel:+33123456789" class="text-gray-700 hover:text-[#D4AF37]">+33 1 23 45 67 89</a>
-                            </div>
                             
                             <div class="flex items-center gap-3">
                                 <i class="fas fa-globe text-[#D4AF37] w-5"></i>
@@ -605,13 +600,6 @@
                         </div>
                     </div>
                     
-                    <div class="bg-gray-50 p-5 rounded-xl">
-                        <h3 class="font-semibold text-gray-900 mb-3">Notre représentant DSA</h3>
-                        <p class="text-sm text-gray-700 mb-2">M. Jean Dupont</p>
-                        <p class="text-sm text-gray-600 mb-1">Responsable conformité DSA</p>
-                        <p class="text-sm text-[#D4AF37] mb-1">j.dupont@marabusiness.com</p>
-                        <p class="text-sm text-gray-600">+33 6 12 34 56 78</p>
-                    </div>
                 </div>
             </div>
 

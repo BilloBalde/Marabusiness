@@ -70,6 +70,27 @@ class ChatApiTest extends TestCase
     }
 
     #[Test]
+    public function a_shop_owner_who_ordered_from_their_own_shop_is_not_their_own_contact(): void
+    {
+        [$owner, $vendor] = $this->vendorUser();
+        $buyer = $this->customer();
+
+        Order::factory()->create(['user_id' => $owner->id, 'vendor_id' => $vendor->id]);
+        Order::factory()->create(['user_id' => $buyer->id, 'vendor_id' => $vendor->id]);
+
+        Sanctum::actingAs($owner);
+
+        $this->getJson('/api/v1/chats')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $buyer->id);
+
+        $this->getJson("/api/v1/chats/{$owner->id}")
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Vous ne pouvez pas discuter avec vous-même.');
+    }
+
+    #[Test]
     public function a_buyer_does_not_see_a_vendor_they_never_ordered_from(): void
     {
         $this->vendorUser();

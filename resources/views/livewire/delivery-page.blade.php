@@ -398,10 +398,12 @@
                 </div>
             </div>
             
+            @if($phone = \App\Support\Company::get('phone'))
             <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
                 <i class="fas fa-phone-alt mr-2"></i>
-                Assistance livraison : +221 78 123 45 67
+                Assistance livraison : {{ $phone }}
             </div>
+            @endif
         </div>
 
         <!-- Section 8: FAQ Rapide -->

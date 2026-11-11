@@ -32,9 +32,7 @@ class ApiProductsPageController extends Controller
                 ->whereHas('product', function($q) {
                     $q->where('is_active', 1);
                 })
-                ->whereHas('vendor', function($q) {
-                    $q->where('is_active', true);
-                });
+                ->sellable();
 
             // SEARCH
             if (!empty($search)) {

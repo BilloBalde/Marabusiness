@@ -71,6 +71,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Utilisée pour pré-remplir votre adresse de livraison lors du paiement.</string>
 	<key>CFBundleURLTypes</key>
 <array>
     <dict>

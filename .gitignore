@@ -28,3 +28,9 @@ yarn-error.log
 # Flutter web build served from Laravel for browser testing. A build artifact,
 # rebuilt on demand from mara_business_mobile_new; never part of the source.
 /public/app
+
+# macOS
+.DS_Store
+
+# Agent worktrees are full copies of the project, vendor/ included
+/.claude/worktrees

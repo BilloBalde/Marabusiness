@@ -436,7 +436,7 @@
                     </div>
                     
                     <p class="text-sm text-gray-600 mt-2">
-                        Pour demander une autorisation : <a href="mailto:ip@marabusiness.com" class="text-[#D4AF37] hover:underline">ip@marabusiness.com</a>
+                        Pour demander une autorisation : <x-company-contact type="email" class="text-[#D4AF37] hover:underline" />
                     </p>
                 </div>
             </div>
@@ -472,8 +472,10 @@
                             
                             <div class="bg-white p-4 rounded-lg border border-gray-200 mt-4">
                                 <p class="font-medium">Envoyez à :</p>
-                                <p class="text-[#D4AF37]">legal@marabusiness.com</p>
-                                <p class="text-xs text-gray-500 mt-1">Ou par courrier : MARA BUSINESS - Service Juridique, 123 Rue Principale, Dakar, Sénégal</p>
+                                <p class="text-[#D4AF37]"><x-company-contact type="email" /></p>
+                                @if($address = \App\Support\Company::get('address'))
+                                <p class="text-xs text-gray-500 mt-1">Ou par courrier : {{ \App\Support\Company::get('name') ?? config('app.name') }} - Service Juridique, {{ $address }}</p>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -501,27 +503,28 @@
                         <div class="space-y-3">
                             <div class="flex items-center gap-3">
                                 <i class="fas fa-envelope text-[#D4AF37] w-5"></i>
-                                <a href="mailto:ip@marabusiness.com" class="text-gray-700 hover:text-[#D4AF37]">ip@marabusiness.com</a>
+                                <x-company-contact type="email" class="text-gray-700 hover:text-[#D4AF37]" />
                             </div>
                             
+                            @if($phone = \App\Support\Company::get('phone'))
                             <div class="flex items-center gap-3">
                                 <i class="fas fa-phone-alt text-[#D4AF37] w-5"></i>
-                                <a href="tel:+221781234567" class="text-gray-700 hover:text-[#D4AF37]">+221 78 123 45 67</a>
+                                <a href="tel:{{ \App\Support\Company::digits($phone) }}" class="text-gray-700 hover:text-[#D4AF37]">{{ $phone }}</a>
                             </div>
+                            @endif
                             
+                            @if($address = \App\Support\Company::get('address'))
                             <div class="flex items-center gap-3">
                                 <i class="fas fa-map-marker-alt text-[#D4AF37] w-5"></i>
-                                <span class="text-gray-700">123 Rue Principale, Dakar, Sénégal</span>
+                                <span class="text-gray-700">{{ $address }}</span>
                             </div>
+                            @endif
                         </div>
                     </div>
                     
                     <div class="bg-gray-50 p-6 rounded-xl">
                         <h3 class="font-semibold text-gray-900 mb-3">Responsable IP</h3>
-                        <p class="text-sm text-gray-700 mb-2">Me. Amadou Diallo</p>
-                        <p class="text-sm text-gray-600 mb-1">Conseil en Propriété Industrielle</p>
-                        <p class="text-sm text-[#D4AF37] mb-1">a.diallo@marabusiness.com</p>
-                        <p class="text-sm text-gray-600">+221 78 987 65 43</p>
+                        <p class="text-sm text-[#D4AF37] mb-1"><x-company-contact type="email" class="text-[#D4AF37] hover:underline" /></p>
                     </div>
                 </div>
             </div>
@@ -544,10 +547,12 @@
                 <i class="fas fa-exclamation-triangle"></i>
                 Signaler une infraction
             </a>
-            <a href="mailto:ip@marabusiness.com" class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-transparent hover:bg-white/10 text-white border-2 border-white/30 font-bold rounded-xl transition-all duration-300">
+            @if($email = \App\Support\Company::get('email'))
+            <a href="mailto:{{ $email }}" class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-transparent hover:bg-white/10 text-white border-2 border-white/30 font-bold rounded-xl transition-all duration-300">
                 <i class="fas fa-envelope"></i>
-                ip@marabusiness.com
+                {{ $email }}
             </a>
+            @endif
         </div>
     </div>
 </div>

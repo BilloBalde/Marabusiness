@@ -1,4 +1,14 @@
 <div>{{-- livewire-root : Livewire n'accepte qu'un seul element racine --}}
+{{-- Contact details come from the site settings the owner fills in the admin panel.
+     This footer used to print an invented phone number, a "Trustpilot 4.5/5 (2,500+
+     reviews)" rating, "Verified" and "SSL" badges, and two store buttons pointing at
+     "#". A block whose setting is empty is left out. --}}
+@php
+    $footerPhone = \App\Helpers\SiteSettings::get('contact_phone');
+    $footerHours = array_values(array_filter(array_map('trim', preg_split('/\R/', (string) \App\Helpers\SiteSettings::get('business_hours')))));
+    $playStoreUrl = \App\Helpers\SiteSettings::get('play_store_url');
+    $appStoreUrl = \App\Helpers\SiteSettings::get('app_store_url');
+@endphp
 <footer class="w-full bg-gray-900 text-gray-300">
     <!-- Main Footer -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
@@ -132,42 +142,33 @@
             
             <!-- Column 3: Télécharger l'app & Paiements -->
             <div>
+                @if($playStoreUrl || $appStoreUrl)
                 <h3 class="font-bold text-white mb-4 text-sm uppercase tracking-wider flex items-center">
                     <i class="fas fa-mobile-alt text-[#D4AF37] mr-2 text-base"></i>
                     Téléchargez l'app
                 </h3>
-                <div class="space-y-3 mb-6">
-                    <div class="flex items-center gap-2 text-sm text-gray-400 mb-2 bg-gray-800/50 p-2 rounded-lg">
-                        <i class="fas fa-bell text-[#D4AF37]"></i>
-                        <span>Alertes de baisse de prix</span>
-                    </div>
-                    <div class="flex items-center gap-2 text-sm text-gray-400 mb-2 bg-gray-800/50 p-2 rounded-lg">
-                        <i class="fas fa-bolt text-[#D4AF37]"></i>
-                        <span>Paiement plus rapide</span>
-                    </div>
-                    <div class="flex items-center gap-2 text-sm text-gray-400 mb-4 bg-gray-800/50 p-2 rounded-lg">
-                        <i class="fas fa-gem text-[#D4AF37]"></i>
-                        <span>Offres exclusives</span>
-                    </div>
-                    
-                    <div class="flex flex-col gap-2">
-                        <a href="#" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition w-full border border-gray-700 group">
-                            <i class="fab fa-google-play mr-3 text-[#D4AF37] text-lg"></i>
-                            <div class="flex flex-col items-start">
-                                <span class="text-xs text-gray-400">Disponible sur</span>
-                                <span class="text-sm font-semibold group-hover:text-[#D4AF37]">Google Play</span>
-                            </div>
-                        </a>
-                        <a href="#" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition w-full border border-gray-700 group">
-                            <i class="fab fa-apple mr-3 text-[#D4AF37] text-lg"></i>
-                            <div class="flex flex-col items-start">
-                                <span class="text-xs text-gray-400">Télécharger sur</span>
-                                <span class="text-sm font-semibold group-hover:text-[#D4AF37]">App Store</span>
-                            </div>
-                        </a>
-                    </div>
+                <div class="flex flex-col gap-2 mb-6">
+                    @if($playStoreUrl)
+                    <a href="{{ $playStoreUrl }}" target="_blank" rel="noopener" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition w-full border border-gray-700 group">
+                        <i class="fab fa-google-play mr-3 text-[#D4AF37] text-lg"></i>
+                        <div class="flex flex-col items-start">
+                            <span class="text-xs text-gray-400">Disponible sur</span>
+                            <span class="text-sm font-semibold group-hover:text-[#D4AF37]">Google Play</span>
+                        </div>
+                    </a>
+                    @endif
+                    @if($appStoreUrl)
+                    <a href="{{ $appStoreUrl }}" target="_blank" rel="noopener" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition w-full border border-gray-700 group">
+                        <i class="fab fa-apple mr-3 text-[#D4AF37] text-lg"></i>
+                        <div class="flex flex-col items-start">
+                            <span class="text-xs text-gray-400">Télécharger sur</span>
+                            <span class="text-sm font-semibold group-hover:text-[#D4AF37]">App Store</span>
+                        </div>
+                    </a>
+                    @endif
                 </div>
-                
+                @endif
+
                 <h3 class="font-bold text-white mb-4 text-sm uppercase tracking-wider flex items-center">
                     <i class="fas fa-credit-card text-[#D4AF37] mr-2 text-base"></i>
                     Paiements acceptés
@@ -188,56 +189,39 @@
                 </h3>
                 
                 <div class="space-y-4">
-                    <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-                        <div class="flex items-center gap-3 mb-3">
+                    @if($footerPhone || $footerHours)
+                    <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700 space-y-3">
+                        @if($footerPhone)
+                        <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-full bg-[#D4AF37]/20 flex items-center justify-center">
                                 <i class="fas fa-phone-alt text-[#D4AF37]"></i>
                             </div>
                             <div>
                                 <p class="text-xs text-gray-400">Service client</p>
-                                <p class="text-white font-semibold">+221 78 123 45 67</p>
+                                <a href="tel:{{ preg_replace('/[^\d+]/', '', $footerPhone) }}" class="text-white font-semibold">{{ $footerPhone }}</a>
                             </div>
                         </div>
+                        @endif
+                        @if($footerHours)
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-full bg-[#D4AF37]/20 flex items-center justify-center">
                                 <i class="fas fa-clock text-[#D4AF37]"></i>
                             </div>
                             <div>
                                 <p class="text-xs text-gray-400">Disponibilité</p>
-                                <p class="text-white text-sm">Lun-Ven: 8h-20h</p>
-                                <p class="text-white text-sm">Sam: 9h-18h</p>
+                                @foreach($footerHours as $line)
+                                    <p class="text-white text-sm">{{ $line }}</p>
+                                @endforeach
                             </div>
                         </div>
+                        @endif
                     </div>
-                    
-                    <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-                        <h4 class="text-white text-sm font-semibold mb-2 flex items-center">
-                            <i class="fas fa-shield-alt text-[#D4AF37] mr-2"></i>
-                            Certifications
-                        </h4>
-                        <div class="flex flex-wrap gap-2">
-                            <div class="flex items-center gap-1 text-xs text-gray-400 bg-gray-900 px-2 py-1 rounded">
-                                <i class="fas fa-lock text-green-500"></i>
-                                <span>SSL Secure</span>
-                            </div>
-                            <div class="flex items-center gap-1 text-xs text-gray-400 bg-gray-900 px-2 py-1 rounded">
-                                <i class="fas fa-star text-yellow-500"></i>
-                                <span>Trustpilot</span>
-                            </div>
-                            <div class="flex items-center gap-1 text-xs text-gray-400 bg-gray-900 px-2 py-1 rounded">
-                                <i class="fas fa-check-circle text-green-500"></i>
-                                <span>Verified</span>
-                            </div>
-                        </div>
-                        <div class="mt-3 flex items-center gap-2">
-                            <div class="flex">
-                                @for($i=1; $i<=5; $i++)
-                                    <i class="fas fa-star text-yellow-500 text-xs"></i>
-                                @endfor
-                            </div>
-                            <span class="text-xs text-gray-400">4.5/5 (2,500+ avis)</span>
-                        </div>
-                    </div>
+                    @endif
+
+                    <a href="/contact" class="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-[#D4AF37] transition">
+                        <i class="fas fa-envelope text-[#D4AF37]"></i>
+                        Nous écrire
+                    </a>
                 </div>
             </div>
         </div>

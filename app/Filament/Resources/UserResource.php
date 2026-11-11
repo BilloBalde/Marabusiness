@@ -62,6 +62,31 @@ class UserResource extends Resource
         return $query;
     }
 
+    /**
+     * The roles the signed-in staff member may give to an account, as [name => name]:
+     * an admin any of them, a manager only vendor and customer. Anyone else — who cannot
+     * reach this resource anyway — gets none.
+     *
+     * Used both to fill the role field and to refuse a role that was not on offer, so the
+     * two can never disagree.
+     *
+     * @return array<string, string>
+     */
+    public static function assignableRoles(): array
+    {
+        $user = Filament::auth()->user();
+
+        if ($user?->hasRole('admin')) {
+            return Role::query()->pluck('name', 'name')->all();
+        }
+
+        if ($user?->hasRole('manager')) {
+            return Role::query()->whereIn('name', ['vendor', 'customer'])->pluck('name', 'name')->all();
+        }
+
+        return [];
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -97,23 +122,12 @@ class UserResource extends Resource
                 
                 Select::make('role')
                     ->label('Role')
-                    ->options(function () {
-                        $query = Role::query();
-                        
-                        // Get the authenticated user using Filament's auth
-                        $authUser = Filament::auth()->user();
-                        
-                        if ($authUser->hasRole('admin')) {
-                            // Admin can see all roles
-                            return $query->pluck('name', 'name');
-                        } elseif ($authUser->hasRole('manager')) {
-                            // Manager can only assign vendor and customer roles
-                            return $query->whereIn('name', ['vendor', 'customer'])->pluck('name', 'name');
-                        } else {
-                            // For other roles, hide admin
-                            return $query->where('name', '!=', 'admin')->pluck('name', 'name');
-                        }
-                    })
+                    ->options(fn () => static::assignableRoles())
+                    // A Select does not turn its options into a validation rule, and
+                    // EditUser/CreateUser read the role back from the raw form state: without
+                    // this a manager could submit "admin" for any account (and set its
+                    // password in the same form).
+                    ->in(fn () => array_keys(static::assignableRoles()))
                     ->default(fn (?User $record) => $record?->roles()->pluck('name')->first())
                     ->required()
                     ->searchable(),

@@ -20,6 +20,11 @@ class Order {
   final String? carrier;
   final DateTime? estimatedDelivery;
   final List<OrderItem> items;
+  // The list endpoint sends this count without the items themselves (a
+  // perf tradeoff for the list view); the detail endpoint sends the items
+  // and this falls back to items.length. Read this instead of items.length
+  // directly, or a list-sourced Order silently shows 0.
+  final int itemsCount;
   final Address? shippingAddress;
   final Payment? lastPayment;
   final Shipment? latestShipment; // Add this field
@@ -69,6 +74,7 @@ class Order {
     this.carrier,
     this.estimatedDelivery,
     required this.items,
+    required this.itemsCount,
     this.shippingAddress,
     this.lastPayment,
     this.latestShipment, // Add this
@@ -127,6 +133,7 @@ class Order {
           ? DateTime.parse(json['estimated_delivery']) 
           : null,
       items: items,
+      itemsCount: json['items_count'] ?? items.length,
       shippingAddress: json['shipping_address'] != null
           ? Address.fromJson(json['shipping_address'])
           : (json['address'] != null ? Address.fromJson(json['address']) : null),

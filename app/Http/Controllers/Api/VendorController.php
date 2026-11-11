@@ -150,7 +150,7 @@ class VendorController extends Controller
     public function products($vendorId, Request $request)
     {
         try {
-            $vendor = Vendor::findOrFail($vendorId);
+            $vendor = Vendor::where('is_active', true)->findOrFail($vendorId);
 
             $products = $this->getVendorProducts($vendor, $request);
 
@@ -159,6 +159,8 @@ class VendorController extends Controller
                 'data' => $products,
                 'message' => 'Vendor products retrieved successfully'
             ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'message' => 'Vendor not found'], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -174,7 +176,7 @@ class VendorController extends Controller
     public function reviews($vendorId, Request $request)
     {
         try {
-            $vendor = Vendor::findOrFail($vendorId);
+            $vendor = Vendor::where('is_active', true)->findOrFail($vendorId);
 
             $reviews = $this->getVendorReviews($vendor, $request);
 
@@ -183,6 +185,8 @@ class VendorController extends Controller
                 'data' => $reviews,
                 'message' => 'Vendor reviews retrieved successfully'
             ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'message' => 'Vendor not found'], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -369,15 +373,16 @@ class VendorController extends Controller
     public function stats($vendorId)
     {
         try {
-            $vendor = Vendor::findOrFail($vendorId);
+            $vendor = Vendor::where('is_active', true)->findOrFail($vendorId);
 
+            // Public, unauthenticated numbers about a shop's storefront — not the shop's
+            // finances. order count and grand_total sum were published here to anyone,
+            // mixed currencies and all, and this endpoint has no caller in the mobile app.
             $stats = [
-                'total_products' => $vendor->vendorProducts()->count(),
-                'total_orders' => $vendor->orders()->count(),
+                'total_products' => $vendor->vendorProducts()->sellable()->count(),
                 'total_reviews' => $vendor->approvedVendorReviews()->count(),
                 'average_rating' => $vendor->vendor_rating,
                 'total_followers' => $vendor->followers()->count(),
-                'total_sales' => $vendor->orders()->sum('grand_total'),
             ];
 
             return response()->json([
@@ -385,6 +390,8 @@ class VendorController extends Controller
                 'data' => $stats,
                 'message' => 'Vendor stats retrieved successfully'
             ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'message' => 'Vendor not found'], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -560,7 +567,7 @@ public function userVendorStatus()
                 $validator = Validator::make($request->all(), [
                     'name' => 'required|string|max:255',
                     'email' => 'required|email|unique:users',
-                    'password' => 'required|string|min:6|confirmed',
+                    'password' => 'required|string|min:8|confirmed',
                 ]);
                 
                 if ($validator->fails()) {

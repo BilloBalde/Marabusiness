@@ -120,7 +120,11 @@ class User extends Authenticatable implements FilamentUser
     public function canAccessPanel(Panel $panel): bool
     {
         return match ($panel->getId()) {
-            'vendor' => $this->hasRole('vendor') && $this->vendor()->exists(),
+            // Applying to sell assigns the 'vendor' role on the spot, with the shop
+            // created is_active=false. The role and a shop row are not approval:
+            // only an active shop opens the panel, and deactivating a vendor later
+            // closes it again.
+            'vendor' => $this->hasRole('vendor') && $this->vendor()->where('is_active', true)->exists(),
             default => $this->hasAnyRole(['admin', 'manager']),
         };
     }

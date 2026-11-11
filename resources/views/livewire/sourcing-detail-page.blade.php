@@ -22,7 +22,7 @@
         {{-- DESCRIPTION --}}
         @if ($sourcing->description_text)
             <div class="bg-white rounded-xl border border-gray-200 p-6 mb-8 prose max-w-none">
-                {!! $sourcing->description_text !!}
+                {!! \App\Support\HtmlSanitizer::clean($sourcing->description_text) !!}
             </div>
         @endif
 

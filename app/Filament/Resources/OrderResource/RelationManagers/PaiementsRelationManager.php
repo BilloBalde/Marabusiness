@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\OrderResource\RelationManagers;
 
+use App\Models\Paiement;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Tables;
@@ -16,18 +17,49 @@ class PaiementsRelationManager extends RelationManager
 {
     protected static string $relationship = 'paiements';
 
+    private const METHOD_LABELS = [
+        'cash' => 'Cash',
+        'stripe' => 'Stripe',
+        'paypal' => 'PayPal',
+        'cod' => 'Cash on Delivery',
+        'om' => 'Orange Money',
+    ];
+
+    /** Platform staff (admin, manager) may record any payment. */
+    private function isStaff(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'manager']) ?? false;
+    }
+
+    /**
+     * May the signed-in person enter, edit, confirm or remove this payment row?
+     *
+     * Card and gateway money (Stripe, LengoPay) is collected by the platform and
+     * verified by the gateway itself. A vendor could add a "Stripe" row here — counted
+     * as confirmed on the spot — and have the order marked paid, and its commission
+     * and payout entries processed, for money that never arrived. A vendor's part is
+     * the money that changes hands outside the platform (cash, cash on delivery,
+     * Orange Money), which Paiement::OFFLINE_METHODS names.
+     */
+    private function canHandle(?Paiement $payment = null): bool
+    {
+        if ($this->isStaff()) {
+            return true;
+        }
+
+        $method = $payment?->payment_method ?? $this->getOwnerRecord()->payment_method;
+
+        return in_array($method, Paiement::OFFLINE_METHODS, true);
+    }
+
     public function form(Form $form): Form
     {
         return $form->schema([
             Select::make('payment_method')
                 ->required()
-                ->options([
-                    'cash' => 'Cash',
-                    'stripe' => 'Stripe',
-                    'paypal' => 'PayPal',
-                    'cod' => 'Cash on Delivery',
-                    'om' => 'Orange Money',
-                ]),
+                ->options(fn (): array => $this->isStaff()
+                    ? self::METHOD_LABELS
+                    : array_intersect_key(self::METHOD_LABELS, array_flip(Paiement::OFFLINE_METHODS))),
 
             TextInput::make('amount')
                 ->numeric()
@@ -81,6 +113,7 @@ class PaiementsRelationManager extends RelationManager
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
+                    ->visible(fn (): bool => $this->canHandle())
                     // Recorded from the back office by someone who has the money in
                     // hand, so it counts immediately — unlike a buyer's declaration.
                     ->mutateFormDataUsing(function (array $data): array {
@@ -102,7 +135,7 @@ class PaiementsRelationManager extends RelationManager
                     ->label('Confirmer la réception')
                     ->icon('heroicon-o-banknotes')
                     ->color('success')
-                    ->visible(fn ($record) => ! $record->isConfirmed())
+                    ->visible(fn ($record) => ! $record->isConfirmed() && $this->canHandle($record))
                     ->requiresConfirmation()
                     ->modalHeading('Confirmer la réception du paiement')
                     ->modalDescription(fn ($record) => "Confirmez avoir reçu {$record->amount} {$record->currency} "
@@ -120,12 +153,14 @@ class PaiementsRelationManager extends RelationManager
                     }),
 
                 Tables\Actions\EditAction::make()
+                    ->visible(fn ($record): bool => $this->canHandle($record))
                     ->after(function ($record, $livewire) {
                         $this->updateOrderTotals($livewire->ownerRecord);
                         $this->refreshForm($livewire);
                     }),
 
                 Tables\Actions\DeleteAction::make()
+                    ->visible(fn ($record): bool => $this->canHandle($record))
                     ->after(function ($record, $livewire) {
                         $this->updateOrderTotals($livewire->ownerRecord);
                         $this->refreshForm($livewire);

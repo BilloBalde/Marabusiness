@@ -4,13 +4,10 @@ namespace App\Livewire;
 
 use App\Models\Order;
 use App\Models\Paiement;
-use App\Support\PaymentReconciliation;
+use App\Services\StripePaymentRecorder;
+use App\Support\StripeSessions;
 use Livewire\Component;
 use Illuminate\Support\Facades\Log;
-use Stripe\Stripe;
-use Stripe\Checkout\Session;
-use Illuminate\Support\Facades\Mail;
-use App\Support\Money;
 
 class SuccessPageStripe extends Component
 {
@@ -32,9 +29,12 @@ class SuccessPageStripe extends Component
             return;
         }
 
-        // First check if payment already exists
-        $this->payment = Paiement::where('transaction_id', $this->sessionId)->first();
-        
+        // First check if payment already exists. Two spellings of the transaction id
+        // exist: the bare session id written by this page, and 'stripe_<id>' written by
+        // the checkout success page and the Stripe webhook. Looking for only one let a
+        // payment the webhook had already recorded be recorded a second time here.
+        $this->payment = Paiement::whereIn('transaction_id', [$this->sessionId, 'stripe_' . $this->sessionId])->first();
+
         if ($this->payment) {
             // Payment already processed
             $this->order = $this->payment->order;
@@ -52,11 +52,9 @@ class SuccessPageStripe extends Component
     private function verifyAndCreatePayment()
     {
         try {
-            Stripe::setApiKey(config('services.stripe.secret'));
-            
             // Retrieve Stripe session
-            $session = Session::retrieve($this->sessionId);
-            
+            $session = app(StripeSessions::class)->retrieve($this->sessionId);
+
             // Check if payment was successful
             if ($session->payment_status !== 'paid') {
                 $this->error = "Payment not completed. Status: " . $session->payment_status;
@@ -70,11 +68,11 @@ class SuccessPageStripe extends Component
 
             // Get order from metadata or from URL parameter
             $metadata = $session->metadata;
-            
+
             if (!empty($metadata->order_id)) {
                 $this->orderId = $metadata->order_id;
             }
-            
+
             if (!$this->orderId) {
                 $this->error = "Order ID not found in payment session";
                 $this->processing = false;
@@ -83,7 +81,7 @@ class SuccessPageStripe extends Component
 
             // Find the order
             $this->order = Order::find($this->orderId);
-            
+
             if (!$this->order) {
                 $this->error = "Order not found";
                 $this->processing = false;
@@ -101,75 +99,20 @@ class SuccessPageStripe extends Component
                 return;
             }
 
-            // Extract payment details from metadata
-            $amountUsd = $metadata->amount_usd ?? ($session->amount_total / 100);
-            $currency = $metadata->currency ?? ($this->order->vendor->currency->code ?? 'USD');
-            $rate = $metadata->rate ?? ($this->order->vendor->currency->rate_to_usd ?? 1);
-            
-            // 1.2 USD at a GNF rate of 0.00012 is 10,000 GNF.
-            //
-            // `?? 1` above catches a vendor with no currency row, but not a rate
-            // of zero — and dividing by zero here is fatal, in the middle of
-            // recording a payment Stripe has already taken.
-            $amountLocal = Money::fromUsd((float) $amountUsd, (float) $rate);
+            // The recording itself — amount conversion, totals, the unique transaction id,
+            // the checks on the order's state and the confirmation e-mail — is shared with
+            // the checkout success page and the Stripe webhook, so the same payment is never
+            // recorded twice whichever of the three gets there first.
+            $recorded = app(StripePaymentRecorder::class)->record($session);
 
-            Log::info('Stripe payment conversion', [
-                'order_id' => $this->order->id,
-                'amount_usd' => $amountUsd,
-                'rate' => $rate,
-                'calculated_amount_local' => $amountLocal,
-                'order_total_remaining' => $this->order->total_remaining,
-            ]);
+            if (! $recorded) {
+                $this->error = "Payment could not be applied to this order";
+                $this->processing = false;
+                return;
+            }
 
-            // Create the payment record
-            $this->payment = Paiement::create([
-                'order_id' => $this->order->id,
-                'amount' => $amountLocal,
-                'payment_method' => 'stripe',
-                'currency' => $currency,
-                'payment_status' => 'paid',
-                'transaction_id' => $this->sessionId,
-                'stripe_payment_intent' => $session->payment_intent,
-                // Verified against Stripe itself: received, not merely declared.
-                'confirmed_at' => now(),
-            ]);
-
-            Log::info('Stripe payment created', [
-                'order_id' => $this->order->id,
-                'payment_id' => $this->payment->id,
-                'amount_local' => $amountLocal,
-                'amount_usd' => $amountUsd,
-                'currency' => $currency,
-                'rate' => $rate,
-            ]);
-
-            // Update order totals. Stripe only ever charges whole USD cents, so
-            // converting its charge back to the vendor's currency almost never
-            // reproduces the order's exact local total — a residual under one cent's
-            // worth counts as settled, not owed.
-            // Confirmed money only, not filtered on payment_status='paid': a
-            // partial cash-on-delivery payment on the same order is real money the
-            // vendor confirmed receiving, and belongs in this balance too. Filtering
-            // on 'paid' silently dropped it — this is the divergence that left a
-            // real order (INV2026090006) showing a balance due that was already
-            // collected.
-            // Order::paidAmount(), not a raw sum: converts each confirmed payment
-            // into the order's own currency first, on top of the confirmed-only
-            // filter the comment above already explains.
-            $totalPaid = $this->order->paidAmount();
-            $reconciled = PaymentReconciliation::resolve(
-                (float) $this->order->grand_total, (float) $totalPaid, $rate
-            );
-
-            $this->order->update([
-                'total_paid' => $reconciled['total_paid'],
-                'total_remaining' => $reconciled['total_remaining'],
-                'payment_status' => $reconciled['payment_status'],
-                'payment_method' => 'stripe',
-            ]);
-
-            // Send confirmation email
-            $this->sendConfirmationEmail();
+            $this->order = $recorded->fresh();
+            $this->payment = Paiement::whereIn('transaction_id', [$this->sessionId, 'stripe_' . $this->sessionId])->first();
 
             $this->processing = false;
 
@@ -187,24 +130,6 @@ class SuccessPageStripe extends Component
                 'session_id' => $this->sessionId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-            ]);
-        }
-    }
-
-    private function sendConfirmationEmail()
-    {
-        try {
-            if ($this->order && $this->order->user) {
-                Mail::to($this->order->user->email)->send(new \App\Mail\PaymentConfirmed($this->order, $this->payment));
-                Log::info('Payment confirmation email sent', [
-                    'order_id' => $this->order->id,
-                    'user_email' => $this->order->user->email,
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::error('Failed to send payment confirmation email', [
-                'order_id' => $this->order->id ?? null,
-                'error' => $e->getMessage(),
             ]);
         }
     }

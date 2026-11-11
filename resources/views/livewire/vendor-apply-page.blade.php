@@ -1,57 +1,57 @@
-<div class="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
     @if(session()->has('success'))
-        <div class="mb-4 p-3 bg-green-100 text-green-700 rounded-lg">
+        <div class="mb-4 p-3.5 bg-green-50 text-green-700 border border-green-200 rounded-xl text-sm">
             {{ session('success') }}
         </div>
     @endif
 
     @if(session()->has('error'))
-        <div class="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+        <div class="mb-4 p-3.5 bg-red-50 text-red-700 border border-red-200 rounded-xl text-sm">
             {{ session('error') }}
         </div>
     @endif
 
-    <h1 class="text-2xl font-bold mb-2">Vendor Application</h1>
-    <p class="text-sm text-gray-600 mb-6">
-        Please read and accept the conditions before submitting your vendor profile.
-    </p>
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Devenir vendeur</h1>
+        <p class="text-gray-500 mt-2">Merci de lire et d'accepter les conditions avant de soumettre votre profil boutique.</p>
+        <div class="w-16 h-1 bg-[#D4AF37] mt-4 rounded-full"></div>
+    </div>
 
     {{-- TERMS MODAL --}}
     @if($showTermsModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg overflow-hidden">
-                <div class="px-5 py-4 border-b flex items-center justify-between">
-                    <h2 class="font-semibold text-lg">Conditions & Commission Contract</h2>
-                    <a href="{{ route('vendors.list') }}" class="text-gray-500 hover:text-gray-900">✕</a>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden">
+                <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="font-semibold text-lg text-gray-900">Conditions et contrat de commission</h2>
+                    <a href="{{ route('vendors.list') }}" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                        <i class="fa-solid fa-xmark"></i>
+                    </a>
                 </div>
 
-                <div class="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-                    <div class="p-4 rounded-lg bg-gray-50 border text-sm text-gray-700 space-y-2">
-                        <p class="font-semibold">Marketplace Rules</p>
+                <div class="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-100 text-sm text-gray-700 space-y-2">
+                        <p class="font-semibold text-gray-900">Règles de la marketplace</p>
                         <ul class="list-disc pl-5 space-y-1">
-                            <li>You must provide accurate store information.</li>
-                            <li>Products must be authentic and legal to sell.</li>
-                            <li>Orders must be fulfilled on time.</li>
-                            <li>Repeated violations may lead to suspension.</li>
+                            <li>Les informations de votre boutique doivent être exactes.</li>
+                            <li>Les produits doivent être authentiques et légaux à la vente.</li>
+                            <li>Les commandes doivent être honorées dans les délais.</li>
+                            <li>Des manquements répétés peuvent entraîner une suspension.</li>
                         </ul>
                     </div>
 
-                    <div class="p-4 rounded-lg bg-gray-50 border text-sm text-gray-700 space-y-2">
-                        <p class="font-semibold">Commission Contract</p>
+                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-100 text-sm text-gray-700 space-y-2">
+                        <p class="font-semibold text-gray-900">Contrat de commission</p>
                         <p>
-                            By joining, you agree that the platform may charge a commission per order
-                            (percentage or fixed fees depending on your plan and payment method).
-                        </p>
-                        <p class="text-gray-500">
-                            (Put your real commission text here. If you have a PDF contract, you can also link it.)
+                            En rejoignant la plateforme, vous acceptez qu'une commission soit prélevée sur chaque
+                            commande (pourcentage ou frais fixes selon votre formule et votre moyen de paiement).
                         </p>
                     </div>
 
-                    <label class="flex items-start gap-2 text-sm">
-                        <input type="checkbox" class="mt-1"
+                    <label class="flex items-start gap-2.5 text-sm text-gray-700">
+                        <input type="checkbox" class="mt-1 rounded border-gray-300 text-[#D4AF37] focus:ring-[#D4AF37]"
                                wire:model="acceptedTerms">
                         <span>
-                            I have read and accept the conditions and the commission contract.
+                            J'ai lu et j'accepte les conditions et le contrat de commission.
                         </span>
                     </label>
 
@@ -60,14 +60,14 @@
                     @enderror
                 </div>
 
-                <div class="px-5 py-4 border-t flex gap-2 justify-end">
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-2 justify-end">
                     <a href="{{ route('vendors.list') }}"
-                       class="px-4 py-2 rounded-lg border hover:bg-gray-50">
-                        Cancel
+                       class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-white transition-colors">
+                        Annuler
                     </a>
                     <button wire:click="acceptTerms"
-                            class="px-4 py-2 rounded-lg bg-[#D4AF37] text-white font-semibold hover:bg-[#c9a12f]">
-                        I Accept — Continue
+                            class="px-4 py-2 rounded-lg bg-[#D4AF37] text-white text-sm font-semibold hover:bg-[#c9a12f] transition-colors">
+                        J'accepte — Continuer
                     </button>
                 </div>
             </div>
@@ -76,39 +76,41 @@
 
     {{-- FORM --}}
     @if(!$showTermsModal)
-        <div class="bg-white border rounded-xl p-5 space-y-6">
+        <div class="space-y-6">
 
             {{-- If guest: create user first --}}
             @guest
-                <div class="border rounded-lg p-4 bg-gray-50">
-                    <h3 class="font-semibold mb-3">Create your account</h3>
+                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 sm:p-8">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-1">Créer votre compte</h3>
+                    <p class="text-sm text-gray-500 mb-5">Cet accès vous permettra de gérer votre boutique.</p>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    @php
+                        $guestField = 'w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/40 transition';
+                        $guestLabel = 'block text-sm font-medium text-gray-700 mb-1';
+                    @endphp
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="text-sm text-gray-600">Full name</label>
-                            <input type="text" wire:model="name"
-                                   class="w-full border rounded-lg p-2">
-                            @error('name') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+                            <label class="{{ $guestLabel }}">Nom complet</label>
+                            <input type="text" wire:model="name" class="{{ $guestField }}">
+                            @error('name') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label class="text-sm text-gray-600">Email</label>
-                            <input type="email" wire:model="email"
-                                   class="w-full border rounded-lg p-2">
-                            @error('email') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+                            <label class="{{ $guestLabel }}">Email</label>
+                            <input type="email" wire:model="email" class="{{ $guestField }}">
+                            @error('email') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label class="text-sm text-gray-600">Password</label>
-                            <input type="password" wire:model="password"
-                                   class="w-full border rounded-lg p-2">
-                            @error('password') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+                            <label class="{{ $guestLabel }}">Mot de passe</label>
+                            <input type="password" wire:model="password" class="{{ $guestField }}">
+                            @error('password') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label class="text-sm text-gray-600">Confirm password</label>
-                            <input type="password" wire:model="password_confirmation"
-                                   class="w-full border rounded-lg p-2">
+                            <label class="{{ $guestLabel }}">Confirmer le mot de passe</label>
+                            <input type="password" wire:model="password_confirmation" class="{{ $guestField }}">
                         </div>
                     </div>
                 </div>
@@ -124,29 +126,26 @@
             @endphp
 
             <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 sm:p-8">
-                <div class="flex items-start justify-between gap-4 mb-6">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900">Vendor Profile</h3>
-                        <p class="text-sm text-gray-500 mt-1">
-                            Fill in your store information. This will appear on your vendor page.
-                        </p>
-                    </div>
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-900">Profil de la boutique</h3>
+                    <p class="text-sm text-gray-500 mt-1">
+                        Ces informations apparaîtront sur votre page boutique publique.
+                    </p>
                 </div>
 
-                {{-- 12-col grid gives better control on desktop --}}
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
                     {{-- Store name --}}
                     <div class="md:col-span-6">
-                        <label class="{{ $labelClass }}">Store name</label>
-                        <input type="text" wire:model="store_name" class="{{ $inputClass }}" placeholder="e.g. Mara Electronics">
+                        <label class="{{ $labelClass }}">Nom de la boutique</label>
+                        <input type="text" wire:model="store_name" class="{{ $inputClass }}" placeholder="ex. Mara Électronique">
                         @error('store_name') <p class="{{ $errorClass }}">{{ $message }}</p> @enderror
                     </div>
 
                     {{-- Currency --}}
                     <div class="md:col-span-6">
-                        <label class="{{ $labelClass }}">Currency</label>
+                        <label class="{{ $labelClass }}">Devise</label>
                         <select wire:model="currency_id" class="{{ $inputClass }}">
-                            <option value="">Select currency</option>
+                            <option value="">Choisir une devise</option>
                             @foreach($currencies as $c)
                                 <option value="{{ $c->id }}">{{ $c->code }}</option>
                             @endforeach
@@ -158,48 +157,48 @@
                     <div class="md:col-span-12">
                         <label class="{{ $labelClass }}">Description</label>
                         <textarea wire:model="description" rows="4" class="{{ $inputClass }}"
-                                placeholder="Tell customers what you sell, shipping info, etc."></textarea>
+                                placeholder="Ce que vous vendez, vos délais de livraison, etc."></textarea>
                         @error('description') <p class="{{ $errorClass }}">{{ $message }}</p> @enderror
                     </div>
 
                     {{-- Country --}}
                     <div class="md:col-span-4">
-                        <label class="{{ $labelClass }}">Country</label>
-                        <input type="text" wire:model="country" class="{{ $inputClass }}" placeholder="Guinea">
+                        <label class="{{ $labelClass }}">Pays</label>
+                        <input type="text" wire:model="country" class="{{ $inputClass }}" placeholder="Guinée">
                         @error('country') <p class="{{ $errorClass }}">{{ $message }}</p> @enderror
                     </div>
 
                     {{-- City --}}
                     <div class="md:col-span-4">
-                        <label class="{{ $labelClass }}">City</label>
+                        <label class="{{ $labelClass }}">Ville</label>
                         <input type="text" wire:model="city" class="{{ $inputClass }}" placeholder="Conakry">
                         @error('city') <p class="{{ $errorClass }}">{{ $message }}</p> @enderror
                     </div>
 
                     {{-- Zip --}}
                     <div class="md:col-span-4">
-                        <label class="{{ $labelClass }}">Zip Code</label>
-                        <input type="text" wire:model="zip_code" class="{{ $inputClass }}" placeholder="e.g. 00000">
+                        <label class="{{ $labelClass }}">Code postal</label>
+                        <input type="text" wire:model="zip_code" class="{{ $inputClass }}" placeholder="ex. 00000">
                         @error('zip_code') <p class="{{ $errorClass }}">{{ $message }}</p> @enderror
                     </div>
 
                     {{-- Address --}}
                     <div class="md:col-span-8">
-                        <label class="{{ $labelClass }}">Address</label>
-                        <input type="text" wire:model="address" class="{{ $inputClass }}" placeholder="Street, building, area...">
+                        <label class="{{ $labelClass }}">Adresse</label>
+                        <input type="text" wire:model="address" class="{{ $inputClass }}" placeholder="Rue, immeuble, quartier...">
                         @error('address') <p class="{{ $errorClass }}">{{ $message }}</p> @enderror
                     </div>
 
                     {{-- State --}}
                     <div class="md:col-span-4">
-                        <label class="{{ $labelClass }}">State</label>
-                        <input type="text" wire:model="state" class="{{ $inputClass }}" placeholder="Region / State">
+                        <label class="{{ $labelClass }}">Région</label>
+                        <input type="text" wire:model="state" class="{{ $inputClass }}" placeholder="Région">
                         @error('state') <p class="{{ $errorClass }}">{{ $message }}</p> @enderror
                     </div>
 
                     {{-- Store Logo --}}
                     <div class="md:col-span-12">
-                        <label class="{{ $labelClass }}">Store Logo</label>
+                        <label class="{{ $labelClass }}">Logo de la boutique</label>
 
                         <div class="mt-2 flex flex-col sm:flex-row sm:items-center gap-4">
                             {{-- Preview --}}
@@ -215,15 +214,15 @@
                                 @endif
 
                                 <div>
-                                    <p class="text-sm font-medium text-gray-700">Upload a logo</p>
-                                    <p class="text-xs text-gray-500">PNG, JPG, WEBP — max 2MB</p>
+                                    <p class="text-sm font-medium text-gray-700">Ajouter un logo</p>
+                                    <p class="text-xs text-gray-500">PNG, JPG, WEBP — 2 Mo max</p>
                                 </div>
                             </div>
 
                             {{-- File input (styled wrapper) --}}
                             <label class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-gray-300
                                         bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer transition w-full sm:w-auto">
-                                Choose file
+                                Choisir un fichier
                                 <input type="file"
                                     wire:model="logo"
                                     accept="image/*"
@@ -238,14 +237,13 @@
                 </div>
             </div>
 
-
             <div class="flex justify-end gap-2">
-                <a href="{{ route('vendors.list') }}" class="px-4 py-2 rounded-lg border hover:bg-gray-50">
-                    Cancel
+                <a href="{{ route('vendors.list') }}" class="px-5 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+                    Annuler
                 </a>
                 <button wire:click="submit"
-                        class="px-4 py-2 rounded-lg bg-[#D4AF37] text-white font-semibold hover:bg-[#c9a12f]">
-                    Submit Application
+                        class="px-5 py-2.5 rounded-lg bg-[#D4AF37] text-white text-sm font-semibold hover:bg-[#c9a12f] transition-colors">
+                    Envoyer ma candidature
                 </button>
             </div>
         </div>

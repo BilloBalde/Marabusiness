@@ -16,7 +16,7 @@ use Illuminate\Validation\Rule;
 use Livewire\WithFileUploads;
 
 #[Layout('components.layouts.app')]
-#[Title('Vendor Application - MARA BUSINESS')]
+#[Title('Devenir vendeur - MARA BUSINESS')]
 class VendorApplyPage extends Component
 {
     use WithFileUploads;
@@ -64,7 +64,7 @@ class VendorApplyPage extends Component
     public function acceptTerms()
     {
         if (!$this->acceptedTerms) {
-            $this->addError('acceptedTerms', 'You must accept the conditions to continue.');
+            $this->addError('acceptedTerms', 'Vous devez accepter les conditions pour continuer.');
             return;
         }
 
@@ -75,7 +75,7 @@ class VendorApplyPage extends Component
     public function submit()
     {
         if (!$this->acceptedTerms) {
-            $this->addError('acceptedTerms', 'You must accept the conditions to continue.');
+            $this->addError('acceptedTerms', 'Vous devez accepter les conditions pour continuer.');
             $this->showTermsModal = true;
             return;
         }
@@ -85,7 +85,7 @@ class VendorApplyPage extends Component
             $this->validate([
                 'name' => ['required', 'string', 'max:255'],
                 'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-                'password' => ['required', 'string', 'min:6', 'confirmed'],
+                'password' => ['required', 'string', 'min:8', 'confirmed'],
             ]);
         }
 
@@ -117,7 +117,7 @@ class VendorApplyPage extends Component
 
         // 4) If vendor already exists (double safety)
         if (Vendor::where('user_id', $user->id)->exists()) {
-            session()->flash('error', 'You already have a vendor profile.');
+            session()->flash('error', 'Vous avez déjà une boutique.');
             return redirect()->route('vendors.list');
         }
 
@@ -159,7 +159,7 @@ class VendorApplyPage extends Component
             ]);
         });
 
-        session()->flash('success', 'Application submitted! Your vendor account is pending approval.');
+        session()->flash('success', 'Candidature envoyée ! Votre compte vendeur est en attente d\'approbation.');
 
         // redirect wherever you want after apply
         return redirect()->route('vendors.list');

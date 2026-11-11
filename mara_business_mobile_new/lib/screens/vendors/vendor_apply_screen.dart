@@ -233,8 +233,8 @@ class _VendorApplyScreenState extends State<VendorApplyScreen> {
         _showMessage('Email invalide', Colors.red);
         return false;
       }
-      if (_passwordController.text.length < 6) {
-        _showMessage('Le mot de passe doit contenir au moins 6 caractères', Colors.red);
+      if (_passwordController.text.length < 8) {
+        _showMessage('Le mot de passe doit contenir au moins 8 caractères', Colors.red);
         return false;
       }
       if (_passwordController.text != _passwordConfirmationController.text) {

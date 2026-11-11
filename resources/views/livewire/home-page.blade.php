@@ -316,11 +316,11 @@
                         <button
                             wire:click="addToWishlist({{ $product->vendor_product_id }})"
                             @click="loading = true; setTimeout(() => { loading = false; added = true; setTimeout(() => added = false, 2000); }, 500)"
-                            class="p-2 rounded-full transition bg-white border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-white relative"
+                            class="group/like p-2 rounded-full transition bg-white border border-[#D4AF37] hover:bg-[#D4AF37] relative"
                             :disabled="loading"
                         >
                             <template x-if="!added && !loading">
-                                <i class="fa-solid fa-heart text-[#D4AF37] group-hover:text-white"></i>
+                                <i class="fa-solid fa-heart text-[#D4AF37] group-hover/like:text-white"></i>
                             </template>
                             <template x-if="added && !loading">
                                 <i class="fa-solid fa-check text-green-500"></i>
@@ -633,11 +633,12 @@
             <p class="text-center text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">Ils nous font confiance</p>
             <div class="flex flex-wrap items-center justify-center gap-10">
                 @foreach($partners as $partner)
-                    @php $logo = '<img src="' . url('uploads/' . $partner->logo) . '" alt="' . $partner->name . '" class="h-10 object-contain opacity-70 hover:opacity-100 transition-opacity">'; @endphp
                     @if($partner->website)
-                        <a href="{{ $partner->website }}" target="_blank" rel="noopener">{!! $logo !!}</a>
+                        <a href="{{ $partner->website }}" target="_blank" rel="noopener">
+                            <img src="{{ url('uploads/' . $partner->logo) }}" alt="{{ $partner->name }}" class="h-10 object-contain opacity-70 hover:opacity-100 transition-opacity">
+                        </a>
                     @else
-                        {!! $logo !!}
+                        <img src="{{ url('uploads/' . $partner->logo) }}" alt="{{ $partner->name }}" class="h-10 object-contain opacity-70 hover:opacity-100 transition-opacity">
                     @endif
                 @endforeach
             </div>

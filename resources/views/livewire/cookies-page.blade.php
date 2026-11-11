@@ -501,26 +501,28 @@
                     <div class="space-y-3">
                         <div class="flex items-center gap-3">
                             <i class="fas fa-envelope text-[#D4AF37] w-5"></i>
-                            <a href="mailto:privacy@marabusiness.com" class="text-gray-700 hover:text-[#D4AF37]">privacy@marabusiness.com</a>
+                            <x-company-contact type="email" class="text-gray-700 hover:text-[#D4AF37]" />
                         </div>
                         
+                        @if($phone = \App\Support\Company::get('phone'))
                         <div class="flex items-center gap-3">
                             <i class="fas fa-phone-alt text-[#D4AF37] w-5"></i>
-                            <a href="tel:+221781234567" class="text-gray-700 hover:text-[#D4AF37]">+221 78 123 45 67</a>
+                            <a href="tel:{{ \App\Support\Company::digits($phone) }}" class="text-gray-700 hover:text-[#D4AF37]">{{ $phone }}</a>
                         </div>
+                        @endif
                         
+                        @if($address = \App\Support\Company::get('address'))
                         <div class="flex items-center gap-3">
                             <i class="fas fa-map-marker-alt text-[#D4AF37] w-5"></i>
-                            <span class="text-gray-700">123 Rue Principale, Dakar, Sénégal</span>
+                            <span class="text-gray-700">{{ $address }}</span>
                         </div>
+                        @endif
                     </div>
                 </div>
                 
                 <div class="bg-gray-50 p-6 rounded-xl">
                     <h3 class="font-semibold text-gray-900 mb-3">Délégué à la Protection des Données</h3>
-                    <p class="text-sm text-gray-700 mb-2">M. Amadou Diallo</p>
-                    <p class="text-sm text-gray-600 mb-1">dpo@marabusiness.com</p>
-                    <p class="text-sm text-gray-600">+221 78 987 65 43</p>
+                    <p class="text-sm text-gray-600 mb-1"><x-company-contact type="dpo" class="text-[#D4AF37] hover:underline" /></p>
                 </div>
             </div>
         </div>

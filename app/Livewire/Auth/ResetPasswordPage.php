@@ -12,7 +12,7 @@ use Livewire\Component;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 
-#[Title('Reset Password Page - ECPG SA')]
+#[Title('Réinitialiser le mot de passe - MARA BUSINESS')]
 class ResetPasswordPage extends Component
 {
     #[Url()]
@@ -31,7 +31,9 @@ class ResetPasswordPage extends Component
         $this->validate([
             'token' => 'required',
             'email' => 'required|email|exists:users',
-            'password' => 'required|min:6|confirmed',
+            // Same floor as registration: the reset form let a strong account be
+            // re-secured with a six-character password the sign-up form would refuse.
+            'password' => 'required|min:8|confirmed',
         ]);
 
         $status = Password::reset(
@@ -50,10 +52,17 @@ class ResetPasswordPage extends Component
                 event(new PasswordReset($user));
             }
         );
-        // Here you would typically reset the password using the token
-        // For example:
-        return $status = Password::PASSWORD_RESET?redirect('/login'):session()->flash('error', 'Une erreur s\'est produite lors de la réinitialisation du mot de passe.');
+        // The old last line assigned the constant instead of comparing it
+        // (`$status = Password::PASSWORD_RESET ? ... : ...`), so it was always true:
+        // an expired or already-used link redirected to the login page as though the
+        // password had been changed, and the error message below was unreachable.
+        if ($status === Password::PASSWORD_RESET) {
+            session()->flash('success', 'Votre mot de passe a été réinitialisé. Vous pouvez vous connecter.');
 
+            return redirect('/login');
+        }
+
+        session()->flash('error', 'Ce lien de réinitialisation est invalide ou a expiré. Demandez-en un nouveau.');
     }
     public function render()
     {

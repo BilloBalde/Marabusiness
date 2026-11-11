@@ -115,4 +115,10 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    | Where the messages typed into the contact form are delivered
+    | (ContactController). It was read with a hard-coded default and no way to set it.
+    */
+    'admin_address' => env('MAIL_ADMIN_ADDRESS', 'contact@afrobridgeinnov.com'),
+
 ];

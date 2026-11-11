@@ -104,7 +104,7 @@ class MyAddresses extends Component
             Address::create($data);
         }
 
-        session()->flash('success', 'Address saved successfully.');
+        session()->flash('success', 'Adresse enregistrée avec succès.');
         $this->resetForm();
     }
 
@@ -114,7 +114,7 @@ class MyAddresses extends Component
             ->whereNull('order_id')
             ->where('id', $id)
             ->delete();
-        session()->flash('success', 'Address removed.');
+        session()->flash('success', 'Adresse supprimée.');
     }
 
     public function render()

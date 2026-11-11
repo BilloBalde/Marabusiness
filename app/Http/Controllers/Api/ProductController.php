@@ -24,9 +24,7 @@ class ProductController extends Controller
             ->whereHas('product', function($q) {
                 $q->where('is_active', 1);
             })
-            ->whereHas('vendor', function($q) {
-                $q->where('is_active', true);
-            });
+            ->sellable();
 
         // Search by product name
         if ($request->has('search') && !empty($request->search)) {
@@ -177,11 +175,17 @@ class ProductController extends Controller
             ->firstOrFail();
 
         // FIXED: Eager load ALL relationships properly
-        $vendorProduct = VendorProduct::with([
-            'vendor.currency', 
-            'variations.wholesaleTiers', // Load variations with their wholesale tiers
-            'wholesaleTiers'
-        ])->findOrFail($vendor_product_id);
+        // Scoped through $product, not a bare VendorProduct::findOrFail(): any
+        // /products/{slug}/{id} used to answer with that listing whatever product it
+        // belonged to (the web page already 404s on a mismatch), and a listing
+        // switched off or held by an inactive vendor is not for sale.
+        $vendorProduct = $product->vendorProducts()
+            ->sellable()
+            ->with([
+                'vendor.currency',
+                'variations.wholesaleTiers', // Load variations with their wholesale tiers
+                'wholesaleTiers'
+            ])->findOrFail($vendor_product_id);
 
         $mappedProduct = $this->mapProductDetail($product, $vendorProduct, $currencyCode);
 
@@ -197,9 +201,7 @@ class ProductController extends Controller
             ->map(function($similarProduct) {
                 // Get the cheapest vendor product for this similar product
                 $cheapestVendorProduct = $similarProduct->vendorProducts
-                    ->filter(function($vp) {
-                        return $vp->vendor && $vp->vendor->is_active;
-                    })
+                    ->filter(fn ($vp) => $vp->isSellable())
                     ->sortBy('price')
                     ->first();
                 

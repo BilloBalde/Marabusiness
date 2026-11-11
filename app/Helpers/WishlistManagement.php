@@ -60,6 +60,7 @@ class WishlistManagement
 
         foreach (self::getWishlistItems() as $item) {
             $vendorProduct = VendorProduct::with(['product', 'vendor.currency', 'variations'])
+                ->sellable()
                 ->find($item['vendor_product_id']);
 
             if (!$vendorProduct) {

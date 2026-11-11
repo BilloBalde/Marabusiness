@@ -55,7 +55,7 @@ class UserController extends Controller
                 'email' => 'sometimes|email|unique:users,email,' . $user->id,
                 'phone' => 'sometimes|string|max:20',
                 'current_password' => 'required_with:new_password|string',
-                'new_password' => 'required_with:current_password|string|min:6|confirmed',
+                'new_password' => 'required_with:current_password|string|min:8|confirmed',
             ]);
 
             if ($validator->fails()) {

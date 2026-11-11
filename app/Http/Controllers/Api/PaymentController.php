@@ -587,22 +587,4 @@ class PaymentController extends Controller
             ]);
         }
     }
-
-    /**
-     * Handle Stripe webhook (for payment confirmation)
-     */
-    public function handleStripeWebhook(Request $request)
-    {
-        // This endpoint would be called by Stripe to confirm payment
-        // You'll need to implement webhook handling here
-    }
-
-    /**
-     * Handle LengoPay callback
-     */
-    public function handleLengoPayCallback(Request $request)
-    {
-        // This endpoint would be called by LengoPay to confirm payment
-        // You'll need to implement callback handling here
-    }
 }

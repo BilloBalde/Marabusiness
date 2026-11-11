@@ -543,13 +543,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text(
-                                'Location (Optional)',
+                                'Position (optionnel)',
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
                               ElevatedButton(
                                 onPressed: checkoutProvider.isGettingLocation
                                     ? null
-                                    : () => checkoutProvider.getLocation(),
+                                    : () async {
+                                        await checkoutProvider.getLocation();
+                                        final error = checkoutProvider.locationError;
+                                        if (error != null && context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text(error)),
+                                          );
+                                        }
+                                      },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.blue[100],
                                   foregroundColor: Colors.blue[800],
@@ -561,7 +569,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         width: 16,
                                         child: CircularProgressIndicator(strokeWidth: 2),
                                       )
-                                    : const Text('📍 Get My Location'),
+                                    : const Text('📍 Utiliser ma position'),
                               ),
                             ],
                           ),
@@ -572,14 +580,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      'Lat: ${checkoutProvider.latitude!.toStringAsFixed(6)}',
+                                      'Lat : ${checkoutProvider.latitude!.toStringAsFixed(6)}',
                                       style: const TextStyle(fontSize: 12),
                                     ),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Text(
-                                      'Lng: ${checkoutProvider.longitude!.toStringAsFixed(6)}',
+                                      'Lng : ${checkoutProvider.longitude!.toStringAsFixed(6)}',
                                       style: const TextStyle(fontSize: 12),
                                     ),
                                   ),

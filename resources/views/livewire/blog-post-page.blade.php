@@ -26,7 +26,7 @@
         </div>
 
         <div class="prose max-w-none text-gray-700">
-            {!! $post->content_text !!}
+            {!! \App\Support\HtmlSanitizer::clean($post->content_text) !!}
         </div>
 
         @if (!empty($post->tags))

@@ -14,7 +14,8 @@ class CreateUser extends CreateRecord
     {
         $role = $this->form->getRawState()['role'] ?? null;
 
-        if ($role && $this->record instanceof \App\Models\User) {
+        // See EditUser::afterSave(): only a role the signed-in staff member could have picked.
+        if ($role && array_key_exists($role, UserResource::assignableRoles()) && $this->record instanceof \App\Models\User) {
             $this->record->syncRoles([$role]);
         }
     }

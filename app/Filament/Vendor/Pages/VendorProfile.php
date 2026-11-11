@@ -3,6 +3,7 @@
 namespace App\Filament\Vendor\Pages;
 
 use App\Models\Currency;
+use App\Models\Order;
 use App\Models\Vendor;
 use Filament\Facades\Filament;
 use Filament\Forms;
@@ -61,6 +62,14 @@ class VendorProfile extends Page implements HasForms
         return Filament::auth()->user()->vendor;
     }
 
+    protected function currencyIsLocked(): bool
+    {
+        $vendor = $this->vendor();
+
+        return $vendor->vendorProducts()->exists()
+            || Order::where('vendor_id', $vendor->id)->exists();
+    }
+
     public function form(Form $form): Form
     {
         return $form
@@ -83,15 +92,33 @@ class VendorProfile extends Page implements HasForms
                             ->required()
                             ->maxLength(255),
 
+                        // Every price a vendor types is a bare number in THIS currency
+                        // (vendor_product.price has no currency column of its own). Switching
+                        // a shop from GNF to USD silently turned a 500,000 GNF price into
+                        // $500,000. Orders were never at risk — they freeze their own rate —
+                        // but the catalogue was, so the currency is locked as soon as the
+                        // shop has an offer or an order.
+                        //
+                        // Only active currencies are offered (the list used to include every
+                        // row, test currencies among them), plus the shop's current one so
+                        // the field never renders blank.
+                        //
+                        // Plain ->options() rather than ->relationship(): this form
+                        // belongs to a standalone Page, not a Resource, so it has no
+                        // bound Eloquent model for the relationship helper to
+                        // introspect (it throws trying to call isRelation() on null).
                         Forms\Components\Select::make('currency_id')
                             ->label('Devise')
-                            // Plain ->options() rather than ->relationship(): this form
-                            // belongs to a standalone Page, not a Resource, so it has no
-                            // bound Eloquent model for the relationship helper to
-                            // introspect (it throws trying to call isRelation() on null).
-                            ->options(fn () => Currency::orderBy('code')->pluck('code', 'id'))
+                            ->options(fn () => Currency::query()
+                                ->where('is_active', true)
+                                ->orWhere('id', $this->vendor()->currency_id)
+                                ->orderBy('code')
+                                ->pluck('code', 'id'))
                             ->required()
-                            ->helperText('S\'applique aux prochaines commandes, sans changer celles déjà passées.'),
+                            ->disabled(fn (): bool => $this->currencyIsLocked())
+                            ->helperText(fn (): string => $this->currencyIsLocked()
+                                ? 'Verrouillée : vos prix et vos commandes sont exprimés dans cette devise. Pour en changer, contactez le support.'
+                                : 'À choisir avant d\'ajouter vos produits : vos prix sont saisis dans cette devise, et elle sera verrouillée dès votre première offre ou commande.'),
 
                         Forms\Components\Textarea::make('description')
                             ->label('Description')

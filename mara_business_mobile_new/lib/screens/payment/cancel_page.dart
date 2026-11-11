@@ -16,7 +16,7 @@ class CancelPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Payment Cancelled'),
+        title: const Text('Paiement annulé'),
         automaticallyImplyLeading: false,
       ),
       body: Center(
@@ -32,7 +32,7 @@ class CancelPage extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               const Text(
-                'Payment Cancelled',
+                'Paiement annulé',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -40,7 +40,7 @@ class CancelPage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                reason ?? 'Your payment was cancelled. You can try again or continue shopping.',
+                reason ?? 'Votre paiement a été annulé. Vous pouvez réessayer ou continuer vos achats.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 16, color: Colors.grey),
               ),
@@ -63,7 +63,7 @@ class CancelPage extends StatelessWidget {
                       foregroundColor: Colors.black,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     ),
-                    child: const Text('Try Again'),
+                    child: const Text('Réessayer'),
                   ),
                   const SizedBox(width: 16),
                   ElevatedButton(
@@ -73,7 +73,7 @@ class CancelPage extends StatelessWidget {
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     ),
-                    child: const Text('Home'),
+                    child: const Text('Accueil'),
                   ),
                 ],
               ),

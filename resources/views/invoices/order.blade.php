@@ -56,6 +56,12 @@
 
     $shipment = $order->shipments()->latest()->first();
 
+    // Les commandes d'avant la scission du panier par vendeur (mai–nov. 2025)
+    // n'ont aucun vendor_id : lire ->store_name / ->currency dessus levait une
+    // ErrorException (donc un 500) pour toute facture de ces commandes.
+    $vendor = $order->vendor;
+    $currencySymbol = $vendor?->currency?->symbol ?? '$';
+
     $hasDiscount = $order->pre_negotiation_total && $order->pre_negotiation_total > $order->grand_total;
     $isSettled = (float) $order->total_remaining <= 0;
 @endphp
@@ -153,7 +159,7 @@
             border-radius: 6px;
         }
 
-        .section { padding: 26px 35px; page-break-inside: avoid; }
+        .section { padding: 19px 35px; page-break-inside: avoid; }
 
         .section-title {
             margin: 0 0 14px;
@@ -243,9 +249,11 @@
             color: {{ $isSettled ? '#1B7A4B' : '#B45309' }};
         }
 
+        .closing { page-break-inside: avoid; }
+
         .footer {
-            margin-top: 10px;
-            padding: 18px 35px 26px;
+            margin-top: 0;
+            padding: 14px 35px 18px;
             text-align: center;
             font-size: 11px;
             color: #9B9585;
@@ -292,12 +300,12 @@
         <tr>
             <td width="48.5%" class="card">
                 <p class="card-label">Vendeur</p>
-                <strong>{{ $order->vendor->store_name }}</strong><br>
-                {{ $order->vendor->address ?? '---' }}<br>
+                <strong>{{ $vendor?->store_name ?? config('app.name') }}</strong><br>
+                {{ $vendor?->address ?? '---' }}<br>
                 {{-- Vendor n'a pas de colonne phone — le vrai numéro vit sur son User.
                      $order->vendor->phone renvoyait toujours null, donc "---" sur
                      toutes les factures jamais générées. --}}
-                Tél : {{ $order->vendor->user->phone ?? '---' }}
+                Tél : {{ $vendor?->user?->phone ?? '---' }}
             </td>
 
             <td width="3%"></td>
@@ -329,7 +337,9 @@
             <td>{{ $shipment->tracking_number ?? '---' }}</td>
             <td>{{ $shipment?->estimated_delivery_at?->format('d/m/Y') ?? '---' }}</td>
             <td>{{ $shipment->current_location ?? '---' }}</td>
-            <td>{{ $order->notes ?? '---' }}</td>
+            {{-- Checkout writes a technical tag ("Marketplace order — Vendor: …") into notes;
+                 it is neither French nor for the customer, and the vendor is already named above. --}}
+            <td>{{ ($order->notes && ! str_starts_with($order->notes, 'Marketplace order')) ? $order->notes : '---' }}</td>
         </tr>
     </table>
 </div>
@@ -376,9 +386,9 @@
                         @endif
                     </td>
 
-                    <td class="num">{{ number_format($item->unit_amount, 2) }} {{ $order->vendor->currency->symbol }}</td>
+                    <td class="num">{{ number_format($item->unit_amount, 2) }} {{ $currencySymbol }}</td>
                     <td class="ctr">{{ $item->quantity }}</td>
-                    <td class="num">{{ number_format($item->total_amount, 2) }} {{ $order->vendor->currency->symbol }}</td>
+                    <td class="num">{{ number_format($item->total_amount, 2) }} {{ $currencySymbol }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -393,29 +403,33 @@
         @if ($hasDiscount)
             <tr class="row-original">
                 <td class="label">Prix initial</td>
-                <td class="value">{{ number_format($order->pre_negotiation_total, 2) }} {{ $order->vendor->currency->symbol }}</td>
+                <td class="value">{{ number_format($order->pre_negotiation_total, 2) }} {{ $currencySymbol }}</td>
             </tr>
             <tr class="row-discount">
                 <td class="label">Remise négociée</td>
-                <td class="value">−{{ number_format($order->pre_negotiation_total - $order->grand_total, 2) }} {{ $order->vendor->currency->symbol }}</td>
+                <td class="value">−{{ number_format($order->pre_negotiation_total - $order->grand_total, 2) }} {{ $currencySymbol }}</td>
             </tr>
         @endif
         <tr class="row-grand">
             <td class="label">Total général</td>
-            <td class="value">{{ number_format($order->grand_total, 2) }} {{ $order->vendor->currency->symbol }}</td>
+            <td class="value">{{ number_format($order->grand_total, 2) }} {{ $currencySymbol }}</td>
         </tr>
         <tr>
             <td class="label">Total payé</td>
-            <td class="value">{{ number_format($order->total_paid, 2) }} {{ $order->vendor->currency->symbol }}</td>
+            <td class="value">{{ number_format($order->total_paid, 2) }} {{ $currencySymbol }}</td>
         </tr>
         <tr class="row-remaining">
             <td class="label">Reste à payer</td>
-            <td class="value">{{ number_format($order->total_remaining, 2) }} {{ $order->vendor->currency->symbol }}</td>
+            <td class="value">{{ number_format($order->total_remaining, 2) }} {{ $currencySymbol }}</td>
         </tr>
     </table>
 </div>
 
-{{-- PAIEMENTS --}}
+{{-- PAIEMENTS + PIED DE PAGE
+     Gardés ensemble : quand le contenu remplit exactement la première page, le pied de
+     page passait seul sur une seconde page presque blanche. Ensemble, c'est l'historique
+     des paiements ET le pied de page qui passent à la page suivante, ou aucun. --}}
+<div class="closing">
 <div class="section">
     <h2 class="section-title">Historique des paiements</h2>
 
@@ -435,7 +449,7 @@
                 <td>{{ $p->created_at->format('d/m/Y H:i') }}</td>
                 <td>{{ $paymentMethodLabels[$p->payment_method] ?? ucfirst($p->payment_method) }}</td>
                 <td>{{ $statusLabels[$p->payment_status] ?? ucfirst($p->payment_status) }}</td>
-                <td class="num">{{ number_format($p->amount, 2) }} {{ $order->vendor->currency->symbol }}</td>
+                <td class="num">{{ number_format($p->amount, 2) }} {{ $currencySymbol }}</td>
             </tr>
         @empty
             <tr><td colspan="4" class="ctr">Aucun paiement pour le moment.</td></tr>
@@ -448,6 +462,7 @@
 <div class="footer">
     <span class="brand">{{ config('app.name') }}</span><br>
     © {{ date('Y') }} — Tous droits réservés — {{ config('app.url') }}
+</div>
 </div>
 
 </body>

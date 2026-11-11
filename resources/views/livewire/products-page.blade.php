@@ -1,73 +1,101 @@
 <div class="bg-gray-50 min-h-screen py-6">
-    <div class="max-w-7xl mx-auto px-4 flex flex-col lg:flex-row gap-6">
+    <div class="max-w-7xl mx-auto px-4">
         {{-- @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.products']) --}}
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {{-- FILTERS --}}
             <div class="lg:col-span-1">
-                <h2 class="text-lg font-semibold mb-4">Filtres</h2>
+                {{-- On a phone this used to stack every category, every brand, the
+                     price slider and the sort box in a row above the first product,
+                     so a shopper scrolled the whole filter panel to reach anything
+                     to buy. Collapsed by default below lg, always open at lg and up
+                     (the x-data state is ignored there by lg:block), and the filters
+                     themselves are still applied live either way. --}}
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 lg:sticky lg:top-24"
+                     x-data="{ open: false }">
+                    <button type="button"
+                            @click="open = !open"
+                            class="w-full flex items-center justify-between lg:pointer-events-none lg:cursor-default">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-[#D4AF37]"></i>
+                            Filtres
+                        </h2>
+                        <i class="fa-solid fa-chevron-down text-xs text-gray-400 transition-transform duration-200 lg:hidden"
+                           :class="{ 'rotate-180': open }"></i>
+                    </button>
 
-                {{-- CATEGORY --}}
-                <div class="mb-6">
-                    <h3 class="font-medium text-gray-700 mb-2">Catégories</h3>
-                    @foreach($categories as $cat)
-                        <label class="flex items-center gap-2 text-sm mb-1">
-                            <input type="checkbox"
-                                wire:model.live="selectedCategories"
-                                value="{{ $cat->id }}"
-                                class="rounded border-gray-300 text-yellow-600">
-                            <span>{{ $cat->name }}</span>
-                        </label>
-                    @endforeach
-                </div>
+                    <div class="hidden lg:block mt-5" :class="{ '!block': open }">
 
-                {{-- BRAND --}}
-                <div class="mb-6">
-                    <h3 class="font-medium text-gray-700 mb-2">Marques</h3>
-                    @foreach($brands as $brand)
-                        <label class="flex items-center gap-2 text-sm mb-1">
-                            <input type="checkbox"
-                                wire:model.live="selectedBrands"
-                                value="{{ $brand->id }}"
-                                class="rounded border-gray-300 text-yellow-600">
-                            <span>{{ $brand->name }}</span>
-                        </label>
-                    @endforeach
-                </div>
+                    {{-- CATEGORY --}}
+                    <div class="mb-6 pb-6 border-b border-gray-100">
+                        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Catégories</h3>
+                        <div class="space-y-2">
+                            @foreach($categories as $cat)
+                                <label class="flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer hover:text-[#96731A] transition-colors">
+                                    <input type="checkbox"
+                                        wire:model.live="selectedCategories"
+                                        value="{{ $cat->id }}"
+                                        class="rounded border-gray-300 text-[#D4AF37] accent-[#D4AF37] focus:ring-[#D4AF37]/40">
+                                    <span>{{ $cat->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
 
-                {{-- PRICE --}}
-                <div class="mb-6">
-                    <h3 class="font-medium text-gray-700 mb-2">Prix Maximum</h3>
-                    <input type="range"
-                        min="0"
-                        max="2000"
-                        wire:model.live.debounce.300ms="price_range"
-                        class="w-full accent-yellow-600">
-                    {{-- At 0 the filter is switched off (ProductsPage: if price_range
-                         > 0), but the label read "0 USD", announcing a maximum price
-                         of nothing over a list showing every product. --}}
-                    <p class="text-sm text-gray-600 mt-1">
-                        @if($price_range > 0)
-                            Jusqu'à {{ number_format($price_range) }} USD
-                        @else
-                            Tous les prix
-                        @endif
-                    </p>
-                </div>
+                    {{-- BRAND --}}
+                    <div class="mb-6 pb-6 border-b border-gray-100">
+                        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Marques</h3>
+                        <div class="space-y-2">
+                            @foreach($brands as $brand)
+                                <label class="flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer hover:text-[#96731A] transition-colors">
+                                    <input type="checkbox"
+                                        wire:model.live="selectedBrands"
+                                        value="{{ $brand->id }}"
+                                        class="rounded border-gray-300 text-[#D4AF37] accent-[#D4AF37] focus:ring-[#D4AF37]/40">
+                                    <span>{{ $brand->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
 
-                {{-- SORT --}}
-                <div class="mb-6">
-                    <h3 class="font-medium text-gray-700 mb-2">Trier par</h3>
-                    <select wire:model.live="sort" class="w-full border-gray-300 rounded-lg p-2">
-                        <option value="latest">Nouveaux</option>
-                        <option value="price">Prix</option>
-                    </select>
+                    {{-- PRICE --}}
+                    <div class="mb-6 pb-6 border-b border-gray-100">
+                        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Prix maximum</h3>
+                        <input type="range"
+                            min="0"
+                            max="2000"
+                            wire:model.live.debounce.300ms="price_range"
+                            class="w-full accent-[#D4AF37]">
+                        {{-- At 0 the filter is switched off (ProductsPage: if price_range
+                             > 0), but the label read "0 USD", announcing a maximum price
+                             of nothing over a list showing every product. --}}
+                        <p class="text-sm font-medium mt-2 {{ $price_range > 0 ? 'text-[#96731A]' : 'text-gray-500' }}">
+                            @if($price_range > 0)
+                                Jusqu'à {{ number_format($price_range) }} USD
+                            @else
+                                Tous les prix
+                            @endif
+                        </p>
+                    </div>
+
+                    {{-- SORT --}}
+                    <div>
+                        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Trier par</h3>
+                        <select wire:model.live="sort" class="w-full border-gray-200 rounded-lg text-sm py-2.5 focus:border-[#D4AF37] focus:ring-[#D4AF37]/40">
+                            <option value="latest">Nouveaux</option>
+                            <option value="price">Prix</option>
+                        </select>
+                    </div>
+
+                    </div>{{-- /collapsible filter body --}}
                 </div>
             </div>
-            
-            <div class="lg:col-span-2">
-                <h2 class="text-xl font-bold mb-4">Tous les Produits</h2>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {{-- RESULTS --}}
+            <div class="lg:col-span-3">
+                <h2 class="text-xl font-bold text-gray-800 mb-5">Tous les produits</h2>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     @forelse($vendorProducts as $vp)
                         @php
                             $product = $vp->product;
@@ -78,7 +106,7 @@
 
                             // Check if product has variations
                             $hasVariations = $vp->has_variations && $vp->variations->count() > 0;
-                            
+
                             // Calculate price display
                             if ($hasVariations) {
                                 $minPrice = $vp->variations->min('price');
@@ -106,66 +134,65 @@
                         @endphp
 
                         @if($displayPrice > 0 || $hasVariations)
-                            <div class="border border-gray-200 rounded-lg bg-white shadow-sm hover:shadow-lg transition"
+                            <div class="group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
                                  x-data="{ added: false }">
 
                                 {{-- IMAGE --}}
-                                <a href="/products/{{ $product->slug }}/{{ $vp_id }}">
-                                    <img src="{{ $img }}" class="w-full h-56 object-cover rounded-t-lg">
+                                <a href="/products/{{ $product->slug }}/{{ $vp_id }}" class="block overflow-hidden rounded-t-xl">
+                                    <img src="{{ $img }}" class="w-full h-56 object-cover group-hover:scale-105 transition-transform duration-500">
                                 </a>
-                                
-                                <div class="p-3">
+
+                                <div class="p-4">
                                     {{-- NAME --}}
-                                    <h3 class="text-md font-semibold line-clamp-2 mb-1">
+                                    <h3 class="text-sm font-semibold text-gray-800 line-clamp-2 mb-2">
                                         {{ $product->name }}
                                     </h3>
 
                                     {{-- VENDOR & STOCK --}}
-                                    <p class="text-xs text-gray-500 mb-1">
-                                        <a href="/vendor/{{ $vendor->slug }}"
-                                           class="inline-flex items-center px-4 py-2 text-xs font-semibold border rounded-full hover:bg-gray-900 hover:text-white">
-                                            🏬 {{ $shop }}
-                                            @if($inStock)
-                                                @if($hasVariations)
-                                                    – {{ $totalStock }} pcs total
-                                                @else
-                                                    – {{ $totalStock }} pcs
-                                                @endif
+                                    <a href="/vendor/{{ $vendor->slug }}"
+                                       class="inline-flex items-center gap-1 mb-2 text-[11px] font-medium text-gray-500 hover:text-[#96731A] transition-colors">
+                                        <i class="fa-solid fa-store text-[#D4AF37]"></i>
+                                        {{ $shop }}
+                                        @if($inStock)
+                                            @if($hasVariations)
+                                                <span class="text-gray-300">·</span> {{ $totalStock }} pcs au total
                                             @else
-                                                – Rupture
+                                                <span class="text-gray-300">·</span> {{ $totalStock }} pcs
                                             @endif
-                                        </a>
-                                    </p>
+                                        @else
+                                            <span class="text-gray-300">·</span> <span class="text-red-500">Rupture</span>
+                                        @endif
+                                    </a>
 
                                     {{-- PRICE + Add to Wishlist --}}
-                                    <div class="flex justify-between items-center mt-2">
+                                    <div class="flex justify-between items-end mt-1">
                                         <div>
                                             @if($hasVariations)
                                                 @if($priceRange)
-                                                    <p class="text-yellow-600 font-bold text-lg">
+                                                    <p class="text-[#96731A] font-bold text-base">
                                                         {{ number_format($minPrice, 2) }} - {{ number_format($maxPrice, 2) }} {{ $currency }}
                                                     </p>
-                                                    <p class="text-xs text-gray-500">
+                                                    <p class="text-xs text-gray-400">
                                                         {{ $vp->variations->count() }} variante(s)
                                                     </p>
                                                 @else
-                                                    <p class="text-yellow-600 font-bold text-lg">
+                                                    <p class="text-[#96731A] font-bold text-base">
                                                         {{ number_format($minPrice, 2) }} {{ $currency }}
                                                     </p>
-                                                    <p class="text-xs text-gray-500">
+                                                    <p class="text-xs text-gray-400">
                                                         {{ $vp->variations->count() }} produit simple
                                                     </p>
                                                 @endif
                                             @else
                                                 @if($salePrice && $salePrice < $vp->price)
-                                                    <p class="text-yellow-600 font-bold text-lg">
+                                                    <p class="text-[#96731A] font-bold text-base">
                                                         {{ number_format($salePrice, 2) }} {{ $currency }}
                                                     </p>
                                                     <p class="line-through text-gray-400 text-xs">
                                                         {{ number_format($vp->price, 2) }} {{ $currency }}
                                                     </p>
                                                 @else
-                                                    <p class="text-yellow-600 font-bold text-lg">
+                                                    <p class="text-[#96731A] font-bold text-base">
                                                         {{ number_format($displayPrice, 2) }} {{ $currency }}
                                                     </p>
                                                 @endif
@@ -175,13 +202,13 @@
                                         @if($inStock)
                                             <button wire:click="addToWishlist({{ $vp_id }})"
                                                     @click="added = true"
-                                                    class="p-2 rounded-full border border-[#D4AF37] bg-white hover:bg-[#FFF7DF] transition">
+                                                    class="p-2 rounded-full border border-[#D4AF37] bg-white hover:bg-[#FDF6E3] transition-colors">
                                                 <i class="fa-solid fa-heart text-[#D4AF37]" x-show="!added"></i>
                                                 <i class="fa-solid fa-check text-green-500" x-show="added"></i>
                                             </button>
                                         @else
-                                            <button disabled class="p-2 rounded-full border bg-gray-300 cursor-not-allowed">
-                                                <i class="fa-solid fa-ban text-gray-500"></i>
+                                            <button disabled class="p-2 rounded-full border bg-gray-100 cursor-not-allowed">
+                                                <i class="fa-solid fa-ban text-gray-400"></i>
                                             </button>
                                         @endif
                                     </div>
@@ -190,9 +217,12 @@
                         @endif
 
                     @empty
-                        <p class="text-gray-600 col-span-3 text-center py-10">
-                            Aucun produit trouvé.
-                        </p>
+                        <div class="col-span-full text-center py-16">
+                            <div class="inline-flex w-16 h-16 items-center justify-center rounded-full bg-gray-100 mb-4">
+                                <i class="fa-solid fa-box-open text-gray-400 text-2xl"></i>
+                            </div>
+                            <p class="text-gray-600 font-medium">Aucun produit trouvé.</p>
+                        </div>
                     @endforelse
                 </div>
 

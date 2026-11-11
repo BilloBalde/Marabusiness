@@ -38,6 +38,33 @@ class VendorProduct extends Model
     ];
 
     /**
+     * An offer a customer may see and buy: switched on itself AND carried by a vendor
+     * who is active.
+     *
+     * The storefront never asked either question. cheapestPerProduct() below only
+     * looks at *rivals'* is_active (to decide who is cheaper), so an offer the vendor
+     * or an admin had switched off — or one belonging to a vendor who was banned or
+     * still awaiting approval — stayed listed, opened and addable to the cart.
+     * Every customer-facing read of vendor_product goes through this scope.
+     */
+    public function scopeSellable($query)
+    {
+        return $query
+            ->where('vendor_product.is_active', true)
+            ->whereExists(function ($sub) {
+                $sub->selectRaw('1')
+                    ->from('vendors as v_sellable')
+                    ->whereColumn('v_sellable.id', 'vendor_product.vendor_id')
+                    ->where('v_sellable.is_active', true);
+            });
+    }
+
+    public function isSellable(): bool
+    {
+        return (bool) $this->is_active && (bool) $this->vendor?->is_active;
+    }
+
+    /**
      * Keeps a single offer per catalogue product: the cheapest among active vendors,
      * ties broken by the lowest id so paging stays stable.
      *

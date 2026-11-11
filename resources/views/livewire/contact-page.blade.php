@@ -13,31 +13,58 @@
         <div class="w-24 h-1 bg-[#D4AF37] mx-auto mt-6 rounded-full"></div>
     </div>
 
+    {{-- The phone, e-mail, address, hours and social links come from the site settings
+         the owner fills in the admin panel (Settings > Site Settings). This page used
+         to print made-up examples (+123 456 7890, contact@yourcompany.com, 123 Main
+         Street) while the real values sat unread in that table. A block whose setting
+         is empty is left out rather than replaced with something invented. --}}
+    @php
+        $contact = \App\Helpers\SiteSettings::contact();
+        $social = array_filter([
+            'facebook' => \App\Helpers\SiteSettings::get('facebook_url'),
+            'instagram' => \App\Helpers\SiteSettings::get('instagram_url'),
+            'whatsapp' => \App\Helpers\SiteSettings::get('whatsapp_url'),
+            'linkedin' => \App\Helpers\SiteSettings::get('linkedin_url'),
+            'tiktok' => \App\Helpers\SiteSettings::get('tiktok_url'),
+        ]);
+        $hours = array_values(array_filter(array_map('trim', preg_split('/\R/', (string) \App\Helpers\SiteSettings::get('business_hours')))));
+        $cardCount = 1 + ($contact['phone'] ? 1 : 0) + ($contact['email'] ? 1 : 0);
+    @endphp
+
     <!-- Contact Cards Row (Top) -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+    <div @class([
+        'grid grid-cols-1 gap-6 mb-10',
+        'md:grid-cols-3' => $cardCount === 3,
+        'md:grid-cols-2' => $cardCount === 2,
+        'max-w-md mx-auto' => $cardCount === 1,
+    ])>
+        @if($contact['phone'])
         <!-- Phone Card -->
         <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 group hover:border-[#D4AF37]">
             <div class="w-14 h-14 bg-[#D4AF37]/10 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-[#D4AF37] transition-all duration-300">
                 <i class="fas fa-phone-alt text-2xl text-[#D4AF37] group-hover:text-white transition-all duration-300"></i>
             </div>
             <h3 class="text-lg font-bold text-gray-900 mb-2">Par Téléphone</h3>
-            <p class="text-gray-600 mb-3">Lun-Ven: 8h-20h | Sam: 9h-18h</p>
-            <a href="tel:+1234567890" class="text-[#D4AF37] font-semibold text-lg hover:underline">
-                +123 456 7890
+            <p class="text-gray-600 mb-3">Appelez-nous directement</p>
+            <a href="tel:{{ preg_replace('/[^\d+]/', '', $contact['phone']) }}" class="text-[#D4AF37] font-semibold text-lg hover:underline">
+                {{ $contact['phone'] }}
             </a>
         </div>
+        @endif
 
+        @if($contact['email'])
         <!-- Email Card -->
         <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 group hover:border-[#D4AF37]">
             <div class="w-14 h-14 bg-[#D4AF37]/10 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-[#D4AF37] transition-all duration-300">
                 <i class="fas fa-envelope text-2xl text-[#D4AF37] group-hover:text-white transition-all duration-300"></i>
             </div>
             <h3 class="text-lg font-bold text-gray-900 mb-2">Par Email</h3>
-            <p class="text-gray-600 mb-3">Réponse sous 24h</p>
-            <a href="mailto:contact@yourcompany.com" class="text-[#D4AF37] font-semibold text-lg hover:underline break-all">
-                contact@yourcompany.com
+            <p class="text-gray-600 mb-3">Écrivez-nous</p>
+            <a href="mailto:{{ $contact['email'] }}" class="text-[#D4AF37] font-semibold text-lg hover:underline break-all">
+                {{ $contact['email'] }}
             </a>
         </div>
+        @endif
 
         <!-- Live Chat Card -->
         <div class="bg-gradient-to-br from-gray-50 to-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 group hover:border-[#D4AF37]">
@@ -46,9 +73,11 @@
             </div>
             <h3 class="text-lg font-bold text-gray-900 mb-2">Chat en Direct</h3>
             <p class="text-gray-600 mb-3">Discutez avec notre équipe</p>
-            <button class="text-[#D4AF37] font-semibold text-lg hover:underline text-left">
+            {{-- Was a <button> wired to nothing. The chat page needs an account, so a
+                 visitor is taken to sign in first. --}}
+            <a href="{{ route('chats') }}" class="text-[#D4AF37] font-semibold text-lg hover:underline text-left">
                 Démarrer le chat
-            </button>
+            </a>
         </div>
     </div>
 
@@ -167,6 +196,7 @@
 
         <!-- RIGHT: CONTACT INFO & MAP (1/3 width) -->
         <div class="lg:w-1/3 space-y-6">
+            @if($hours)
             <!-- Office Hours Card -->
             <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
                 <div class="flex items-center gap-3 mb-6">
@@ -175,23 +205,18 @@
                     </div>
                     <h3 class="text-xl font-bold text-gray-900">Heures d'ouverture</h3>
                 </div>
-                
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center pb-3 border-b border-gray-100">
-                        <span class="text-gray-600">Lundi - Vendredi</span>
-                        <span class="font-semibold text-gray-900">8h00 - 20h00</span>
-                    </div>
-                    <div class="flex justify-between items-center pb-3 border-b border-gray-100">
-                        <span class="text-gray-600">Samedi</span>
-                        <span class="font-semibold text-gray-900">9h00 - 18h00</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600">Dimanche</span>
-                        <span class="font-semibold text-red-500">Fermé</span>
-                    </div>
+
+                {{-- One row per line typed in the "business_hours" setting, for example
+                     "Lundi - Vendredi : 8h00 - 20h00". --}}
+                <div class="space-y-3">
+                    @foreach($hours as $line)
+                        <p class="text-gray-700 pb-3 border-b border-gray-100 last:border-0 last:pb-0">{{ $line }}</p>
+                    @endforeach
                 </div>
             </div>
+            @endif
 
+            @if($contact['address'])
             <!-- Address Card -->
             <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
                 <div class="flex items-center gap-3 mb-6">
@@ -200,27 +225,27 @@
                     </div>
                     <h3 class="text-xl font-bold text-gray-900">Notre adresse</h3>
                 </div>
-                
-                                <p class="text-gray-700 leading-relaxed mb-4">
-                        123 Main Street<br>
-                        Dakar, Sénégal
-                    </p>
-                    
-                <!-- Simple Map Placeholder (optional) -->
-                <div class="mt-4 bg-gray-200 rounded-xl h-40 flex items-center justify-center text-gray-500 border border-gray-300">
-                    <div class="text-center">
-                        <i class="fas fa-map-marked-alt text-3xl text-gray-400 mb-2"></i>
-                        <p class="text-sm">Carte interactive</p>
-                    </div>
-                </div>
-                
-                <a href="#" class="inline-flex items-center gap-2 text-[#D4AF37] font-medium mt-4 hover:underline">
+
+                <p class="text-gray-700 leading-relaxed mb-4">{!! nl2br(e($contact['address'])) !!}</p>
+
+                <a href="https://www.google.com/maps/search/?api=1&query={{ urlencode($contact['address']) }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-[#D4AF37] font-medium mt-4 hover:underline">
                     <i class="fas fa-directions"></i>
                     Obtenir l'itinéraire
                 </a>
             </div>
+            @endif
 
+            @if($social)
             <!-- Social Media Card -->
+            @php
+                $socialStyles = [
+                    'facebook'  => ['hover:bg-[#1877F2]', 'fab fa-facebook-f'],
+                    'instagram' => ['hover:bg-[#E4405F]', 'fab fa-instagram'],
+                    'whatsapp'  => ['hover:bg-[#25D366]', 'fab fa-whatsapp'],
+                    'linkedin'  => ['hover:bg-[#0A66C2]', 'fab fa-linkedin-in'],
+                    'tiktok'    => ['hover:bg-black', 'fab fa-tiktok'],
+                ];
+            @endphp
             <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
                 <div class="flex items-center gap-3 mb-6">
                     <div class="w-12 h-12 bg-[#D4AF37]/10 rounded-2xl flex items-center justify-center">
@@ -228,29 +253,20 @@
                     </div>
                     <h3 class="text-xl font-bold text-gray-900">Suivez-nous</h3>
                 </div>
-                
+
                 <div class="flex flex-wrap gap-3">
-                    <a href="#" class="w-12 h-12 bg-gray-100 hover:bg-[#1877F2] rounded-xl flex items-center justify-center text-gray-600 hover:text-white transition-all duration-300">
-                        <i class="fab fa-facebook-f text-xl"></i>
-                    </a>
-                    <a href="#" class="w-12 h-12 bg-gray-100 hover:bg-[#E4405F] rounded-xl flex items-center justify-center text-gray-600 hover:text-white transition-all duration-300">
-                        <i class="fab fa-instagram text-xl"></i>
-                    </a>
-                    <a href="#" class="w-12 h-12 bg-gray-100 hover:bg-[#25D366] rounded-xl flex items-center justify-center text-gray-600 hover:text-white transition-all duration-300">
-                        <i class="fab fa-whatsapp text-xl"></i>
-                    </a>
-                    <a href="#" class="w-12 h-12 bg-gray-100 hover:bg-[#0A66C2] rounded-xl flex items-center justify-center text-gray-600 hover:text-white transition-all duration-300">
-                        <i class="fab fa-linkedin-in text-xl"></i>
-                    </a>
-                    <a href="#" class="w-12 h-12 bg-gray-100 hover:bg-black rounded-xl flex items-center justify-center text-gray-600 hover:text-white transition-all duration-300">
-                        <i class="fab fa-tiktok text-xl"></i>
-                    </a>
+                    @foreach($social as $network => $url)
+                        <a href="{{ $url }}" target="_blank" rel="noopener" aria-label="{{ ucfirst($network) }}" class="w-12 h-12 bg-gray-100 {{ $socialStyles[$network][0] }} rounded-xl flex items-center justify-center text-gray-600 hover:text-white transition-all duration-300">
+                            <i class="{{ $socialStyles[$network][1] }} text-xl"></i>
+                        </a>
+                    @endforeach
                 </div>
-                
+
                 <p class="text-sm text-gray-500 mt-4">
                     Rejoignez notre communauté pour suivre nos actualités et offres exclusives.
                 </p>
             </div>
+            @endif
         </div>
     </div>
 

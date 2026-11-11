@@ -66,6 +66,20 @@ class OrderResource extends Resource
         return __('filament.nav.orders');
     }
 
+    /**
+     * Whether the person on this panel is barred from changing what the buyer agreed to:
+     * the customer, the shop, the lines, the shipping cost, the payment method and status.
+     *
+     * False here — the platform's own staff correct any field. The vendor panel's
+     * resource extends this class and answers true: a vendor moves an order along
+     * (status, carrier, notes) but cannot re-price it, hand it to another customer or
+     * declare it paid.
+     */
+    protected static function locksAgreedTerms(): bool
+    {
+        return false;
+    }
+
     public static function generateOrderNumber()
     {
         $currentYearMonth = now()->format('Ym'); // Get the current YearMonth (e.g., "202504")
@@ -106,18 +120,22 @@ class OrderResource extends Resource
             ->schema([
                 Group::make()->schema([
                     Section::make('Order Information')->schema([
+                        // preload() is off when the terms are locked: a disabled select
+                        // still rendered every customer's name into the page for a vendor.
                         Select::make('user_id')
                             ->label('Customer Info')
                             ->relationship('user', 'name')
-                            ->preload()
+                            ->preload(fn (): bool => ! static::locksAgreedTerms())
                             ->searchable()
-                            ->required(),
+                            ->required()
+                            ->disabled(fn (): bool => static::locksAgreedTerms()),
                         Select::make('vendor_id')
                             ->label('Vendor')
                             ->relationship('vendor', 'store_name')
-                            ->preload()
+                            ->preload(fn (): bool => ! static::locksAgreedTerms())
                             ->searchable()
-                            ->required(),
+                            ->required()
+                            ->disabled(fn (): bool => static::locksAgreedTerms()),
 
                         Hidden::make('order_number')
                             ->default(function () {
@@ -136,7 +154,8 @@ class OrderResource extends Resource
                                 'om' => 'Orange Money',
                             ])
                             ->required()
-                            ->reactive(),
+                            ->reactive()
+                            ->disabled(fn (): bool => static::locksAgreedTerms()),
 
                         TextInput::make('amount')
                             ->label('Paid Amount')
@@ -172,7 +191,12 @@ class OrderResource extends Resource
                                 'failed' => 'Failed'
                             ])
                             ->required()
-                            ->default('pending'),
+                            ->default('pending')
+                            // Never typed in by a vendor: Order's saved() hook turns every
+                            // financial transaction of a "paid" order into PROCESSED, which
+                            // books commission and revenue for money nobody has confirmed.
+                            // A vendor's route to "paid" is confirming a payment row.
+                            ->disabled(fn (): bool => static::locksAgreedTerms()),
 
                         // Same gap as the table's status column: without a
                         // 'negotiating' option, editing an order under negotiation
@@ -240,7 +264,8 @@ class OrderResource extends Resource
                             ->numeric()
                             ->default(0)
                             ->required()
-                            ->columnSpan(1),
+                            ->columnSpan(1)
+                            ->disabled(fn (): bool => static::locksAgreedTerms()),
 
                         // Then update all calculations to include shipping
                         Placeholder::make('grand_total_placeholder')
@@ -525,6 +550,7 @@ class OrderResource extends Resource
                                     }),
                             ])->columns(12)
                             ->defaultItems(0)
+                            ->disabled(fn (): bool => static::locksAgreedTerms())
                             ->itemLabel(function (array $state): ?string {
                                 // Create a better label for each item showing product and variations
                                 if (empty($state['product_id'])) {

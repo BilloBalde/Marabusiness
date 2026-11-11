@@ -119,7 +119,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       case 'GBP': return '£';
       case 'GNF': return 'FG';
       case 'CNY': return '¥';
-      default: return '\$';
+      // No symbol for a currency we don't recognize — showing '$' implied US
+      // dollars for currencies that aren't, which is worse than showing nothing.
+      default: return '';
     }
   }
 
@@ -316,7 +318,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => ReviewListScreen(
-          productId: product.id,
+          productId: product.vendorProductId,
           productName: product.name,
           initialReviews: product.reviews,
         ),

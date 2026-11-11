@@ -124,21 +124,26 @@ Route::middleware('auth')->group(function (){
             'quotes' => $rfq->offers()->latest()->get(),
         ]);
     })->name('api.rfq.details');
-    /* Route::get('/logout', function () {
+    // One closure for both verbs: the GET route used to be a separate copy that,
+    // at some point, lost its Auth::logout() call and became a no-op — opening the
+    // link in a new tab, or visiting it directly, redirected to the homepage while
+    // leaving the session fully authenticated. Sharing the body makes that specific
+    // way of drifting apart impossible.
+    //
+    // invalidate() + regenerateToken() alongside Auth::logout(), matching Laravel's
+    // own documented logout example: logout() alone drops the user from the guard
+    // but leaves the rest of the session (and its CSRF token) intact.
+    $logout = function () {
         \Illuminate\Support\Facades\Auth::logout();
+        request()->session()->invalidate();
+        request()->session()->regenerateToken();
         session()->flash('success', 'Utilisateur déconnecté avec succès');
         return redirect()->route('home');
-    })->name('logout'); */
-    Route::post('/logout', function () {
-        \Illuminate\Support\Facades\Auth::logout();
-        session()->flash('success', 'Utilisateur déconnecté avec succès');
-        return redirect()->route('home');
-    })->name('logout');
+    };
 
-    // Keep GET for backward compatibility but redirect to POST
-    Route::get('/logout', function () {
-        return redirect()->route('home');
-    })->name('logout.get');
+    Route::post('/logout', $logout)->name('logout');
+    // Kept for links or bookmarks written before the form-based POST logout existed.
+    Route::get('/logout', $logout)->name('logout.get');
 });
 Route::get('/cookies', \App\Livewire\CookieSettings::class)->name('cookies');
 // Auth here only proves someone is logged in; InvoiceController itself checks that

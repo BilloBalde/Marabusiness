@@ -131,7 +131,7 @@ class CommonProductCard extends StatelessWidget {
       case 'GBP': return '£';
       case 'GNF': return 'FG';
       case 'CNY': return '¥';
-      default: return '\$';
+      default: return '';
     }
   }
 

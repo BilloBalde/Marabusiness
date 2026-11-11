@@ -103,7 +103,7 @@ class QuoteClientPagesTest extends TestCase
             ->call('sendReply')
             ->assertHasNoErrors();
 
-        $lastMessage = Message::where('quote_id', $quote->id)->latest()->first();
+        $lastMessage = Message::where('quote_id', $quote->id)->latest('id')->first();
 
         $this->assertSame('Parfait, merci !', $lastMessage->content);
         $this->assertSame($me->id, $lastMessage->sender_id);
@@ -125,7 +125,7 @@ class QuoteClientPagesTest extends TestCase
             ->call('sendReply')
             ->assertHasNoErrors();
 
-        $lastMessage = Message::where('quote_id', $quote->id)->latest()->first();
+        $lastMessage = Message::where('quote_id', $quote->id)->latest('id')->first();
 
         $this->assertCount(1, $lastMessage->attachments);
     }

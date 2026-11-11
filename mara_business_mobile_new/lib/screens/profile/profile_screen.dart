@@ -1041,7 +1041,7 @@ Widget _buildOrdersTab() {
   );
 }
   Widget _buildOrderCard(Order order) {
-    int totalQuantity = order.items.fold(0, (sum, item) => sum + item.quantity);
+    int totalQuantity = order.itemsCount;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(

@@ -20,13 +20,15 @@ Vous avez reçu une nouvelle commande de la part de **{{ $customer->first_name ?
 | {{ $item->product->name ?? 'Produit' }} | {{ $item->quantity }} | {{ number_format($item->unit_amount, 2) }} {{ $order->vendor->currency->code ?? 'GNF' }} | {{ number_format($item->total_amount, 2) }} {{ $order->vendor->currency->code ?? 'GNF' }} |
 @endforeach
 
+@if($order->address)
 ## Informations de livraison
 
 **Destinataire :** {{ $order->address->first_name }} {{ $order->address->last_name }}
 **Téléphone :** {{ $order->address->phone }}
-**Adresse :** {{ $order->address->street_address }}, {{ $order->address->city }}, {{ $order->address->state }}, {{ $order->address->zip_code }}, {{ $order->address->country }}
+**Adresse :** {{ collect([$order->address->street_address, $order->address->city, $order->address->state, $order->address->zip_code, $order->address->country])->filter()->implode(', ') }}
 @if($order->address->zone)
 **Zone de livraison :** {{ $order->address->zone }}
+@endif
 @endif
 
 ## Récapitulatif financier
@@ -35,7 +37,7 @@ Vous avez reçu une nouvelle commande de la part de **{{ $customer->first_name ?
 - **Frais de livraison :** {{ number_format($order->shipping_amount, 2) }} {{ $order->vendor->currency->code ?? 'GNF' }}
 - **Total :** {{ number_format($order->grand_total, 2) }} {{ $order->vendor->currency->code ?? 'GNF' }}
 
-<x-mail::button :url="route('vendor.orders.show', $order)">
+<x-mail::button :url="url('/vendor/orders/' . $order->id)">
 Gérer la commande
 </x-mail::button>
 
@@ -44,7 +46,9 @@ Gérer la commande
 **Instructions importantes :**
 - Préparez la commande dès que possible
 - Si vous utilisez un service de livraison, confirmez l'expédition depuis votre tableau de bord
+@if($order->address?->phone)
 - En cas de question, contactez le client au {{ $order->address->phone }}
+@endif
 
 Cordialement,<br>
 {{ config('app.name') }}

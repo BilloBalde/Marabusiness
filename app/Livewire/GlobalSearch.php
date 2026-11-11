@@ -22,8 +22,8 @@ class GlobalSearch extends Component
             // A catalogue product with no active vendor listing has nothing to link
             // to — the dropdown builds its href from vendorProducts[0], which 500s
             // the whole page hosting the search bar without this guard.
-            ->whereHas('vendorProducts', fn ($q) => $q->where('is_active', 1))
-            ->with(['vendorProducts' => fn ($q) => $q->where('is_active', 1)])
+            ->whereHas('vendorProducts', fn ($q) => $q->sellable())
+            ->with(['vendorProducts' => fn ($q) => $q->sellable()])
             ->limit(8)
             ->get(['id', 'name', 'slug', 'images']);
     }

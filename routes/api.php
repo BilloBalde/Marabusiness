@@ -31,6 +31,12 @@ Route::get('/ping', function() {
 Route::post('/payments/lengopay/callback', [LengoPayWebhookController::class, 'handle'])
     ->name('lengopay.callback');
 
+// Stripe calls this itself (dashboard > Developers > Webhooks, events
+// checkout.session.completed and checkout.session.async_payment_succeeded).
+// Authenticated by the signature over the raw body, not by a login.
+Route::post('/payments/stripe/webhook', [\App\Http\Controllers\StripeWebhookController::class, 'handle'])
+    ->name('stripe.webhook');
+
 // Public routes
 Route::prefix('v1')->group(function () {
     // Auth routes

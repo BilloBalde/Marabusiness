@@ -594,9 +594,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 ),
 
               // Items Summary
-              if (order.items.isNotEmpty)
+              if (order.itemsCount > 0)
                 Text(
-                  '${order.items.length} article${order.items.length > 1 ? 's' : ''}',
+                  '${order.itemsCount} article${order.itemsCount > 1 ? 's' : ''}',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],

@@ -102,8 +102,14 @@ class HomePage extends Component
      */
     private function mapProductForHomepage(Product $product)
     {
+        // Only offers a customer can actually buy: the offer itself and its vendor
+        // must both be active (mirrors VendorProduct::scopeSellable()).
+        $sellableVendors = $product->vendors->filter(
+            fn ($vendor) => $vendor->is_active && $vendor->pivot->is_active
+        );
+
         // Check if product has vendors
-        if (!$product->vendors || $product->vendors->isEmpty()) {
+        if ($sellableVendors->isEmpty()) {
             return (object)[
                 'id' => $product->id,
                 'name' => $product->name,
@@ -125,7 +131,7 @@ class HomePage extends Component
         }
 
         // Remove duplicated vendors (variations)
-        $uniqueVendor = $product->vendors
+        $uniqueVendor = $sellableVendors
             ->groupBy('id')
             ->map(fn($g) => $g->first())
             ->sortBy(fn($v) => $v->pivot->price)

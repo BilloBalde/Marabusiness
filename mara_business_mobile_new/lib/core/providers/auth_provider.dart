@@ -146,6 +146,28 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> forgotPassword(String email) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.forgotPassword(email);
+
+      _isLoading = false;
+      if (!response.success) {
+        _error = response.message ?? 'Une erreur est survenue';
+      }
+      notifyListeners();
+      return response.success;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   // Add this method to AuthProvider
 
   Future<bool> updateProfile(Map<String, dynamic> data) async {

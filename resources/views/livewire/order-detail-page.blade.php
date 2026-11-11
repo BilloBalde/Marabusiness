@@ -23,10 +23,19 @@
     ];
 
     $shipment = $order->latestShipment;
+
+    $orderStatusLabels = [
+        'new' => 'Nouvelle', 'processing' => 'En traitement', 'shipped' => 'Expédiée',
+        'delivered' => 'Livrée', 'cancelled' => 'Annulée', 'negotiating' => 'En négociation',
+    ];
+    $paymentStatusLabels = [
+        'paid' => 'Payé', 'pending' => 'En attente', 'partial' => 'Partiel',
+        'unpaid' => 'Non payé', 'refunded' => 'Remboursé', 'failed' => 'Échoué',
+    ];
 @endphp
 
 <div class="w-full max-w-[85rem] py-10 px-4 sm:px-6 lg:px-8 mx-auto">
-    @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.my-order', 'hasSub' => true, 'subContent' => 'ui.navbar.orders', 'subLink' => 'orders'])
+    @include('livewire.partials.nav-header', ['tileContent' => 'ui.navbar.my_order', 'hasSub' => true, 'subContent' => 'ui.navbar.orders', 'subLink' => 'orders'])
 
     <!-- HEADER -->
     <div class="flex items-center justify-between mb-8 flex-wrap gap-3">
@@ -63,7 +72,7 @@
             </div>
             <div>
                 <p class="text-xs text-gray-500 uppercase">Client</p>
-                <p class="mt-1 font-semibold text-gray-700">{{ ($address == 'no address') ? 'no address' : $address->full_name }}</p>
+                <p class="mt-1 font-semibold text-gray-700">{{ ($address == 'no address') ? 'Aucune adresse' : $address->full_name }}</p>
             </div>
         </div>
 
@@ -99,7 +108,7 @@
 
                 <div class="flex items-center justify-between mt-1 flex-wrap gap-2">
                     <span class="inline-block px-3 py-1 text-white rounded-lg text-sm shadow {{ $statusColor }}">
-                        {{ ucfirst($order->status) }}
+                        {{ $orderStatusLabels[$order->status] ?? ucfirst($order->status) }}
                     </span>
                     
                     {{-- Cancel Button - Only show for orders with status 'new' --}}
@@ -229,7 +238,7 @@
                 @endphp
 
                 <span class="mt-1 inline-block px-3 py-1 text-white rounded-lg text-sm shadow {{ $payColor }}">
-                    {{ ucfirst($order->payment_status) }}
+                    {{ $paymentStatusLabels[$order->payment_status] ?? ucfirst($order->payment_status) }}
                 </span>
             </div>
         </div>

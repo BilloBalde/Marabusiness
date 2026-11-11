@@ -18,7 +18,11 @@ class ChatController extends Controller
     {
         try {
             $user = Auth::user();
-            $contacts = [];
+            // A plain [] blows up on ->values() below whenever neither branch
+            // reassigns it — no role at all, or role 'vendor' with no vendor
+            // row yet. An empty Collection keeps that case a graceful empty
+            // list instead of a 500.
+            $contacts = collect();
 
             if ($user->hasRole('customer')) {
                 // Get managers customer has chatted with
@@ -42,6 +46,7 @@ class ChatController extends Controller
                     ->toArray();
 
                 $vendors = User::role('vendor')
+                    ->where('id', '!=', $user->id)
                     ->whereHas('vendor', fn($q) => $q->whereIn('id', $vendorIds))
                     ->with('vendor')
                     ->get(['id', 'name', 'email', 'avatar']);
@@ -60,7 +65,11 @@ class ChatController extends Controller
                         ->unique()
                         ->toArray();
 
+                    // A shop owner who orders from their own shop is listed as one
+                    // of its customers; opening that "conversation" is a chat with
+                    // themselves, which canChat() refuses.
                     $customers = User::whereIn('id', $customerIds)
+                        ->where('id', '!=', $user->id)
                         ->get(['id', 'name', 'email', 'avatar']);
 
                     $contacts = $customers->map(fn($customer) => $this->formatContact($customer, $user));
@@ -105,11 +114,18 @@ class ChatController extends Controller
         try {
             $currentUser = Auth::user();
 
+            if ((int) $userId === $currentUser->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous ne pouvez pas discuter avec vous-même.'
+                ], 403);
+            }
+
             // Check if user can chat
             if (!$this->canChat($currentUser->id, $userId)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You are not authorized to view these messages'
+                    'message' => 'Vous ne pouvez pas consulter cette conversation.'
                 ], 403);
             }
 
@@ -162,11 +178,18 @@ class ChatController extends Controller
             $sender = Auth::user();
             $receiverId = $request->receiver_id;
 
+            if ((int) $receiverId === $sender->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous ne pouvez pas vous envoyer un message à vous-même.'
+                ], 403);
+            }
+
             // Check authorization
             if (!$this->canChat($sender->id, $receiverId)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You are not authorized to send messages to this user'
+                    'message' => "Vous ne pouvez pas envoyer de message à cet utilisateur."
                 ], 403);
             }
 

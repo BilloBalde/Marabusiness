@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorProduct;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -147,7 +148,8 @@ class StockIntegrityTest extends TestCase
     {
         // The guard must refuse only genuine shortfalls; an ordinary purchase has
         // to keep working, and the stock has to come down by what was bought.
-        Sanctum::actingAs(User::factory()->create());
+        Mail::fake();
+        Sanctum::actingAs($buyer = User::factory()->create());
         $listing = $this->listing(5);
 
         $this->addToCart($listing, 2);
@@ -156,5 +158,8 @@ class StockIntegrityTest extends TestCase
 
         $this->assertNotSame(409, $response->getStatusCode(), 'a purchase within stock must not be refused');
         $this->assertSame(3, (int) $listing->fresh()->stock, '5 in stock minus 2 bought');
+
+        // Sent after the response now, not inline — it must still be sent.
+        Mail::assertSent(\App\Mail\OrderPlaced::class, fn ($mail) => $mail->hasTo($buyer->email));
     }
 }

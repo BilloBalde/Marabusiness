@@ -14,7 +14,7 @@
                 À propos de <span class="text-gray-900">MARA BUSINESS</span>
             </h1>
             <p class="text-xl md:text-2xl max-w-3xl mx-auto opacity-90">
-                Votre partenaire de confiance pour la distribution et la logistique en Afrique et dans le monde
+                La place de marché qui rapproche acheteurs et vendeurs
             </p>
             <div class="w-24 h-1 bg-white mx-auto mt-8 rounded-full"></div>
         </div>
@@ -59,15 +59,18 @@
             </h2>
             
             <div class="space-y-4 text-gray-600 leading-relaxed">
+                {{-- The founding year, the Dakar warehouse, "offices in 5 countries" and the
+                     "hundreds of customers" were invented; so were the figures and the team
+                     below. This page now says only what the platform does and shows real counts. --}}
                 <p>
-                    <span class="font-bold text-gray-900">MARA BUSINESS</span> est née d'une vision simple mais puissante : 
-                    faciliter le commerce entre l'Afrique et le reste du monde. Fondée en 2020, notre entreprise a commencé 
-                    avec une petite équipe passionnée et un entrepôt modeste à Dakar.
+                    <span class="font-bold text-gray-900">MARA BUSINESS</span> est une place de marché en ligne :
+                    des vendeurs y présentent leurs produits, des acheteurs les commandent et les règlent
+                    par carte, Orange Money ou à la livraison.
                 </p>
                 <p>
-                    Aujourd'hui, nous sommes fiers de servir des centaines de clients à travers le continent, 
-                    avec des bureaux dans 5 pays africains et des partenariats logistiques internationaux. 
-                    Notre croissance est le reflet de notre engagement envers l'excellence et la satisfaction client.
+                    Notre rôle est de mettre en relation acheteurs et vendeurs, de sécuriser le paiement et de suivre
+                    la livraison. Nous accompagnons aussi les entreprises qui souhaitent s'approvisionner à l'international
+                    et développer leur présence en ligne.
                 </p>
                 <p>
                     Nous croyons fermement au potentiel de l'Afrique et travaillons chaque jour pour créer 
@@ -75,21 +78,24 @@
                 </p>
             </div>
             
-            <!-- Stats -->
+            <!-- Stats: real counts from the database -->
+            @php
+                $figures = array_filter([
+                    'Boutiques actives' => $vendorsCount,
+                    'Produits en vente' => $productsCount,
+                    'Commandes livrées' => $deliveredCount,
+                ]);
+            @endphp
+            @if($figures)
             <div class="grid grid-cols-3 gap-4 pt-6">
+                @foreach($figures as $label => $value)
                 <div>
-                    <div class="text-3xl font-bold text-[#D4AF37]">500+</div>
-                    <div class="text-sm text-gray-500">Clients satisfaits</div>
+                    <div class="text-3xl font-bold text-[#D4AF37]">{{ number_format($value, 0, ',', ' ') }}</div>
+                    <div class="text-sm text-gray-500">{{ $label }}</div>
                 </div>
-                <div>
-                    <div class="text-3xl font-bold text-[#D4AF37]">5</div>
-                    <div class="text-sm text-gray-500">Pays couverts</div>
-                </div>
-                <div>
-                    <div class="text-3xl font-bold text-[#D4AF37]">10k+</div>
-                    <div class="text-sm text-gray-500">Produits livrés</div>
-                </div>
+                @endforeach
             </div>
+            @endif
         </div>
 
         <!-- Right: Image/Illustration -->
@@ -154,86 +160,11 @@
         </div>
     </div>
 
-    <!-- Team Section -->
-    <div class="mb-16">
-        <div class="text-center mb-12">
-            <div class="inline-block px-4 py-2 bg-[#D4AF37]/10 rounded-full text-[#D4AF37] font-semibold text-sm mb-4">
-                Notre Équipe
-            </div>
-            <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Les talents derrière MARA BUSINESS</h2>
-            <p class="text-gray-600 max-w-2xl mx-auto">
-                Une équipe passionnée, diversifiée et engagée à votre service
-            </p>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <!-- Team Member 1 -->
-            <div class="group">
-                <div class="relative rounded-2xl overflow-hidden mb-4">
-                    <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=687&q=80" 
-                         alt="Amadou Diallo" 
-                         class="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div class="absolute bottom-4 left-4 text-white transform translate-y-10 group-hover:translate-y-0 transition-transform duration-300 opacity-0 group-hover:opacity-100">
-                        <p class="text-sm">Fondateur & CEO</p>
-                    </div>
-                </div>
-                <h3 class="text-lg font-bold text-gray-900">Amadou Diallo</h3>
-                <p class="text-[#D4AF37] text-sm">Fondateur & CEO</p>
-            </div>
-
-            <!-- Team Member 2 -->
-            <div class="group">
-                <div class="relative rounded-2xl overflow-hidden mb-4">
-                    <img src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=687&q=80" 
-                         alt="Fatou Ndiaye" 
-                         class="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div class="absolute bottom-4 left-4 text-white transform translate-y-10 group-hover:translate-y-0 transition-transform duration-300 opacity-0 group-hover:opacity-100">
-                        <p class="text-sm">Directrice des Opérations</p>
-                    </div>
-                </div>
-                <h3 class="text-lg font-bold text-gray-900">Fatou Ndiaye</h3>
-                <p class="text-[#D4AF37] text-sm">Directrice des Opérations</p>
-            </div>
-
-            <!-- Team Member 3 -->
-            <div class="group">
-                <div class="relative rounded-2xl overflow-hidden mb-4">
-                    <img src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?ixlib=rb-4.0.3&auto=format&fit=crop&w=687&q=80" 
-                         alt="Moussa Keita" 
-                         class="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div class="absolute bottom-4 left-4 text-white transform translate-y-10 group-hover:translate-y-0 transition-transform duration-300 opacity-0 group-hover:opacity-100">
-                        <p class="text-sm">Directeur Commercial</p>
-                    </div>
-                </div>
-                <h3 class="text-lg font-bold text-gray-900">Moussa Keita</h3>
-                <p class="text-[#D4AF37] text-sm">Directeur Commercial</p>
-            </div>
-
-            <!-- Team Member 4 -->
-            <div class="group">
-                <div class="relative rounded-2xl overflow-hidden mb-4">
-                    <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&auto=format&fit=crop&w=761&q=80" 
-                         alt="Aminata Sow" 
-                         class="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <div class="absolute bottom-4 left-4 text-white transform translate-y-10 group-hover:translate-y-0 transition-transform duration-300 opacity-0 group-hover:opacity-100">
-                        <p class="text-sm">Responsable Logistique</p>
-                    </div>
-                </div>
-                <h3 class="text-lg font-bold text-gray-900">Aminata Sow</h3>
-                <p class="text-[#D4AF37] text-sm">Responsable Logistique</p>
-            </div>
-        </div>
-    </div>
-
     <!-- CTA Section -->
     <div class="bg-gradient-to-r from-gray-900 to-gray-800 rounded-3xl p-8 md:p-12 text-center text-white">
         <h2 class="text-3xl md:text-4xl font-bold mb-4">Prêt à travailler avec nous ?</h2>
         <p class="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Rejoignez les centaines d'entreprises qui nous font confiance pour leurs besoins logistiques
+            Parlez-nous de votre projet : nous vous répondrons dans les meilleurs délais.
         </p>
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
             <a href="/contact" class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[#D4AF37] hover:bg-[#c9a12f] text-gray-900 font-bold rounded-xl transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl">

@@ -29,7 +29,7 @@ class OrderPlaced extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Commande Placée - EGPG SA',
+            subject: 'Commande Placée - ' . config('app.name'),
         );
     }
 

@@ -50,7 +50,7 @@ class WishlistController extends Controller
             ]);
 
             // Verify product exists
-            $product = VendorProduct::with('product')->find($vendorProductId);
+            $product = VendorProduct::with('product')->sellable()->find($vendorProductId);
             if (!$product) {
                 return response()->json([
                     'success' => false,

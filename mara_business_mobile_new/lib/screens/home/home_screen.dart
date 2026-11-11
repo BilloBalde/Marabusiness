@@ -78,12 +78,12 @@ class _HomeScreenState extends State<HomeScreen> {
     // 🔽 Add this condition to show the error
     if (provider.error != null) {
       return Scaffold(
-        appBar: AppBar(title: Text('Error')),
+        appBar: AppBar(title: Text('Erreur')),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              '❌ Error loading home:\n${provider.error}',
+              '❌ Erreur de chargement de l\'accueil :\n${provider.error}',
               style: TextStyle(color: Colors.red, fontSize: 16),
               textAlign: TextAlign.center,
             ),
@@ -439,7 +439,7 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Popular Categories',
+                  'Catégories populaires',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -450,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFFD4AF37),
                   ),
-                  child: const Text('View All'),
+                  child: const Text('Voir tout'),
                 ),
               ],
             ),
@@ -547,7 +547,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'New Arrivals',
+                                'Nouveautés',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
@@ -567,7 +567,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     vertical: 8,
                                   ),
                                 ),
-                                child: const Text('Shop Now'),
+                                child: const Text('Acheter'),
                               ),
                             ],
                           ),
@@ -716,7 +716,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const Spacer(),
                           const Text(
-                            'Limited Time\nOffer',
+                            'Offre à durée\nlimitée',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -725,7 +725,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            'Buy 1 Get 1 Free',
+                            '1 acheté, 1 offert',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
@@ -798,7 +798,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const Spacer(),
                           const Text(
-                            'New\nCustomer',
+                            'Nouveau\nClient',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -807,7 +807,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            '20% OFF',
+                            '-20%',
                             style: TextStyle(
                               color: Color(0xFFD4AF37),
                               fontSize: 14,
@@ -846,7 +846,7 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFFD4AF37),
               ),
-              child: const Text('See All'),
+              child: const Text('Voir tout'),
             ),
         ],
       ),

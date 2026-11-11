@@ -403,17 +403,19 @@
                     <div class="space-y-3">
                         <div class="flex items-center gap-3">
                             <i class="fas fa-envelope text-[#D4AF37] w-5"></i>
-                            <a href="mailto:legal@marabusiness.com" class="text-gray-700 hover:text-[#D4AF37]">legal@marabusiness.com</a>
+                            <x-company-contact type="email" class="text-gray-700 hover:text-[#D4AF37]" />
                         </div>
+                        @if($phone = \App\Support\Company::get('phone'))
                         <div class="flex items-center gap-3">
                             <i class="fas fa-phone-alt text-[#D4AF37] w-5"></i>
-                            <a href="tel:+221781234567" class="text-gray-700 hover:text-[#D4AF37]">+221 78 123 45 67</a>
+                            <a href="tel:{{ \App\Support\Company::digits($phone) }}" class="text-gray-700 hover:text-[#D4AF37]">{{ $phone }}</a>
                         </div>
+                        @endif
                     </div>
                     
                     <div class="bg-gray-50 p-4 rounded-xl">
                         <p class="text-sm text-gray-700 mb-1">Service juridique</p>
-                        <p class="text-sm text-[#D4AF37]">a.diallo@marabusiness.com</p>
+                        <p class="text-sm text-[#D4AF37]"><x-company-contact type="email" /></p>
                     </div>
                 </div>
             </div>

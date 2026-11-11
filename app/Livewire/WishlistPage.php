@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 
 class WishlistPage extends Component
 {
-    #[Title('Wishlist - MARA BUSINESS')]
+    #[Title('Ma liste de souhaits - MARA BUSINESS')]
 
     public $wishlist_items = [];
     public $selected_items = [];
@@ -65,7 +65,7 @@ class WishlistPage extends Component
 
         if (!Auth::check()) {
             $this->dispatch('show-toast',
-                message: 'Please login to add items to cart.',
+                message: 'Connectez-vous pour ajouter des articles au panier.',
                 type: 'warning'
             );
             return $this->redirectRoute('login');
@@ -94,7 +94,7 @@ class WishlistPage extends Component
 
         $this->dispatch('cart-updated', total_count: CartManagement::getCartCount());
         $this->dispatch('show-toast',
-            message: 'Selected items added to cart.',
+            message: 'Articles sélectionnés ajoutés au panier.',
             type: 'success'
         );
     }

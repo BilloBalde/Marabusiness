@@ -2,6 +2,7 @@
 
 import '../../utils/app_logger.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../services/api_service.dart';
 import '../models/cart.dart';
 import '../models/checkout_models.dart';
@@ -24,6 +25,7 @@ class CheckoutProvider extends ChangeNotifier {
   double? _latitude;
   double? _longitude;
   bool _isGettingLocation = false;
+  String? _locationError;
 
   // Shipping
   bool _hasShippingCalculated = false;
@@ -81,6 +83,7 @@ class CheckoutProvider extends ChangeNotifier {
   double? get latitude => _latitude;
   double? get longitude => _longitude;
   bool get isGettingLocation => _isGettingLocation;
+  String? get locationError => _locationError;
 
   bool get hasShippingCalculated => _hasShippingCalculated;
   ShippingResult? get shippingResult => _shippingResult;
@@ -278,19 +281,45 @@ void _generateSummaryWithoutShipping() {
   // Location methods
   Future<void> getLocation() async {
     _isGettingLocation = true;
+    _locationError = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(seconds: 2));
-    
-    _latitude = 9.945587;
-    _longitude = -9.696677;
-    _isGettingLocation = false;
-    
-    if (_shippingAddress != null) {
-      await calculateShipping();
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        _locationError = 'Activez la localisation sur votre appareil.';
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _locationError = 'Autorisez l\'accès à la localisation pour utiliser cette fonction.';
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+
+      _latitude = position.latitude;
+      _longitude = position.longitude;
+
+      if (_shippingAddress != null) {
+        await calculateShipping();
+      }
+    } catch (e) {
+      logDebug('🔴 getLocation error: $e');
+      _locationError = 'Impossible de récupérer votre position.';
+    } finally {
+      _isGettingLocation = false;
+      notifyListeners();
     }
-    
-    notifyListeners();
   }
 
   void setLocation(double lat, double lng) {

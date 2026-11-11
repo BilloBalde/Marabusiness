@@ -44,7 +44,7 @@ class VendorPage extends Component
 
     public function mount($slug)
     {
-        $this->vendor = Vendor::where('slug', $slug)->firstOrFail();
+        $this->vendor = Vendor::where('slug', $slug)->where('is_active', true)->firstOrFail();
         
         if (Auth::check()) {
             $this->isFollowing = $this->vendor->is_followed_by_current_user;

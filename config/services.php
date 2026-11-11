@@ -71,6 +71,10 @@ return [
     */
     'stripe' => [
         'secret' => env('STRIPE_SECRET'),
+        // Signing secret of the webhook endpoint (Stripe dashboard > Developers >
+        // Webhooks, "whsec_..."). Without it POST /api/payments/stripe/webhook answers
+        // 503 and a buyer who pays then closes the tab is not credited.
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
     ],
 
     'google' => [

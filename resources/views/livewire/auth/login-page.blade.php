@@ -20,6 +20,13 @@
 
           <hr class="my-6 border-gray-300">
 
+          {{-- SUCCESS MESSAGE (e.g. after a password reset) --}}
+          @if (session('success'))
+            <div class="px-4 py-3 mb-4 text-sm text-green-700 bg-green-100 border border-green-200 rounded-lg">
+                {{ session('success') }}
+            </div>
+          @endif
+
           {{-- ERROR MESSAGE --}}
           @if (session('error'))
             <div class="px-4 py-3 mb-4 text-sm text-red-700 bg-red-100 border border-red-200 rounded-lg">

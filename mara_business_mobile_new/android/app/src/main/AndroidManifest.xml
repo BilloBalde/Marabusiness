@@ -4,6 +4,10 @@
     <!-- ✅ Internet permission -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Location, for "use my current location" at checkout -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <!--
       allowBackup was true, which put SharedPreferences — where the auth token is
       kept — into Android's backup: extractable with adb backup on many devices

@@ -106,6 +106,7 @@ class ProductsPage extends Component
         // filter, so a product carried by three shops used to appear three times.
         $query = VendorProduct::with(['product', 'vendor.currency', 'variations'])
             ->whereHas('product', fn($q) => $q->where('is_active', 1))
+            ->sellable()
             ->cheapestPerProduct()
             // vendor_product.price is in the vendor's own currency, and the price
             // filter and the price sort below both compared it as a bare number.

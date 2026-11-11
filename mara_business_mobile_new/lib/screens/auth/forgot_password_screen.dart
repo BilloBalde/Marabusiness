@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/providers/auth_provider.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -21,10 +23,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSubmitted = true);
-      // TODO: Implement forgot password API call
-      await Future.delayed(const Duration(seconds: 2));
-      
-      if (mounted) {
+
+      final authProvider = context.read<AuthProvider>();
+      final success = await authProvider.forgotPassword(_emailController.text.trim());
+
+      if (!mounted) return;
+
+      if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Lien de réinitialisation envoyé à votre adresse e-mail.'),
@@ -34,6 +39,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         );
         setState(() => _isSubmitted = false);
         Navigator.pop(context);
+      } else {
+        setState(() => _isSubmitted = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.error ?? 'Une erreur est survenue.'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }

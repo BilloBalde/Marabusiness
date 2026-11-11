@@ -52,36 +52,64 @@
                 <h2 class="text-2xl font-bold text-gray-900">Éditeur du site</h2>
             </div>
             
+            {{-- The publisher's identity comes from config/company.php (.env). This section used
+                 to state an invented company: a SARL with a 5 000 000 FCFA capital, an RCCM and a
+                 NINEA number, an address in Dakar and a named publication director. A line whose
+                 value is not set is left out rather than made up. --}}
+            @php
+                $company = fn (string $key) => \App\Support\Company::get($key);
+                $identity = array_filter([
+                    'Raison sociale' => $company('name'),
+                    'Forme juridique' => $company('legal_form'),
+                    'Capital' => $company('capital'),
+                    'RCCM' => $company('registration'),
+                    'NIF' => $company('tax_id'),
+                ]);
+                $coordinates = array_filter([
+                    'Adresse' => $company('address'),
+                    'Téléphone' => $company('phone'),
+                    'Email' => $company('email'),
+                ]);
+            @endphp
             <div class="space-y-4 text-gray-700">
                 <p>
-                    <span class="font-semibold text-gray-900">MARA BUSINESS</span> est une société à responsabilité limitée (SARL) au capital de 5 000 000 FCFA, immatriculée au Registre du Commerce et des Crédits Mobiliers de Dakar sous le numéro RCCM SN-DKR-2020-B-12345.
+                    Ce site est édité par <span class="font-semibold text-gray-900">{{ $company('name') ?? config('app.name') }}</span>.
                 </p>
-                
+
+                @if($identity || $coordinates)
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    @if($identity)
                     <div class="bg-gray-50 p-4 rounded-xl">
                         <h3 class="font-semibold text-gray-900 mb-2">Identité</h3>
                         <ul class="space-y-2 text-sm">
-                            <li><span class="text-gray-500">Raison sociale :</span> MARA BUSINESS SARL</li>
-                            <li><span class="text-gray-500">Capital :</span> 5 000 000 FCFA</li>
-                            <li><span class="text-gray-500">RCCM :</span> SN-DKR-2020-B-12345</li>
-                            <li><span class="text-gray-500">NINEA :</span> 123456789</li>
+                            @foreach($identity as $label => $value)
+                                <li><span class="text-gray-500">{{ $label }} :</span> {{ $value }}</li>
+                            @endforeach
                         </ul>
                     </div>
-                    
+                    @endif
+
+                    @if($coordinates)
                     <div class="bg-gray-50 p-4 rounded-xl">
                         <h3 class="font-semibold text-gray-900 mb-2">Coordonnées</h3>
                         <ul class="space-y-2 text-sm">
-                            <li><span class="text-gray-500">Adresse :</span> 123 Rue Principale, Dakar</li>
-                            <li><span class="text-gray-500">Téléphone :</span> +221 78 123 45 67</li>
-                            <li><span class="text-gray-500">Email :</span> contact@marabusiness.com</li>
+                            @foreach($coordinates as $label => $value)
+                                <li><span class="text-gray-500">{{ $label }} :</span> {{ $value }}</li>
+                            @endforeach
                         </ul>
                     </div>
+                    @endif
                 </div>
-                
+                @else
+                <p class="text-sm text-gray-600">Les informations d'immatriculation de l'éditeur seront communiquées prochainement.</p>
+                @endif
+
+                @if($director = $company('publication_director'))
                 <p class="text-sm text-gray-600 mt-2">
                     <i class="fas fa-user-tie text-[#D4AF37] mr-2"></i>
-                    <span class="font-semibold">Directeur de publication :</span> M. Amadou Diallo
+                    <span class="font-semibold">Directeur de publication :</span> {{ $director }}
                 </p>
+                @endif
             </div>
         </div>
 
@@ -94,19 +122,21 @@
                 <h2 class="text-2xl font-bold text-gray-900">Hébergement</h2>
             </div>
             
+            @if($host = \App\Support\Company::get('host_name'))
             <div class="flex items-start gap-4 p-4 bg-gray-50 rounded-xl">
                 <div class="w-12 h-12 bg-[#D4AF37]/10 rounded-lg flex items-center justify-center flex-shrink-0">
                     <i class="fas fa-cloud text-[#D4AF37] text-xl"></i>
                 </div>
                 <div>
-                    <h3 class="font-semibold text-gray-900 mb-1">JINEIYATECH HOSTING</h3>
-                    <p class="text-sm text-gray-600">Rue 123, Dakar, Sénégal - www.jineiyatech.com</p>
+                    <h3 class="font-semibold text-gray-900 mb-1">{{ $host }}</h3>
+                    @if($hostAddress = \App\Support\Company::get('host_address'))
+                        <p class="text-sm text-gray-600">{{ $hostAddress }}</p>
+                    @endif
                 </div>
             </div>
-            
-            <p class="text-sm text-gray-600 mt-4">
-                Le site est hébergé sur des serveurs sécurisés situés en France et au Sénégal.
-            </p>
+            @else
+            <p class="text-sm text-gray-600">Les coordonnées de l'hébergeur seront communiquées prochainement.</p>
+            @endif
         </div>
 
         <!-- Section 3: Propriété intellectuelle -->
@@ -170,7 +200,7 @@
             </div>
             
             <p class="text-sm text-gray-600">
-                Contactez notre DPO : <a href="mailto:dpo@marabusiness.com" class="text-[#D4AF37]">dpo@marabusiness.com</a>
+                Contactez notre DPO : <x-company-contact type="dpo" class="text-[#D4AF37]" />
             </p>
         </div>
 
@@ -240,13 +270,10 @@
             </div>
             
             <div class="space-y-2">
-                <p><i class="fas fa-envelope text-[#D4AF37] w-6 inline"></i> legal@marabusiness.com</p>
-                <p><i class="fas fa-phone-alt text-[#D4AF37] w-6 inline"></i> +221 78 123 45 67</p>
-            </div>
-            
-            <div class="mt-4 p-4 bg-gray-50 rounded-xl">
-                <p class="font-semibold">Me. Fatou Ndiaye</p>
-                <p class="text-sm">fatou.ndiaye@marabusiness.com</p>
+                <p><i class="fas fa-envelope text-[#D4AF37] w-6 inline"></i> <x-company-contact type="email" /></p>
+                @if($phone = \App\Support\Company::get('phone'))
+                <p><i class="fas fa-phone-alt text-[#D4AF37] w-6 inline"></i> {{ $phone }}</p>
+                @endif
             </div>
         </div>
 

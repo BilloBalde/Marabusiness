@@ -3,16 +3,13 @@
 namespace App\Livewire;
 
 use App\Models\Order;
-use App\Models\Paiement;
-use App\Support\PaymentReconciliation;
+use App\Services\StripePaymentRecorder;
+use App\Support\StripeSessions;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Component;
-use Stripe\Stripe;
-use Stripe\Checkout\Session;
-use App\Support\Money;
 
 #[Title('Success Page - MARA BUSINESS')]
 class SuccessPage extends Component
@@ -26,8 +23,6 @@ class SuccessPage extends Component
     {
         $this->session_id = request()->query('session_id');
         $this->order_id = request()->query('order_id');
-        
-        $userId = Auth::id();
 
         // If we have a Stripe session_id, verify the payment
         if ($this->session_id) {
@@ -66,113 +61,26 @@ class SuccessPage extends Component
         $this->loadOrders();
     }
 
-    protected function verifyStripePayment()
+    /**
+     * Asks Stripe about the session in the URL and records it — for the order the
+     * session itself names, and only when the signed-in buyer owns that order.
+     *
+     * The `order_id` in the URL is deliberately not consulted: it is the one part of this
+     * request the buyer controls, and it used to decide which order got the money.
+     * The Stripe webhook records the same payments, so this page may well find it
+     * already done; the banner reads "confirmed" either way.
+     */
+    protected function verifyStripePayment(): void
     {
         try {
-            Stripe::setApiKey(config('services.stripe.secret'));
-            
-            // Retrieve the Stripe session
-            $session = Session::retrieve($this->session_id);
-            
-            if ($session->payment_status === 'paid') {
-                // Find the order by ID from query parameter or metadata
-                $orderId = $this->order_id ?? $session->metadata->order_id ?? null;
-                
-                if ($orderId) {
-                    $order = Order::find($orderId);
-                    
-                    if ($order && !$order->paiements()->where('payment_method', 'stripe')->exists()) {
-                        // Calculate amounts
-                        $totalAmount = $session->amount_total / 100; // Convert from cents
-                        $currency = strtoupper($session->currency);
-                        
-                        // Convert USD to vendor currency if needed
-                        $orderCurrency = $order->vendor?->currency?->code ?? 'USD';
-                        $orderRate = $order->vendor?->currency?->rate_to_usd ?? 1;
-                        
-                        // `?? 1` above catches a missing currency row, not a rate
-                        // of zero, and dividing by zero here is fatal while
-                        // recording money Stripe has already collected.
-                        $localAmount = $orderCurrency === 'USD'
-                            ? $totalAmount
-                            : Money::fromUsd((float) $totalAmount, (float) $orderRate);
-                        
-                        // Create payment record
-                        Paiement::create([
-                            'order_id' => $order->id,
-                            'amount' => $localAmount,
-                            'payment_method' => 'stripe',
-                            'currency' => $orderCurrency,
-                            'payment_status' => 'paid',
-                            'transaction_id' => 'stripe_' . $session->id,
-                            // Verified against Stripe itself, so this is money received,
-                            // not money a buyer says they sent.
-                            'confirmed_at' => now(),
-                        ]);
-                        
-                        // Update order totals. Stripe only ever charges whole USD
-                        // cents, so converting its charge back to the vendor's currency
-                        // almost never reproduces the order's exact local total — a
-                        // residual under one cent's worth counts as settled, not owed.
-                        // Confirmed money only: a buyer's own unconfirmed declaration
-                        // on this same order must not count towards Stripe's balance.
-                        // Order::paidAmount() converts each payment into the order's own
-                        // currency first — a raw sum here would let a cash/OM payment in a
-                        // different currency dwarf or mask what Stripe actually collected.
-                        $totalPaid = $order->paidAmount();
-                        $reconciled = PaymentReconciliation::resolve(
-                            (float) $order->grand_total, (float) $totalPaid, $orderRate
-                        );
-                        
-                        $order->update([
-                            'total_paid' => $reconciled['total_paid'],
-                            'total_remaining' => $reconciled['total_remaining'],
-                            'payment_status' => $reconciled['payment_status'],
-                        ]);
-                        
-                        // Update financial transactions
-                        $this->updateFinancialTransactionStatus($order, 'stripe', $localAmount, 'Stripe payment completed');
-                        
-                        // Mark as completed
-                        $this->stripe_payment_completed = true;
-                        
-                        Log::info('Stripe payment completed and recorded', [
-                            'order_id' => $order->id,
-                            'order_number' => $order->order_number,
-                            'session_id' => $session->id,
-                            'stripe_amount' => $totalAmount,
-                            'local_amount' => $localAmount,
-                        ]);
-                    }
-                }
-            }
-            
-        } catch (\Exception $e) {
+            $session = app(StripeSessions::class)->retrieve($this->session_id);
+
+            $order = app(StripePaymentRecorder::class)->record($session, Auth::id());
+
+            $this->stripe_payment_completed = $order !== null;
+        } catch (\Throwable $e) {
             Log::error('Stripe payment verification failed', [
                 'session_id' => $this->session_id,
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    protected function updateFinancialTransactionStatus($order, $paymentMethod, $amount, $notes = '')
-    {
-        try {
-            // Find and update the pending financial transaction
-            $transaction = \App\Models\FinancialTransaction::where('order_id', $order->id)
-                ->where('status', 'pending')
-                ->first();
-            
-            if ($transaction) {
-                $transaction->update([
-                    'status' => \App\Models\FinancialTransaction::STATUS_PROCESSED,
-                    'processed_at' => now(),
-                    'notes' => $notes . ' - Amount: ' . $amount . ' ' . $paymentMethod,
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::error('Failed to update financial transaction status', [
-                'order_id' => $order->id,
                 'error' => $e->getMessage(),
             ]);
         }

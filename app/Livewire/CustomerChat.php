@@ -174,12 +174,12 @@ class CustomerChat extends Component
         $receiver = User::find($this->chatWithId);
 
         if (!$receiver) {
-            session()->flash('error', 'Receiver not found.');
+            session()->flash('error', 'Destinataire introuvable.');
             return;
         }
 
         if (!$this->canChatWith($receiver)) {
-            session()->flash('error', 'You are not allowed to chat with this user.');
+            session()->flash('error', 'Vous ne pouvez pas discuter avec cet utilisateur.');
             return;
         }
 

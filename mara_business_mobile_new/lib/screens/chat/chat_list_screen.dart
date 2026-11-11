@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/chat.dart';
+import '../../core/providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_logger.dart';
 
@@ -38,6 +39,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     });
 
     try {
+      final myId = context.read<AuthProvider>().user?.id;
       final response = await context.read<ApiService>().getChatContacts();
       if (!mounted) return;
 
@@ -46,6 +48,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
         setState(() {
           _contacts = (raw as List? ?? [])
               .map((c) => ChatContact.fromJson(Map<String, dynamic>.from(c)))
+              // A shop owner who bought from their own shop came back as their
+              // own contact; the server refuses a chat with yourself.
+              .where((c) => c.id != myId)
               .toList();
           _isLoading = false;
         });

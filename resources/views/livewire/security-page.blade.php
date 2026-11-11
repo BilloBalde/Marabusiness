@@ -461,7 +461,7 @@
                     </div>
                     
                     <p class="text-sm text-gray-600">
-                        Pour exercer vos droits : <a href="mailto:dpo@marabusiness.com" class="text-[#D4AF37] hover:underline">dpo@marabusiness.com</a>
+                        Pour exercer vos droits : <x-company-contact type="dpo" class="text-[#D4AF37] hover:underline" />
                     </p>
                 </div>
             </div>
@@ -603,16 +603,16 @@
                     </p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        @if($phone = \App\Support\Company::get('phone'))
                         <div class="border border-gray-200 rounded-xl p-4">
-                            <h3 class="font-semibold text-gray-900 mb-2">Urgence (24/7)</h3>
-                            <p class="text-lg text-[#D4AF37] font-bold">+221 78 123 45 67</p>
-                            <p class="text-xs text-gray-500 mt-1">Ligne d'urgence sécurité</p>
+                            <h3 class="font-semibold text-gray-900 mb-2">Par téléphone</h3>
+                            <p class="text-lg text-[#D4AF37] font-bold">{{ $phone }}</p>
                         </div>
+                        @endif
                         
                         <div class="border border-gray-200 rounded-xl p-4">
                             <h3 class="font-semibold text-gray-900 mb-2">Par email</h3>
-                            <p class="text-[#D4AF37] font-medium">securite@marabusiness.com</p>
-                            <p class="text-xs text-gray-500 mt-1">Réponse sous 2h ouvrées</p>
+                            <p class="text-[#D4AF37] font-medium"><x-company-contact type="email" /></p>
                         </div>
                     </div>
                     
@@ -656,7 +656,7 @@
                             <i class="fas fa-chevron-down text-gray-400 group-hover:text-[#D4AF37]"></i>
                         </button>
                         <div class="px-6 pb-4 text-gray-600" style="display: none;">
-                            Vérifiez la présence du cadenas dans la barre d'adresse et que l'URL commence par https://. Notre domaine officiel est marabusiness.com.
+                            Vérifiez la présence du cadenas dans la barre d'adresse et que l'URL commence par https://. Notre domaine officiel est {{ parse_url(config('app.url'), PHP_URL_HOST) }}.
                         </div>
                     </div>
                     
@@ -667,7 +667,7 @@
                             <i class="fas fa-chevron-down text-gray-400 group-hover:text-[#D4AF37]"></i>
                         </button>
                         <div class="px-6 pb-4 text-gray-600" style="display: none;">
-                            Ne cliquez sur aucun lien et ne téléchargez aucune pièce jointe. Transférez l'email à securite@marabusiness.com puis supprimez-le.
+                            Ne cliquez sur aucun lien et ne téléchargez aucune pièce jointe. Transférez l'email à <x-company-contact type="email" /> puis supprimez-le.
                         </div>
                     </div>
                     

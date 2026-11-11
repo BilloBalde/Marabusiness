@@ -67,7 +67,10 @@ class ProductDetailPage extends Component
         // showing this product's title/photos while quietly adding a mismatched
         // (and possibly mispriced) vendor's listing to the cart. A listing that
         // isn't really this product's now 404s instead.
+        // ->sellable(): an offer switched off, or one whose vendor is inactive,
+        // 404s exactly like a listing that was never this product's.
         $this->vendorProduct = $this->product->vendorProducts()
+            ->sellable()
             ->with([
                 'vendor.currency',
                 'reviews.user',
@@ -130,9 +133,14 @@ class ProductDetailPage extends Component
         // doesn't run its own ->vendorProducts()->with(...)->first() query per
         // card — that was a fresh query for every one of up to 8 cards, on
         // every single product page view.
+        // Only products that have at least one offer a customer can buy, and only
+        // those offers: the card links to the cheapest loaded one, which would 404
+        // if it were switched off or its vendor inactive.
         $this->similarProducts = Product::where('category_id', $this->product->category_id)
             ->where('id', '!=', $this->product->id)
-            ->with(['vendorProducts.vendor.currency', 'vendorProducts.variations'])
+            ->where('is_active', 1)
+            ->whereHas('vendorProducts', fn ($q) => $q->sellable())
+            ->with(['vendorProducts' => fn ($q) => $q->sellable()->with(['vendor.currency', 'variations'])])
             ->limit(8)
             ->get();
     }

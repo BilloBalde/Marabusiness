@@ -246,7 +246,6 @@ class CheckoutController extends Controller
 
             $orders = [];
             $redirectUrl = null;
-            $emailErrors = [];
 
             Log::info('PlaceOrder shipping_carrier:', ['carrier' => $request->shipping_carrier]);
 
@@ -468,34 +467,35 @@ class CheckoutController extends Controller
 
             DB::commit();
 
-            // Send emails AFTER successful commit
-            try {
-                // Send order confirmation emails to customers
-                foreach ($orders as $order) {
-                    Mail::to($user->email)->send(new \App\Mail\OrderPlaced($order));
-                    Log::info('Order confirmation email sent successfully', [
-                        'order_id' => $order->id,
-                        'order_number' => $order->order_number,
-                        'user_email' => $user->email,
+            // Emails go out AFTER the response is sent. Sent inline, a slow or
+            // rate-limited SMTP server (49s for one Mailtrap send) held the request
+            // past the app's 30s timeout: the order was committed, yet the app
+            // showed "Paiement annulé" and invited the customer to place it again.
+            dispatch(function () use ($orders, $user) {
+                try {
+                    foreach ($orders as $order) {
+                        Mail::to($user->email)->send(new \App\Mail\OrderPlaced($order));
+                        Log::info('Order confirmation email sent successfully', [
+                            'order_id' => $order->id,
+                            'order_number' => $order->order_number,
+                            'user_email' => $user->email,
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('Failed to send order confirmation email', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
                     ]);
                 }
-            } catch (\Exception $e) {
-                Log::error('Failed to send order confirmation email', [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
-                $emailErrors[] = "Failed to send confirmation email: " . $e->getMessage();
-            }
 
-            // Send vendor notifications
-            try {
-                $this->sendVendorNotifications($orders);
-            } catch (\Exception $e) {
-                Log::error('Failed to send vendor notifications', [
-                    'error' => $e->getMessage(),
-                ]);
-                $emailErrors[] = "Vendor notifications failed: " . $e->getMessage();
-            }
+                try {
+                    \App\Support\VendorOrderNotifier::send($orders);
+                } catch (\Throwable $e) {
+                    Log::error('Failed to send vendor notifications', [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            })->afterResponse();
 
             return response()->json([
                 'success' => true,
@@ -505,7 +505,7 @@ class CheckoutController extends Controller
                     'order_number' => $o->order_number
                 ]),
                 'redirect_url' => $redirectUrl,
-                'email_errors' => !empty($emailErrors) ? $emailErrors : null,
+                'email_errors' => null, // kept for older app builds; emails now send after the response
             ]);
 
         } catch (\Exception $e) {
@@ -665,26 +665,6 @@ class CheckoutController extends Controller
     /**
      * Send vendor notifications
      */
-    private function sendVendorNotifications($orders)
-    {
-        foreach ($orders as $order) {
-            if ($order->vendor && $order->vendor->email) {
-                try {
-                    Mail::to($order->vendor->email)->send(new \App\Mail\VendorOrderNotification($order));
-                    Log::info('Vendor notification sent', [
-                        'order_id' => $order->id,
-                        'vendor_id' => $order->vendor_id,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::warning('Failed to send vendor notification', [
-                        'order_id' => $order->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-        }
-    }
-
     private function calculateShippingForOrder($request, $selectedItems)
     {
         $groupedItems = [];

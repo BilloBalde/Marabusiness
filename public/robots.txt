@@ -1,2 +1,17 @@
 User-agent: *
-Disallow:
+Disallow: /admin
+Disallow: /vendor/login
+Disallow: /api/
+Disallow: /livewire/
+Disallow: /cart
+Disallow: /checkout
+Disallow: /success
+Disallow: /payment/
+Disallow: /my-orders
+Disallow: /orders
+Disallow: /chats
+Disallow: /wishlist
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password

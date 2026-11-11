@@ -118,7 +118,7 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
       case 'CNY':
         return '¥';
       default:
-        return '\$';
+        return '';
     }
   }
 

@@ -38,6 +38,11 @@ class CartManagement
             'variations',
             'variations.wholesaleTiers',
         ])->whereIn('id', $items->pluck('vendor_product_id')->unique())
+            // A line whose offer was switched off, or whose vendor was deactivated,
+            // after it went into the cart drops out here — and with it out of the
+            // checkout, the negotiation and the mobile API, which all read the cart
+            // through this method.
+            ->sellable()
             ->get()
             ->keyBy('id');
 
@@ -160,7 +165,7 @@ class CartManagement
                 'wholesaleTiers',
                 'variations',
                 'variations.wholesaleTiers',
-            ])->find($vendor_product_id);
+            ])->sellable()->find($vendor_product_id);
 
             if (!$vendorProduct) {
                 \Log::warning('CartManagement: Vendor product not found', ['id' => $vendor_product_id]);
@@ -328,7 +333,7 @@ static public function addItemToCart($vendor_product_id, $quantity = 1, $variati
             ]);
             return [
                 'success' => false,
-                'message' => 'Product not found or error loading product data',
+                'message' => 'Ce produit n\'est plus disponible.',
                 'cart_count' => self::getCartCount(),
                 'items_count' => count(self::getCartItemsFromCookie())
             ];
@@ -805,13 +810,18 @@ static public function removeCartItem($cart_key)
     /**
      * Get total cart count
      */
+    /**
+     * Counts only lines the cart can still show: a raw sum over cart_items included a
+     * line whose offer had been switched off, or whose vendor had gone inactive, since
+     * it was added — the badge in the navbar read higher than the cart page ever showed.
+     */
     static public function getCartCount(): int
     {
         if (!Auth::check()) {
             return 0;
         }
 
-        return (int) CartItem::where('user_id', Auth::id())->sum('quantity');
+        return (int) collect(self::getCartItemsFromCookie())->sum('quantity');
     }
 
     /**

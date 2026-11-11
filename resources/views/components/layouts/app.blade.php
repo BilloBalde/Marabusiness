@@ -1,15 +1,20 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full" class="scroll-smooth" xmlns="http://www.w3.org/1999/xhtml">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full scroll-smooth" xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? 'MARA BUSINESS' }}</title>
-    <meta property="og:title" content="{{ $title ?? 'MARA BUSINESS' }}">
-    <meta property="og:description" content="{{ $description ?? 'MARA BUSINESS - Plateforme de vente de telephones et accessoires.' }}">
+    {{-- Title and description come from the page, then from the site settings the
+         owner fills in the admin panel (they were saved there and never read), then
+         from a fixed default. --}}
+    <title>{{ $title ?? (\App\Helpers\SiteSettings::seo()['title'] ?: 'MARA BUSINESS') }}</title>
+    <meta name="description" content="{{ $description ?? (\App\Helpers\SiteSettings::seo()['description'] ?: 'MARA BUSINESS - Plateforme de vente de telephones et accessoires.') }}">
+    <meta property="og:title" content="{{ $title ?? (\App\Helpers\SiteSettings::seo()['title'] ?: 'MARA BUSINESS') }}">
+    <meta property="og:description" content="{{ $description ?? (\App\Helpers\SiteSettings::seo()['description'] ?: 'MARA BUSINESS - Plateforme de vente de telephones et accessoires.') }}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ url()->current() }}">
-    <meta property="og:image" content="{{ asset('assets/images/og-image.jpg') }}">
+    {{-- The logo: the previous og-image.jpg was never added to the repository. --}}
+    <meta property="og:image" content="{{ \App\Helpers\SiteSettings::logo() }}">
     <link rel="shortcut icon" href="{{ asset('assets/images/favicon.ico') }}" type="image/x-icon">
     <!-- In your <head> section -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">

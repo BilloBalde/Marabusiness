@@ -544,16 +544,15 @@
                         <div class="border border-gray-200 rounded-xl p-4">
                             <h3 class="font-semibold text-gray-900 mb-2">Par email</h3>
                             <p class="text-sm text-gray-600 mb-2">Envoyez votre signalement à :</p>
-                            <p class="text-[#D4AF37] font-medium">securite@marabusiness.com</p>
-                            <p class="text-xs text-gray-500 mt-2">Réponse sous 24h</p>
+                            <p class="text-[#D4AF37] font-medium"><x-company-contact type="email" /></p>
                         </div>
                         
+                        @if($phone = \App\Support\Company::get('phone'))
                         <div class="border border-gray-200 rounded-xl p-4">
                             <h3 class="font-semibold text-gray-900 mb-2">Par téléphone</h3>
-                            <p class="text-sm text-gray-600 mb-2">Service sécurité produit :</p>
-                            <p class="text-[#D4AF37] font-medium">+221 78 123 45 67</p>
-                            <p class="text-xs text-gray-500 mt-2">Lun-Ven: 8h-18h</p>
+                            <p class="text-[#D4AF37] font-medium">{{ $phone }}</p>
                         </div>
+                        @endif
                     </div>
                     
                     <div class="bg-gray-50 p-4 rounded-xl">

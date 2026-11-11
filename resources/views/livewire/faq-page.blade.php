@@ -281,10 +281,12 @@
                 <i class="fas fa-envelope"></i>
                 Contactez-nous
             </a>
-            <a href="#" class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-transparent hover:bg-white/10 text-white border-2 border-white/30 font-bold rounded-xl transition-all duration-300">
+            @if($phone = \App\Support\Company::get('phone'))
+            <a href="tel:{{ \App\Support\Company::digits($phone) }}" class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-transparent hover:bg-white/10 text-white border-2 border-white/30 font-bold rounded-xl transition-all duration-300">
                 <i class="fas fa-phone-alt"></i>
-                +221 78 123 45 67
+                {{ $phone }}
             </a>
+            @endif
         </div>
     </div>
 </div>

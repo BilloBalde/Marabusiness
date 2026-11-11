@@ -106,7 +106,7 @@
                 <li>Une fois approuvé, vous pourrez commencer à ajouter vos produits et gérer votre boutique</li>
             </ul>
 
-            <p>Vous pourrez apres vous connecter a votre compte en suivant ce lien: <a href="https://afrobridgeinnov.com/vendor">AFROBRIDGE VENDOR</a></p>
+            <p>Vous pourrez apres vous connecter a votre compte en suivant ce lien: <a href="{{ url('/vendor') }}">Espace vendeur {{ config('app.name') }}</a></p>
             
             <p>En attendant, vous pouvez déjà préparer vos produits et réfléchir à votre stratégie de vente.</p>
             

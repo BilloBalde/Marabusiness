@@ -306,8 +306,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     if (value == null || value.isEmpty) {
                                       return 'Requis';
                                     }
-                                    if (value.length < 6) {
-                                      return 'Minimum 6 caractères';
+                                    if (value.length < 8) {
+                                      return 'Minimum 8 caractères';
                                     }
                                   }
                                   return null;

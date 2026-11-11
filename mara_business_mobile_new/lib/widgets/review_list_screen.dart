@@ -6,9 +6,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/product_detail_models.dart'; // IMPORT THE REVIEW MODEL
+import '../../services/api_service.dart';
 import '../../widgets/rating_bar.dart';
 
 class ReviewListScreen extends StatefulWidget {
+  // Despite the name, the reviews API is keyed by vendor_product_id, not the
+  // base product id — pass ProductDetail.vendorProductId here.
   final int productId;
   final String productName;
   final List<Review> initialReviews; // Change from List<dynamic> to List<Review>
@@ -28,8 +31,7 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
   List<Review> _reviews = []; // Change from List<dynamic> to List<Review>
   bool _isLoading = false;
   bool _hasMore = true;
-  final int _page = 1;
-  final int _perPage = 10;
+  int _page = 0; // incremented before each fetch, so the first load-more is page 1
 
   // Filters
   String _selectedFilter = 'recent'; // recent, highest, lowest, with_photos
@@ -81,40 +83,51 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
 
     setState(() => _isLoading = true);
 
-    // TODO: Implement actual API call to load more reviews
-    // Simulating API delay
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final apiService = context.read<ApiService>();
+      final response = await apiService.getProductReviews(widget.productId, page: _page + 1);
 
-    // Mock data - replace with actual API call
-    final mockReviews = List.generate(5, (index) {
-      final i = _reviews.length + index + 1;
-      return Review(
-        id: i,
-        userId: i,
-        userName: 'User $i',
-        userAvatar: null,
-        rating: (i % 5) + 1,
-        comment: 'This is a sample review number $i. The product quality is excellent and shipping was fast.',
-        createdAt: DateTime.now().subtract(Duration(days: i)).toIso8601String(),
-        createdAtHuman: '$i days ago',
-        verifiedPurchase: i % 2 == 0,
+      if (!mounted) return;
+
+      if (response.success) {
+        final paginator = response.data['data'] as Map<String, dynamic>;
+        final items = (paginator['data'] as List)
+            .map((json) => Review.fromJson(json as Map<String, dynamic>))
+            .toList();
+
+        // The first page can overlap with the reviews the product-detail
+        // payload already showed, so dedupe by id instead of assuming a clean split.
+        final seenIds = _reviews.map((r) => r.id).toSet();
+        final newItems = items.where((r) => !seenIds.contains(r.id)).toList();
+
+        setState(() {
+          _page = paginator['current_page'] as int;
+          _reviews.addAll(newItems);
+          _isLoading = false;
+          _hasMore = (paginator['current_page'] as int) < (paginator['last_page'] as int);
+          _calculateStats();
+        });
+      } else {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response.message ?? 'Impossible de charger les avis')),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible de charger les avis')),
       );
-    });
-
-    setState(() {
-      _reviews.addAll(mockReviews);
-      _isLoading = false;
-      _hasMore = _reviews.length < 30; // Just for demo
-      _calculateStats();
-    });
+    }
   }
 
   void _applyFilter(String filter) {
     setState(() {
       _selectedFilter = filter;
       _showFilterMenu = false;
-      // TODO: Implement actual filter logic with API call
-      // For now, just resort the existing reviews
       switch (filter) {
         case 'recent':
           _reviews.sort((a, b) => b.createdAt!.compareTo(a.createdAt!));
@@ -125,9 +138,6 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
         case 'lowest':
           _reviews.sort((a, b) => a.rating.compareTo(b.rating));
           break;
-        case 'with_photos':
-          // For now, just show all since we don't have photos in the model
-          break;
       }
     });
   }
@@ -137,7 +147,6 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
       case 'recent': return 'Plus récents';
       case 'highest': return 'Mieux notés';
       case 'lowest': return 'Moins bien notés';
-      case 'with_photos': return 'Avec photos';
       default: return 'Filtrer';
     }
   }
@@ -236,7 +245,6 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
                   _buildFilterOption('recent', 'Plus récents', Icons.access_time),
                   _buildFilterOption('highest', 'Mieux notés', Icons.star),
                   _buildFilterOption('lowest', 'Moins bien notés', Icons.star_border),
-                  _buildFilterOption('with_photos', 'Avec photos', Icons.photo_camera),
                 ],
               ),
             ),

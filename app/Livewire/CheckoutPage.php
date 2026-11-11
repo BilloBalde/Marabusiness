@@ -416,11 +416,11 @@ class CheckoutPage extends Component
                 ];
             }
             
-            session()->flash('shipping-success', 'Shipping costs calculated successfully!');
+            session()->flash('shipping-success', 'Frais de livraison calculés avec succès !');
             
         } catch (\Exception $e) {
             Log::error('Shipping calculation error: ' . $e->getMessage());
-            session()->flash('shipping-error', 'Error calculating shipping: ' . $e->getMessage());
+            session()->flash('shipping-error', 'Erreur lors du calcul de la livraison : ' . $e->getMessage());
             
             // Fallback to basic shipping
             $this->availableCarriers = [
@@ -518,7 +518,7 @@ class CheckoutPage extends Component
             $groups = $this->getGroupedCartItems();
             
             if ($groups->isEmpty()) {
-                session()->flash('error', 'Your cart is empty.');
+                session()->flash('error', 'Votre panier est vide.');
                 return redirect()->route('cart');
             }
             
@@ -785,13 +785,13 @@ class CheckoutPage extends Component
                     
                     // Validate Stripe amount limits
                     if ($stripeAmount <= 0) {
-                        $this->addError('amount', 'Invalid payment amount.');
+                        $this->addError('amount', 'Montant de paiement invalide.');
                         $this->placingOrder = false;
                         return;
                     }
                     
                     if ($stripeAmount > 99999999) {
-                        $this->addError('amount', 'Payment amount exceeds Stripe limit. Please contact support.');
+                        $this->addError('amount', 'Le montant dépasse la limite Stripe. Veuillez contacter le support.');
                         $this->placingOrder = false;
                         return;
                     }
@@ -839,7 +839,7 @@ class CheckoutPage extends Component
                             'order_id' => $order->id,
                         ]);
                         
-                        $this->addError('payment_method', 'Payment gateway error: ' . $e->getMessage());
+                        $this->addError('payment_method', 'Erreur de la passerelle de paiement : ' . $e->getMessage());
                         $this->placingOrder = false;
                         return;
                     }
@@ -851,7 +851,7 @@ class CheckoutPage extends Component
                     
                     if (number_format($this->amount, 2) != number_format($vendorTotal, 2)) {
                         $this->addError('amount', 
-                            "Orange Money payment must be exactly " . 
+                            "Le paiement Orange Money doit être exactement de " . 
                             number_format($vendorTotal, 2) . 
                             " GNF"
                         );
@@ -888,41 +888,39 @@ class CheckoutPage extends Component
                 // lock, before this loop started — see the transaction above.
             }
             
-            /** SEND ORDER CONFIRMATION EMAILS */
-            /* foreach ($orders as $order) {
-                Mail::to($user->email)->send(new \App\Mail\OrderPlaced($order));
-            } */
-            $emailErrors = [];
-            foreach ($orders as $order) {
-                try {
-                    Mail::to($user->email)->send(new \App\Mail\OrderPlaced($order));
-                    Log::info('Order confirmation email sent successfully', [
-                        'order_id' => $order->id,
-                        'order_number' => $order->order_number,
-                        'user_email' => $user->email,
-                    ]);
-                } catch (\Exception $e) {
-                    // Log the error but don't stop the order process
-                    Log::error('Failed to send order confirmation email', [
-                        'order_id' => $order->id,
-                        'order_number' => $order->order_number,
-                        'user_email' => $user->email,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                    
-                    $emailErrors[] = "Failed to send confirmation email for Order #{$order->order_number}: " . $e->getMessage();
+            /** SEND ORDER CONFIRMATION EMAILS — after the response */
+            // Sent inline, a slow or rate-limited SMTP server held the customer
+            // on "placing order" for as long as each send took (49s for one
+            // Mailtrap send), after the order was already committed above.
+            dispatch(function () use ($orders, $user) {
+                foreach ($orders as $order) {
+                    try {
+                        Mail::to($user->email)->send(new \App\Mail\OrderPlaced($order));
+                        Log::info('Order confirmation email sent successfully', [
+                            'order_id' => $order->id,
+                            'order_number' => $order->order_number,
+                            'user_email' => $user->email,
+                        ]);
+                    } catch (\Throwable $e) {
+                        Log::error('Failed to send order confirmation email', [
+                            'order_id' => $order->id,
+                            'order_number' => $order->order_number,
+                            'user_email' => $user->email,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
+                    }
                 }
-            }
 
-            try {
-                $this->sendVendorNotifications($orders);
-            } catch (\Exception $e) {
-                Log::error('Failed to send vendor notifications', [
-                    'error' => $e->getMessage(),
-                ]);
-                $emailErrors[] = "Vendor notifications failed: " . $e->getMessage();
-            }
+                try {
+                    \App\Support\VendorOrderNotifier::send($orders);
+                } catch (\Throwable $e) {
+                    Log::error('Failed to send vendor notifications', [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            })->afterResponse();
+
             /** CLEAR SELECTED ITEMS FROM CART */
             if (!empty($this->selected_ids)) {
                 foreach ($this->selected_ids as $vendorProductId) {
@@ -936,11 +934,6 @@ class CheckoutPage extends Component
                 }
             }
 
-            // Store email errors in session to show to user if any
-            if (!empty($emailErrors)) {
-                session()->flash('email-errors', $emailErrors);
-            }
-            
             $this->placingOrder = false;
             
             return redirect($redirect_url ?? route('success'));
@@ -948,7 +941,7 @@ class CheckoutPage extends Component
         } catch (\Exception $e) {
             $this->placingOrder = false;
             Log::error('Checkout Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-            session()->flash('error', 'Checkout failed: ' . $e->getMessage());
+            session()->flash('error', 'Échec de la commande : ' . $e->getMessage());
             return redirect()->back();
         }
     }
@@ -1108,30 +1101,6 @@ class CheckoutPage extends Component
         }
     }
     
-    /** -------------------------------------------------------------
-     *   Send notifications to vendors (optional)
-     * ------------------------------------------------------------- */
-    private function sendVendorNotifications($orders)
-    {
-        foreach ($orders as $order) {
-            if ($order->vendor && $order->vendor->email) {
-                try {
-                    Mail::to($order->vendor->email)->send(new \App\Mail\VendorOrderNotification($order));
-                    Log::info('Vendor notification sent', [
-                        'order_id' => $order->id,
-                        'vendor_id' => $order->vendor_id,
-                        'vendor_email' => $order->vendor->email,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::warning('Failed to send vendor notification', [
-                        'order_id' => $order->id,
-                        'vendor_id' => $order->vendor_id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-        }
-    }
     /** -------------------------------------------------------------
      *   Get geolocation
      * ------------------------------------------------------------- */
